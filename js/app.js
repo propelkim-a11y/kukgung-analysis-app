@@ -1,6 +1,6 @@
 /**
  * app.js
- * 수동 정밀 분석 툴 통합 버전
+ * 수동 분석 강화 버전: 자동 수평/수직선 생성 및 각도 연동
  */
 
 import { DynamicLeveler } from './sensor.js';
@@ -101,10 +101,13 @@ function initApp() {
                 if (loadingSpinner) loadingSpinner.classList.add('hidden');
                 renderCanvas(data ? data.results : {}, dummyVideo);
                 if (data) {
-                    document.getElementById('res-arrow-angle').innerText = `${data.arrow.toFixed(1)}°`;
                     document.getElementById('res-bow-arm').innerText = `${data.bowArm.toFixed(1)}°`;
                     document.getElementById('res-draw-arm').innerText = `${data.drawArm.toFixed(1)}°`;
                 }
+                
+                // [자동 보조선 생성] 촬영 시 스마트폰 기울기(currentPhoneRoll) 반영
+                createAutoGuideLines(currentPhoneRoll);
+                
                 document.getElementById('btn-mode-analyze').click();
             });
         };
@@ -113,7 +116,36 @@ function initApp() {
     initManualAnalysis();
 }
 
-// 4. 수동 분석 드로잉 로직
+// 4. 자동 보조선 생성 (수평/수직)
+function createAutoGuideLines(phoneRoll) {
+    const w = drawCanvas.width;
+    const h = drawCanvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    
+    // 수평선 (기울기 보정 포함)
+    const angleRad = (phoneRoll) * Math.PI / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    
+    // 수평선
+    lines.push({
+        x1: cx - 200 * cos, y1: cy - 200 * sin,
+        x2: cx + 200 * cos, y2: cy + 200 * sin,
+        selected: false, type: 'auto-h'
+    });
+    
+    // 수직선
+    lines.push({
+        x1: cx + 150 * sin, y1: cy - 150 * cos,
+        x2: cx - 150 * sin, y2: cy + 150 * cos,
+        selected: false, type: 'auto-v'
+    });
+    
+    redrawLines();
+}
+
+// 5. 수동 분석 드로잉 로직
 function initManualAnalysis() {
     const clearBtn = document.getElementById('btn-clear-draw');
     
@@ -126,6 +158,7 @@ function initManualAnalysis() {
         selectedLines = [];
         redrawLines();
         document.getElementById('angle-display').innerText = "두 선을 선택하세요";
+        document.getElementById('res-manual-angle').innerText = "0°";
     });
 }
 
@@ -143,7 +176,6 @@ function handleStart(e) {
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
 
-    // 선 선택 로직 (이미 그려진 선 근처 클릭 시)
     const clickedLineIndex = findNearbyLine(x, y);
     if (clickedLineIndex !== -1) {
         toggleLineSelection(clickedLineIndex);
@@ -161,7 +193,6 @@ function handleMove(e) {
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
-
     redrawLines();
     drawTempLine(startPoint.x, startPoint.y, x, y);
 }
@@ -173,7 +204,7 @@ function handleEnd(e) {
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
 
-    lines.push({x1: startPoint.x, y1: startPoint.y, x2: x, y2: y, selected: false});
+    lines.push({x1: startPoint.x, y1: startPoint.y, x2: x, y2: y, selected: false, type: 'manual'});
     isDrawing = false;
     redrawLines();
 }
@@ -191,17 +222,25 @@ function drawTempLine(x1, y1, x2, y2) {
 
 function redrawLines() {
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    lines.forEach((line, index) => {
+    lines.forEach((line) => {
         drawCtx.beginPath();
         drawCtx.moveTo(line.x1, line.y1);
         drawCtx.lineTo(line.x2, line.y2);
-        drawCtx.strokeStyle = line.selected ? "#00e676" : "rgba(255, 255, 255, 0.5)";
+        
+        if (line.type.startsWith('auto')) {
+            drawCtx.strokeStyle = line.selected ? "#00e676" : "rgba(255, 235, 59, 0.5)";
+            drawCtx.setLineDash([10, 5]);
+        } else {
+            drawCtx.strokeStyle = line.selected ? "#00e676" : "rgba(255, 255, 255, 0.5)";
+            drawCtx.setLineDash([]);
+        }
+        
         drawCtx.lineWidth = line.selected ? 4 : 2;
         drawCtx.stroke();
+        drawCtx.setLineDash([]);
         
-        // 각도 텍스트 표시 (개별 선의 기울기)
         const angle = Math.atan2(line.y1 - line.y2, line.x2 - line.x1) * 180 / Math.PI;
-        drawCtx.fillStyle = "white";
+        drawCtx.fillStyle = line.type.startsWith('auto') ? "#ffeb3b" : "white";
         drawCtx.font = "12px Arial";
         drawCtx.fillText(`${angle.toFixed(1)}°`, (line.x1 + line.x2)/2, (line.y1 + line.y2)/2);
     });
@@ -210,7 +249,7 @@ function redrawLines() {
 function findNearbyLine(x, y) {
     return lines.findIndex(line => {
         const d = distToSegment({x, y}, {x: line.x1, y: line.y1}, {x: line.x2, y: line.y2});
-        return d < 20;
+        return d < 30;
     });
 }
 
@@ -226,9 +265,12 @@ function toggleLineSelection(index) {
 
     if (selectedLines.length === 2) {
         const angle = calculateAngleBetweenLines(selectedLines[0], selectedLines[1]);
-        document.getElementById('angle-display').innerText = `사잇각: ${angle.toFixed(1)}°`;
+        const angleText = `사잇각: ${angle.toFixed(1)}°`;
+        document.getElementById('angle-display').innerText = angleText;
+        document.getElementById('res-manual-angle').innerText = `${angle.toFixed(1)}°`;
     } else {
         document.getElementById('angle-display').innerText = "두 선을 선택하세요";
+        document.getElementById('res-manual-angle').innerText = "0°";
     }
     redrawLines();
 }
@@ -249,7 +291,7 @@ function distToSegment(p, v, w) {
     return Math.sqrt(Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + Math.pow(p.y - (v.y + t * (w.y - v.y)), 2));
 }
 
-// 5. 녹화 로직
+// 6. 녹화 로직
 function startRecording() {
     if (!streamRef || isRecording) return;
     recordedChunks = [];

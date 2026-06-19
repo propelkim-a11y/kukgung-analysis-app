@@ -46,34 +46,28 @@
 
             <!-- 분석 모드 (결과 리포트 화면) -->
             <div id="analysis-section" class="view-section hidden">
-                <h3>🏹 만작(Full Draw) 상태 분석 결과</h3>
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
                     <canvas id="drawing-canvas" style="position: absolute; top: 0; left: 0;"></canvas>
-                    <div id="loading-spinner" class="hidden">
-                        <div class="spinner"></div>
-                        <p>AI 자세 분석 중...</p>
-                    </div>
                 </div>
                 <div class="tool-bar">
-                    <button id="btn-draw-line" class="tool-btn">📏 선 그리기</button>
                     <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
                     <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
                 </div>
                 <div class="report-box">
-                    <div class="report-item">
-                        <span>🎯 화살 예상 고각</span>
-                        <span id="res-arrow-angle" class="highlight">0°</span>
+                    <div class="report-item main-result">
+                        <span>📏 선택한 두 선의 각도</span>
+                        <span id="res-manual-angle" class="highlight">0°</span>
                     </div>
                     <div class="report-item">
-                        <span>💪 줌팔 각도</span>
+                        <span>💪 줌팔 각도 (AI)</span>
                         <span id="res-bow-arm" class="highlight">0°</span>
                     </div>
                     <div class="report-item">
-                        <span>🖐️ 깍지팔 각도</span>
+                        <span>🖐️ 깍지팔 각도 (AI)</span>
                         <span id="res-draw-arm" class="highlight">0°</span>
                     </div>
-                    <div id="feedback-text" class="feedback">분석 데이터를 로딩 중입니다...</div>
+                    <div id="feedback-text" class="feedback">화면을 드래그하여 보조선을 그려보세요.</div>
                 </div>
             </div>
         </main>

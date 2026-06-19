@@ -123,6 +123,8 @@ body {
 /* 분석 리포트 */
 .report-box { padding: 12px; background: #2a2a2a; border-radius: 10px; margin-top: 10px; width: 100%; }
 .report-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+.report-item.main-result { border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 10px; }
+.report-item.main-result .highlight { font-size: 1.4rem; color: #00e676; }
 .highlight { font-weight: bold; color: #00e676; font-size: 1.1rem; }
 .feedback { margin-top: 8px; font-size: 0.85rem; color: #ffb300; border-top: 1px solid #444; padding-top: 5px; }
 
