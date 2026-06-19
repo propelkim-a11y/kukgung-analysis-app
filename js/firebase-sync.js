@@ -24,7 +24,11 @@ export class ArcherySync {
         }
 
         // @ts-ignore
-        this.supabase = supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
+        if (typeof window.supabase !== 'undefined') {
+            this.supabase = window.supabase.createClient(this.SUPABASE_URL, this.SUPABASE_KEY);
+        } else {
+            console.warn("Supabase 라이브러리가 로드되지 않았습니다. 동기화 기능이 제한됩니다.");
+        }
         
         this.channel = this.supabase.channel(`archery_${roomId}`, {
             config: { broadcast: { self: true } }

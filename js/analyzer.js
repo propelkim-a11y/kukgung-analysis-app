@@ -6,9 +6,13 @@
 export class ArcheryAnalyzer {
     constructor() {
         // @ts-ignore
-        this.pose = new Pose({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-        });
+        if (typeof window.Pose !== 'undefined') {
+            this.pose = new window.Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+        } else {
+            console.error("MediaPipe Pose 라이브러리가 로드되지 않았습니다.");
+        }
         
         this.pose.setOptions({
             modelComplexity: 1,
