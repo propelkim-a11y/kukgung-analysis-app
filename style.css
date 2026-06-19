@@ -8,10 +8,16 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #121212; color: #ffffff;
-    height: 100vh; overflow: hidden;
+    height: 100vh; height: 100dvh; /* 모바일 동적 높이 대응 */
+    overflow: hidden;
+    position: fixed; width: 100%; /* 바운스 방지 */
 }
 
-.container { display: flex; flex-direction: column; height: 100vh; justify-content: space-between; }
+.container { 
+    display: flex; flex-direction: column; 
+    height: 100%; width: 100%;
+    justify-content: space-between; 
+}
 
 /* 헤더 */
 .header { text-align: center; padding: 15px; background: rgba(0,0,0,0.8); z-index: 10; }
@@ -20,14 +26,14 @@ body {
 .badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #444; margin-top: 5px; }
 
 /* 메인 콘텐츠 */
-.main-content { flex: 1; position: relative; background-color: #000; }
+.main-content { flex: 1; position: relative; background-color: #000; overflow: hidden; }
 .view-section { width: 100%; height: 100%; position: absolute; top:0; left:0; display: flex; flex-direction: column; }
 .hidden { display: none !important; }
 
 #video-preview, #output-canvas { width: 100%; height: 100%; object-fit: cover; }
 
 /* 수평계 UI */
-.level-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.level-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
 .center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; z-index: 5; }
 .level-line { 
     width: 220px; height: 2px; 
@@ -35,10 +41,16 @@ body {
     position: absolute; left: -110px; 
     transition: transform 0.05s linear, background-color 0.3s; 
 }
-.level-line.ready { background-color: #00e676; box-shadow: 0 0 10px #00e676; }
 
 /* 하단 제어부 */
-.footer { background: #1e1e1e; padding: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.footer { 
+    background: #1e1e1e; 
+    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); /* 아이폰 하단 바 대응 */
+    display: flex; flex-direction: column; gap: 10px; 
+    align-items: center; 
+    z-index: 50;
+    border-top: 1px solid #333;
+}
 .mode-selector button { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 20px; margin: 0 5px; cursor: pointer; }
 .mode-selector button.active { background: #007aff; }
 
