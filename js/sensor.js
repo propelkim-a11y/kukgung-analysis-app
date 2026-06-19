@@ -50,17 +50,15 @@ export class DynamicLeveler {
         }
 
         this.levelLine.style.transform = `rotate(${-displayAngle}deg)`;
-        this.angleText.innerText = `좌우 기울기: ${displayAngle.toFixed(1)}°`;
+        this.angleText.innerText = `${displayAngle.toFixed(1)}°`;
 
         const IS_LEVEL = Math.abs(displayAngle) <= 1.0; 
         
         if (IS_LEVEL) {
-            this.statusText.innerText = "수평 일치! 촬영 준비 완료";
-            this.statusText.style.color = "#00e676";
+            this.statusText.innerText = "";
             this.levelLine.style.backgroundColor = "#00e676";
         } else {
-            this.statusText.innerText = "삼각대 수평을 맞춰주세요";
-            this.statusText.style.color = "#ff4d4d";
+            this.statusText.innerText = "";
             this.levelLine.style.backgroundColor = "#ff4d4d";
         }
 

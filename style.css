@@ -65,18 +65,33 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 5. 하단 제어부(메뉴) */
+/* 5. 하단 제어부(메뉴) - 반투명 처리 */
 .footer { 
-    background: #1e1e1e; 
+    background: rgba(30, 30, 30, 0.6); /* 반투명 배경 */
+    backdrop-filter: blur(10px); /* 블러 효과로 가독성 확보 */
+    -webkit-backdrop-filter: blur(10px);
     padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
     display: flex; flex-direction: column; gap: 10px; 
     align-items: center; 
-    z-index: 50; /* 가장 상위 */
-    border-top: 1px solid #333;
+    z-index: 50; 
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    position: absolute;
+    bottom: 0;
+    width: 100%;
 }
 
-/* 헤더 */
-.header { text-align: center; padding: 15px; background: rgba(0,0,0,0.8); z-index: 10; }
+/* 헤더 - 반투명 처리 */
+.header { 
+    text-align: center; 
+    padding: 15px; 
+    background: rgba(0, 0, 0, 0.4); /* 더 투명하게 */
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 10; 
+    position: absolute;
+    top: 0;
+    width: 100%;
+}
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; transition: color 0.3s; }
 #angle-text { font-size: 0.9rem; opacity: 0.7; margin-top: 3px; }
 .badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #444; margin-top: 5px; }
