@@ -37,44 +37,31 @@ export class DynamicLeveler {
         let pitch = event.beta || 0;
         let displayAngle = roll;
 
-        // 최신 안드로이드 규격: screen.orientation.angle 사용
-        const orientationAngle = (window.screen && window.screen.orientation && window.screen.orientation.angle) !== undefined 
-            ? window.screen.orientation.angle 
-            : (window.orientation || 0);
+        // 최신 안드로이드 표준 screen.orientation.angle 반영
+        const screenAngle = (screen.orientation && screen.orientation.angle) !== undefined 
+                            ? screen.orientation.angle 
+                            : (window.orientation || 0);
 
-        // 가로 모드(90도 또는 270도 회전) 시 축 보정
-        if (orientationAngle === 90) {
+        // 안드로이드를 가로로 돌렸을 때 (90도 혹은 270도 회전 상태)
+        if (screenAngle === 90) {
             displayAngle = -pitch;
-        } else if (orientationAngle === -90 || orientationAngle === 270) {
+        } else if (screenAngle === 270 || screenAngle === -90) {
             displayAngle = pitch;
         }
 
-        // UI 업데이트
-        if (this.levelLine) {
-            this.levelLine.style.transform = `rotate(${-displayAngle}deg)`;
-        }
-        if (this.angleText) {
-            this.angleText.innerText = `좌우 기울기: ${displayAngle.toFixed(1)}°`;
-        }
+        this.levelLine.style.transform = `rotate(${-displayAngle}deg)`;
+        this.angleText.innerText = `좌우 기울기: ${displayAngle.toFixed(1)}°`;
 
-        const IS_LEVEL = Math.abs(displayAngle) <= 1.0;
+        const IS_LEVEL = Math.abs(displayAngle) <= 1.0; 
         
-        if (this.statusText) {
-            if (IS_LEVEL) {
-                this.statusText.innerText = "수평 일치! 촬영 준비 완료";
-                this.statusText.style.color = "#00e676";
-                if (this.levelLine) {
-                    this.levelLine.style.backgroundColor = "#00e676";
-                    this.levelLine.classList.add('ready');
-                }
-            } else {
-                this.statusText.innerText = "삼각대 수평을 맞춰주세요";
-                this.statusText.style.color = "#ff4d4d";
-                if (this.levelLine) {
-                    this.levelLine.style.backgroundColor = "#ff4d4d";
-                    this.levelLine.classList.remove('ready');
-                }
-            }
+        if (IS_LEVEL) {
+            this.statusText.innerText = "수평 일치! 촬영 준비 완료";
+            this.statusText.style.color = "#00e676";
+            this.levelLine.style.backgroundColor = "#00e676";
+        } else {
+            this.statusText.innerText = "삼각대 수평을 맞춰주세요";
+            this.statusText.style.color = "#ff4d4d";
+            this.levelLine.style.backgroundColor = "#ff4d4d";
         }
 
         this.onLevelChange(IS_LEVEL, displayAngle);
