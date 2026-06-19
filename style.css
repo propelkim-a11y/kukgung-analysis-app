@@ -1,6 +1,6 @@
 /* 
  * style.css
- * 사용자 최적화 레이아웃 구조 반영
+ * 완전 투명 UI 및 확대/축소 정밀 분석 최적화
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,16 +12,15 @@ body {
     overflow: hidden;
 }
 
-/* 1. 전체 컨테이너 구조 조정 */
 .container { 
     display: flex; 
     flex-direction: column; 
-    height: 100dvh; /* 모바일 브라우저 주소창 대응 */
+    height: 100dvh;
     justify-content: space-between; 
     background-color: #000;
+    position: relative;
 }
 
-/* 2. 메인 콘텐츠 영역 */
 .main-content { 
     flex: 1; 
     position: relative; 
@@ -29,7 +28,6 @@ body {
     overflow: hidden;
 }
 
-/* 3. 카메라 영역 */
 .view-section { 
     width: 100%; 
     height: 100%; 
@@ -37,17 +35,42 @@ body {
     top: 0; 
     left: 0; 
     z-index: 1; 
-    display: flex;
-    flex-direction: column;
 }
 
 #video-preview, #output-canvas { 
     width: 100%; 
     height: 100%; 
-    object-fit: cover; 
+    object-fit: contain; /* 영상 전체가 다 보이도록 */
+    background: #000;
 }
 
-/* 4. 수평계 */
+/* 상하단 탭 완전 투명화 */
+.header { 
+    text-align: center; 
+    padding: 20px; 
+    background: transparent; 
+    z-index: 100; 
+    position: absolute;
+    top: 0;
+    width: 100%;
+    pointer-events: none; /* 영상 터치 방해 금지 */
+}
+
+.footer { 
+    background: transparent; 
+    padding: 15px 15px calc(20px + env(safe-area-inset-bottom)); 
+    display: flex; flex-direction: column; gap: 15px; 
+    align-items: center; 
+    z-index: 100; 
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
+#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
+
+/* 수평계 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -56,7 +79,6 @@ body {
     pointer-events: none; 
     z-index: 2; 
 }
-
 .center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
 .level-line { 
     width: 220px; height: 2px; 
@@ -65,107 +87,81 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 5. 하단 제어부(메뉴) - 반투명 처리 */
-.footer { 
-    background: rgba(30, 30, 30, 0.6); /* 반투명 배경 */
-    backdrop-filter: blur(10px); /* 블러 효과로 가독성 확보 */
-    -webkit-backdrop-filter: blur(10px);
-    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
-    display: flex; flex-direction: column; gap: 10px; 
-    align-items: center; 
-    z-index: 50; 
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-}
-
-/* 헤더 - 반투명 처리 */
-.header { 
-    text-align: center; 
-    padding: 15px; 
-    background: rgba(0, 0, 0, 0.4); /* 더 투명하게 */
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    z-index: 10; 
-    position: absolute;
-    top: 0;
-    width: 100%;
-}
-#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; transition: color 0.3s; }
-#angle-text { font-size: 0.9rem; opacity: 0.7; margin-top: 3px; }
-.badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #444; margin-top: 5px; }
-
-/* 분석 섹션 특화 스타일 */
+/* 분석 섹션 */
 #analysis-section { 
-    background: #121212; 
-    padding: 10px;
     z-index: 5;
-    display: flex;
-    flex-direction: column;
+    background: #000;
 }
-#analysis-section h3 { font-size: 1rem; text-align: center; margin-bottom: 10px; color: #007aff; }
-.canvas-container { flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 300px; }
 
-.tool-bar { display: flex; gap: 10px; padding: 10px 0; align-items: center; justify-content: center; }
-.tool-btn { padding: 8px 12px; background: #444; border: none; color: #fff; border-radius: 5px; font-size: 0.85rem; }
-.tool-btn.active { background: #007aff; }
-.angle-badge { background: #00e676; color: #000; padding: 5px 10px; border-radius: 15px; font-weight: bold; font-size: 0.85rem; }
+.canvas-container { 
+    width: 100%; 
+    height: 100%; 
+    position: relative; 
+    overflow: hidden; 
+    touch-action: none;
+}
 
-/* 공통 요소 */
-.hidden { display: none !important; }
-.mode-selector button { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 20px; margin: 0 5px; cursor: pointer; }
+#manual-analysis-box canvas {
+    transform-origin: center;
+    transition: transform 0.1s ease-out;
+}
+
+/* 도구 및 컨트롤러 */
+.tool-bar { 
+    position: absolute; top: 70px; right: 15px; 
+    display: flex; flex-direction: column; gap: 10px; z-index: 110; 
+}
+.tool-btn { 
+    padding: 10px 15px; background: rgba(0,0,0,0.6); 
+    border: 1px solid rgba(255,255,255,0.2); color: #fff; 
+    border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px);
+}
+
+.video-controls {
+    display: flex; justify-content: center; gap: 15px; 
+    margin-bottom: 10px; z-index: 110;
+}
+.control-btn {
+    padding: 10px 15px; background: rgba(255, 255, 255, 0.15); 
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; 
+    border-radius: 10px; backdrop-filter: blur(10px); font-size: 0.9rem;
+}
+
+.report-box { 
+    padding: 20px; 
+    background: rgba(0, 0, 0, 0.6); 
+    border-radius: 20px; 
+    margin: 0 15px 10px; 
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 110;
+}
+.main-result { text-align: center; }
+.main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 2.5rem; display: block; }
+
+/* 공통 버튼 */
+.mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; }
 .mode-selector button.active { background: #007aff; }
 
-.action-zone { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 64px; }
 #record-btn { 
-    width: 64px; height: 64px; 
-    border-radius: 50%; 
-    border: 4px solid #fff; 
-    background: rgba(255,255,255,0.2); 
-    cursor: pointer; 
-    transition: all 0.3s; 
+    width: 70px; height: 70px; border-radius: 50%; border: 5px solid #fff; 
+    background: rgba(255,255,255,0.2); transition: all 0.3s; 
 }
-#record-btn.ready { background: #00e676; box-shadow: 0 0 15px #00e676; }
-#record-btn.recording { border-radius: 8px; background: #ff4d4d; animation: pulse 1.5s infinite; }
+#record-btn.recording { border-radius: 15px; background: #ff4d4d; animation: pulse 1.5s infinite; }
 
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-    70% { transform: scale(0.9); box-shadow: 0 0 0 10px rgba(255, 77, 77, 0); }
+    70% { transform: scale(0.9); box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
 }
 
-/* 분석 리포트 */
-.report-box { padding: 12px; background: #2a2a2a; border-radius: 10px; margin-top: 10px; width: 100%; }
-.report-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
-.report-item.main-result { border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 10px; }
-.report-item.main-result .highlight { font-size: 1.4rem; color: #00e676; }
-.highlight { font-weight: bold; color: #00e676; font-size: 1.1rem; }
-.feedback { margin-top: 8px; font-size: 0.85rem; color: #ffb300; border-top: 1px solid #444; padding-top: 5px; }
+.hidden { display: none !important; }
+.btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; }
 
-/* 권한 오버레이 */
+/* 오버레이 */
 .overlay { 
     position: fixed; top:0; left:0; width:100%; height:100%; 
-    background:rgba(0,0,0,0.95); z-index:100; 
-    display:flex; flex-direction:column; justify-content:center; align-items:center; 
-    text-align:center; padding:20px; 
+    background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
 }
-.btn-permission { 
-    padding: 12px 24px; background: #007aff; color:#fff; 
-    border:none; border-radius:8px; font-weight:bold; margin-top:20px; 
-    cursor: pointer;
-}
-.btn-secondary { padding: 10px 20px; background: #444; border-radius: 5px; cursor: pointer; display: inline-block; font-size: 0.9rem; }
-
-/* 로딩 스피너 */
-#loading-spinner {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); display: flex; flex-direction: column;
-    justify-content: center; align-items: center; z-index: 20;
-}
-.spinner {
-    width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
-    border-top: 4px solid #007aff; border-radius: 50%;
-    animation: spin 1s linear infinite; margin-bottom: 10px;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; }

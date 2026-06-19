@@ -53,20 +53,18 @@
                     <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
                     <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
                 </div>
+                <!-- 비디오 컨트롤러 추가 -->
+                <div class="video-controls">
+                    <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
+                    <button id="btn-video-play" class="control-btn">▶️ 재생/정지</button>
+                    <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
+                </div>
+
                 <div class="report-box">
-                    <div class="report-item main-result">
-                        <span>📏 선택한 두 선의 각도</span>
-                        <span id="res-manual-angle" class="highlight">0°</span>
+                    <div class="report-item main-result" style="border-bottom: none;">
+                        <span>📐 선택한 두 선의 각도</span>
+                        <span id="res-manual-angle" class="highlight" style="font-size: 2rem;">0°</span>
                     </div>
-                    <div class="report-item">
-                        <span>💪 줌팔 각도 (AI)</span>
-                        <span id="res-bow-arm" class="highlight">0°</span>
-                    </div>
-                    <div class="report-item">
-                        <span>🖐️ 깍지팔 각도 (AI)</span>
-                        <span id="res-draw-arm" class="highlight">0°</span>
-                    </div>
-                    <div id="feedback-text" class="feedback">화면을 드래그하여 보조선을 그려보세요.</div>
                 </div>
             </div>
         </main>
