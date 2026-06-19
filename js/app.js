@@ -1,6 +1,6 @@
 /**
  * app.js
- * 전체 흐름 제어, MediaRecorder 연동 및 MediaPipe 시각화 통합
+ * 안드로이드(갤럭시) 최적화: 순차적 권한 요청 및 VP9 코덱 대응
  */
 
 import { DynamicLeveler } from './sensor.js';
@@ -41,22 +41,35 @@ function initApp() {
     const permissionBtn = document.getElementById('btn-permission');
     if (permissionBtn) {
         permissionBtn.addEventListener('click', async () => {
-            console.log("권한 요청 시작...");
+            console.log("순차적 권한 요청 시작...");
+            
+            // 1단계: 센서 권한
             const sensorGranted = await leveler.init();
+            
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                // 2단계: 카메라 권한
+                const videoStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
                 });
-                video.srcObject = stream;
-                setupRecorder(stream);
+                
+                // 3단계: 오디오 권한 (순차적 요청으로 안정성 확보)
+                try {
+                    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
+                } catch (audioErr) {
+                    console.warn("오디오 권한 거부됨, 무음 녹화 진행:", audioErr);
+                }
+
+                video.srcObject = videoStream;
+                setupRecorder(videoStream);
                 
                 if (sensorGranted) {
                     document.getElementById('permission-overlay').classList.add('hidden');
                     sync.init('1234');
                 }
             } catch (err) {
-                console.error("카메라 에러:", err);
-                alert('카메라 화면을 불러올 수 없습니다. HTTPS 환경인지 확인해주세요.');
+                console.error("카메라 권한 에러:", err);
+                alert('카메라를 시작할 수 없습니다. 크롬 설정에서 권한을 허용해 주세요.');
             }
         });
     }
@@ -84,7 +97,7 @@ function initApp() {
         hideElement.classList.add('hidden');
     }
 
-    // 분석기 구동 및 파일 업로드 처리
+    // 분석기 구동
     const analyzer = new ArcheryAnalyzer();
     document.getElementById('file-upload').addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -123,12 +136,24 @@ function initApp() {
     });
 }
 
-// 4. 녹화 로직
+// 4. 녹화 로직 (안드로이드 VP9 코덱 최적화)
 function setupRecorder(stream) {
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    let selectedType = "";
+    
+    for (let type of types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+            selectedType = type;
+            break;
+        }
+    }
+    
+    console.log("선택된 녹화 코덱:", selectedType);
+    mediaRecorder = new MediaRecorder(stream, { mimeType: selectedType });
+    
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const blob = new Blob(recordedChunks, { type: selectedType });
         processVideo(blob);
         recordedChunks = [];
     };
@@ -202,7 +227,7 @@ function renderCanvas(results, sourceVideo) {
     });
 }
 
-// DOM 로드 완료 후 실행
+// 초기화 실행
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
 } else {
