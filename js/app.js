@@ -45,14 +45,19 @@ function initApp() {
             console.log("안드로이드 권한 요청 시작...");
             const sensorGranted = await leveler.init();
             try {
-                // 안드로이드 크롬 브라우저 규격 대응 (순차 권한 및 고해상도)
+                // 안드로이드 크롬 브라우저 규격 대응 (유연한 해상도 설정)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment', 
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        width: { ideal: 1280, max: 1920 }, // 고정값 대신 이상값(ideal) 사용
+                        height: { ideal: 720, max: 1080 }
                     },
-                    audio: true // 활 시위 소리 녹음용
+                    audio: true 
+                }).catch(async (err) => {
+                    console.warn("오디오 포함 요청 실패, 비디오만 재시도:", err);
+                    return await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } 
+                    });
                 });
                 
                 streamRef = stream;
