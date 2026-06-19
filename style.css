@@ -86,9 +86,16 @@ body {
     background: #121212; 
     padding: 10px;
     z-index: 5;
+    display: flex;
+    flex-direction: column;
 }
 #analysis-section h3 { font-size: 1rem; text-align: center; margin-bottom: 10px; color: #007aff; }
-.canvas-container { flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+.canvas-container { flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 300px; }
+
+.tool-bar { display: flex; gap: 10px; padding: 10px 0; align-items: center; justify-content: center; }
+.tool-btn { padding: 8px 12px; background: #444; border: none; color: #fff; border-radius: 5px; font-size: 0.85rem; }
+.tool-btn.active { background: #007aff; }
+.angle-badge { background: #00e676; color: #000; padding: 5px 10px; border-radius: 15px; font-weight: bold; font-size: 0.85rem; }
 
 /* 공통 요소 */
 .hidden { display: none !important; }
