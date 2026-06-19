@@ -253,10 +253,31 @@ function renderCanvas(results, sourceVideo) {
     });
 }
 
-// 5. 버튼 이벤트 바인딩
+// 5. 버튼 이벤트 바인딩 (수평 체크 및 폴백 로직 추가)
 recordBtn.addEventListener('click', () => {
-    if (!isRecording) sync.sendSignal('START');
-    else sync.sendSignal('STOP');
+    // 수평이 맞지 않은 경우 안내
+    if (recordBtn.disabled || !recordBtn.classList.contains('ready')) {
+        if (!isRecording) {
+            alert("⚠️ 삼각대 수평을 맞춰주세요! (초록색 가이드라인 일치 시 촬영 가능)");
+            return;
+        }
+    }
+
+    if (!isRecording) {
+        // 동기화 신호 시도, 실패해도 로컬 녹화는 시작
+        try {
+            sync.sendSignal('START');
+        } catch (e) {
+            console.warn("동기화 신호 전송 실패, 로컬 모드로 시작합니다.");
+            startRecording();
+        }
+    } else {
+        try {
+            sync.sendSignal('STOP');
+        } catch (e) {
+            stopRecording();
+        }
+    }
 });
 
 // 초기화 실행
