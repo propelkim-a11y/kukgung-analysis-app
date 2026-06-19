@@ -1,22 +1,76 @@
 /* 
  * style.css
- * 국궁 다각도 자세 분석 웹앱 스타일 시트
+ * 사용자 최적화 레이아웃 구조 반영
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #121212; color: #ffffff;
-    height: 100vh; height: 100dvh; /* 모바일 동적 높이 대응 */
+    background-color: #000; color: #ffffff;
+    height: 100dvh;
     overflow: hidden;
-    position: fixed; width: 100%; /* 바운스 방지 */
 }
 
+/* 1. 전체 컨테이너 구조 조정 */
 .container { 
-    display: flex; flex-direction: column; 
-    height: 100%; width: 100%;
+    display: flex; 
+    flex-direction: column; 
+    height: 100dvh; /* 모바일 브라우저 주소창 대응 */
     justify-content: space-between; 
+    background-color: #000;
+}
+
+/* 2. 메인 콘텐츠 영역이 남은 공간을 꽉 채우도록 설정 */
+.main-content { 
+    flex: 1; 
+    position: relative; 
+    background-color: #000;
+    overflow: hidden;
+}
+
+/* 3. 카메라 영역이 메인 콘텐츠 안에서만 꽉 차게 설정 */
+.view-section { 
+    width: 100%; 
+    height: 100%; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    z-index: 1; /* 비디오는 가장 아래 레이어 */
+}
+
+#video-preview, #output-canvas { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+}
+
+/* 4. 수평계는 비디오 바로 위에 떠 있게 설정 */
+.level-container { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    pointer-events: none; 
+    z-index: 2; /* 비디오보다 위 */
+}
+
+.center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
+.level-line { 
+    width: 220px; height: 2px; 
+    background-color: #ff4d4d; 
+    position: absolute; left: -110px; 
+    transition: transform 0.05s linear, background-color 0.3s; 
+}
+
+/* 5. 하단 제어부(메뉴)가 무조건 가장 위에 보이도록 설정 */
+.footer { 
+    background: #1e1e1e; 
+    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); /* 아이폰 하단 바 대응 */
+    display: flex; flex-direction: column; gap: 10px; 
+    align-items: center; 
+    z-index: 10; /* 가장 상위 레이어 배치 */
+    border-top: 1px solid #333;
 }
 
 /* 헤더 */
@@ -25,32 +79,8 @@ body {
 #angle-text { font-size: 0.9rem; opacity: 0.7; margin-top: 3px; }
 .badge { display: inline-block; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #444; margin-top: 5px; }
 
-/* 메인 콘텐츠 */
-.main-content { flex: 1; position: relative; background-color: #000; overflow: hidden; }
-.view-section { width: 100%; height: 100%; position: absolute; top:0; left:0; display: flex; flex-direction: column; }
+/* 공통 요소 */
 .hidden { display: none !important; }
-
-#video-preview, #output-canvas { width: 100%; height: 100%; object-fit: cover; }
-
-/* 수평계 UI */
-.level-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
-.center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; z-index: 5; }
-.level-line { 
-    width: 220px; height: 2px; 
-    background-color: #ff4d4d; 
-    position: absolute; left: -110px; 
-    transition: transform 0.05s linear, background-color 0.3s; 
-}
-
-/* 하단 제어부 */
-.footer { 
-    background: #1e1e1e; 
-    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); /* 아이폰 하단 바 대응 */
-    display: flex; flex-direction: column; gap: 10px; 
-    align-items: center; 
-    z-index: 50;
-    border-top: 1px solid #333;
-}
 .mode-selector button { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 20px; margin: 0 5px; cursor: pointer; }
 .mode-selector button.active { background: #007aff; }
 
@@ -74,7 +104,6 @@ body {
 
 /* 분석 리포트 */
 .report-box { padding: 15px; background: #2a2a2a; border-radius: 10px; margin: 10px; width: calc(100% - 20px); }
-.report-item { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .highlight { font-weight: bold; color: #00e676; font-size: 1.2rem; }
 .feedback { margin-top: 10px; font-size: 0.95rem; color: #ffb300; border-top: 1px solid #444; padding-top: 8px; }
 
@@ -93,7 +122,6 @@ body {
 .btn-secondary { padding: 10px 20px; background: #444; border-radius: 5px; cursor: pointer; display: inline-block; }
 
 /* 로딩 스피너 */
-.canvas-container { position: relative; flex: 1; }
 #loading-spinner {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.7); display: flex; flex-direction: column;
