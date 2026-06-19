@@ -1,6 +1,6 @@
 /**
  * app.js
- * 안드로이드(갤럭시) 최적화: 순차적 권한 요청 및 VP9 코덱 대응
+ * 안드로이드(갤럭시) 최적화: 고해상도 지원 및 VP9 코덱 자동 다운로드 통합
  */
 
 import { DynamicLeveler } from './sensor.js';
@@ -11,6 +11,7 @@ let currentPhoneRoll = 0;
 let mediaRecorder;
 let recordedChunks = [];
 let isRecording = false;
+let streamRef = null;
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
@@ -31,50 +32,45 @@ const leveler = new DynamicLeveler((isLevel, currentRoll) => {
 // 2. 동기화 모듈 초기화
 let sync;
 
-// 3. 초기화 함수
+// 3. 초기화 및 권한 승인 (안드로이드 최적화 수정본 반영)
 function initApp() {
     sync = new ArcherySync(
-        () => startRecording(false),
-        () => stopRecording(false)
+        () => startRecording(), // 동기화 시작 신호
+        () => stopRecording()   // 동기화 종료 신호
     );
 
     const permissionBtn = document.getElementById('btn-permission');
     if (permissionBtn) {
         permissionBtn.addEventListener('click', async () => {
-            console.log("순차적 권한 요청 시작...");
-            
-            // 1단계: 센서 권한
+            console.log("안드로이드 권한 요청 시작...");
             const sensorGranted = await leveler.init();
-            
             try {
-                // 2단계: 카메라 권한
-                const videoStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                // 안드로이드 크롬 브라우저 규격 대응 (순차 권한 및 고해상도)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment', 
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: true // 활 시위 소리 녹음용
                 });
                 
-                // 3단계: 오디오 권한 (순차적 요청으로 안정성 확보)
-                try {
-                    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
-                } catch (audioErr) {
-                    console.warn("오디오 권한 거부됨, 무음 녹화 진행:", audioErr);
-                }
+                streamRef = stream;
+                video.srcObject = stream;
+                video.play();
 
-                video.srcObject = videoStream;
-                setupRecorder(videoStream);
-                
                 if (sensorGranted) {
                     document.getElementById('permission-overlay').classList.add('hidden');
                     sync.init('1234');
                 }
             } catch (err) {
-                console.error("카메라 권한 에러:", err);
-                alert('카메라를 시작할 수 없습니다. 크롬 설정에서 권한을 허용해 주세요.');
+                console.error("권한 에러:", err);
+                alert('안드로이드 설정에서 카메라 및 마이크 권한을 허용해 주세요.');
             }
         });
     }
 
-    // 뷰 모드 전환 토글 이벤트
+    // 뷰 모드 전환 토글
     const camSection = document.getElementById('camera-section');
     const anaSection = document.getElementById('analysis-section');
     const uploadLabel = document.getElementById('upload-label');
@@ -136,47 +132,72 @@ function initApp() {
     });
 }
 
-// 4. 녹화 로직 (안드로이드 VP9 코덱 최적화)
-function setupRecorder(stream) {
-    const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-    let selectedType = "";
-    
-    for (let type of types) {
-        if (MediaRecorder.isTypeSupported(type)) {
-            selectedType = type;
-            break;
-        }
-    }
-    
-    console.log("선택된 녹화 코덱:", selectedType);
-    mediaRecorder = new MediaRecorder(stream, { mimeType: selectedType });
-    
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: selectedType });
-        processVideo(blob);
-        recordedChunks = [];
-    };
-}
-
-recordBtn.addEventListener('click', () => {
-    if (!isRecording) sync.sendSignal('START');
-    else sync.sendSignal('STOP');
-});
-
-function startRecording(isLocal = true) {
+// 4. 녹화 로직 (안드로이드 최적화 수정본 반영)
+function startRecording() {
+    if (!streamRef) return;
     if (isRecording) return;
-    isRecording = true;
+    
     recordedChunks = [];
+    
+    // 안드로이드 크롬 최적화 코덱 검사 (VP9 최우선)
+    let options = { mimeType: 'video/webm;codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm' };
+    }
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/mp4' }; 
+    }
+
+    try {
+        mediaRecorder = new MediaRecorder(streamRef, options);
+    } catch (e) {
+        mediaRecorder = new MediaRecorder(streamRef); 
+    }
+
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        
+        // 자동 다운로드 실행
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+        a.download = `kukgung_${Date.now()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+
+        alert('녹화 파일이 스마트폰 [다운로드] 폴더에 저장되었습니다!');
+        
+        // 분석을 위해 파일 입력창에 전달 (선택사항)
+        processVideo(blob);
+    };
+
     mediaRecorder.start();
+    isRecording = true;
     recordBtn.classList.add('recording');
+    recordBtn.style.backgroundColor = '#ff4d4d';
+    recordBtn.style.boxShadow = '0 0 15px #ff4d4d';
 }
 
-function stopRecording(isLocal = true) {
+function stopRecording() {
     if (!isRecording) return;
     isRecording = false;
     mediaRecorder.stop();
     recordBtn.classList.remove('recording');
+    recordBtn.style.backgroundColor = '';
+    recordBtn.style.boxShadow = '';
 }
 
 function processVideo(blob) {
@@ -226,6 +247,12 @@ function renderCanvas(results, sourceVideo) {
         ctx.stroke();
     });
 }
+
+// 5. 버튼 이벤트 바인딩
+recordBtn.addEventListener('click', () => {
+    if (!isRecording) sync.sendSignal('START');
+    else sync.sendSignal('STOP');
+});
 
 // 초기화 실행
 if (document.readyState === 'loading') {
