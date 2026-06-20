@@ -1,4 +1,3 @@
-// [최종 수정본] js/app.js - 촬영 기능 안정화 버전
 import { DynamicLeveler } from './sensor.js';
 
 let streamRef = null;
@@ -29,32 +28,33 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
+    // 1. 권한 허용 버튼: 안드로이드 최적화 (비디오/오디오 분리 요청)
     document.getElementById('btn-permission').addEventListener('click', async () => {
         try {
             await leveler.init();
-            // 안드로이드 최적화 권한 요청
-            streamRef = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'environment', width: { ideal: 1280 } },
-                audio: true 
-            });
+            try {
+                streamRef = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 } },
+                    audio: true 
+                });
+            } catch (audioErr) {
+                console.warn('마이크 제외하고 카메라만 시도');
+                streamRef = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+            }
             video.srcObject = streamRef;
             video.play();
+            document.getElementById('permission-overlay').classList.add('hidden');
         } catch (err) {
-            console.warn('카메라 권한 거부 또는 미지원');
-            // 비디오만 다시 시도
-            try {
-                streamRef = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                video.srcObject = streamRef;
-                video.play();
-            } catch(e) { alert('카메라를 켤 수 없습니다.'); }
+            alert('카메라를 시작할 수 없습니다: ' + err.message);
         }
-        document.getElementById('permission-overlay').classList.add('hidden');
     });
 
     document.getElementById('btn-mode-shoot').addEventListener('click', () => switchMode('shoot'));
     document.getElementById('btn-mode-analyze').addEventListener('click', () => switchMode('analyze'));
 
-    // 촬영 버튼 이벤트 (중복 클릭 방지 및 상태 체크)
+    // 2. 촬영 버튼: 중복 클릭 방지 및 상태 체크
     recordBtn.onclick = (e) => {
         e.preventDefault();
         if (!isRecording) startRecording();
@@ -82,7 +82,7 @@ async function initApp() {
     analysisVideo.ontimeupdate = () => { if (!analysisVideo.paused) renderToCanvas(analysisVideo); };
     window.analysisVideo = analysisVideo;
 
-    // 드로잉 이벤트 (PC/모바일 통합)
+    // 3. 드로잉 및 줌 이벤트
     drawingCanvas.onmousedown = (e) => handleStart(e.clientX, e.clientY);
     window.onmousemove = (e) => handleMove(e.clientX, e.clientY);
     window.onmouseup = handleEnd;
@@ -107,9 +107,10 @@ async function initApp() {
     drawingCanvas.ontouchend = handleEnd;
 }
 
+// 4. 녹화 시작: 안드로이드 호환 코덱 자동 선택
 function startRecording() {
-    if (!streamRef || !streamRef.active) {
-        alert('카메라 연결이 불안정합니다. 페이지를 새로고침 해주세요.');
+    if (!streamRef) {
+        alert('카메라가 활성화되지 않았습니다.');
         return;
     }
     
@@ -121,7 +122,7 @@ function startRecording() {
         mediaRecorder = new MediaRecorder(streamRef, supportedType ? { mimeType: supportedType } : {});
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -130,19 +131,11 @@ function startRecording() {
             loadVideoForAnalysis(url);
         };
 
-        mediaRecorder.start(1000); // 1초 단위로 데이터 수집 (안정성)
+        mediaRecorder.start(1000); // 1초 단위 데이터 수집으로 안정성 확보
         isRecording = true;
         recordBtn.classList.add('recording');
     } catch (err) {
-        console.error('녹화 오류:', err);
-        // 오디오 없이 재시도
-        if (streamRef.getAudioTracks().length > 0) {
-            const videoOnlyStream = new MediaStream(streamRef.getVideoTracks());
-            streamRef = videoOnlyStream;
-            startRecording();
-        } else {
-            alert('녹화를 시작할 수 없습니다: ' + err.message);
-        }
+        alert('녹화 시작 실패: ' + err.message);
     }
 }
 
@@ -154,7 +147,6 @@ function stopRecording() {
     }
 }
 
-// ... (이하 분석 및 드로잉 로직은 동일)
 function switchMode(mode) {
     const shootView = document.getElementById('camera-section');
     const analyzeView = document.getElementById('analysis-section');
