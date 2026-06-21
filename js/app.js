@@ -8,6 +8,8 @@ let phoneRollAtRecord = 0;
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
+
+// 센서 초기화 (실패해도 앱이 멈추지 않도록 예외 처리 강화)
 const leveler = new DynamicLeveler((isLevel, roll) => {
     recordBtn.classList.toggle('ready', isLevel);
     phoneRollAtRecord = roll;
@@ -28,9 +30,12 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-    // 1. 권한 허용 버튼: 오디오 완전 제거 (audio: false)로 안드로이드 버그 해결
-    document.getElementById('btn-permission').onclick = async () => {
-        const sensorGranted = await leveler.init();
+    const permBtn = document.getElementById('btn-permission');
+    
+    permBtn.onclick = async () => {
+        console.log("Permission button clicked");
+        
+        // 1. 카메라 권한 먼저 요청 (가장 중요)
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -38,19 +43,30 @@ async function initApp() {
             });
             streamRef = stream;
             video.srcObject = stream;
-            video.play();
-            if (sensorGranted) document.getElementById('permission-overlay').classList.add('hidden');
+            await video.play();
+            document.getElementById('permission-overlay').classList.add('hidden');
         } catch (err) {
-            alert('카메라 권한이 필요합니다. 설정에서 허용해 주세요.');
+            console.error("Camera error:", err);
+            alert('카메라를 시작할 수 없습니다. 브라우저 설정에서 카메라 권한을 허용해 주세요.');
+            return; // 카메라 실패 시 중단
+        }
+
+        // 2. 센서 초기화 (카메라 성공 후 별도로 진행)
+        try {
+            await leveler.init();
+        } catch (err) {
+            console.warn("Sensor init failed:", err);
+            // 센서 실패 시 수평계 기능만 안 될 뿐, 촬영은 가능하게 함
+            recordBtn.classList.add('ready'); 
         }
     };
 
-    // 2. 촬영 버튼: 중복 리스너 제거 및 onclick 단일화로 충돌 해결
     recordBtn.onclick = () => {
         if (!isRecording) startRecording();
         else stopRecording();
     };
 
+    // UI 모드 전환 및 기타 이벤트
     document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
     document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
     
@@ -63,9 +79,11 @@ async function initApp() {
         lines = []; selectedLines = []; drawAll(); resManualAngle.innerText = "0°";
     };
 
+    // 분석용 비디오 엘리먼트 생성
     const analysisVideo = document.createElement('video');
     analysisVideo.hidden = true;
     analysisVideo.playsInline = true;
+    analysisVideo.webkitPlaysInline = true;
     document.body.appendChild(analysisVideo);
 
     document.getElementById('btn-video-play').onclick = () => analysisVideo.paused ? analysisVideo.play() : analysisVideo.pause();
@@ -75,30 +93,11 @@ async function initApp() {
     analysisVideo.ontimeupdate = () => { if (!analysisVideo.paused) renderToCanvas(analysisVideo); };
     window.analysisVideo = analysisVideo;
 
-    drawingCanvas.onmousedown = (e) => handleStart(e.clientX, e.clientY);
-    window.onmousemove = (e) => handleMove(e.clientX, e.clientY);
-    window.onmouseup = handleEnd;
-
-    drawingCanvas.ontouchstart = (e) => {
-        if (e.touches.length === 2) {
-            lastPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-        } else {
-            handleStart(e.touches[0].clientX, e.touches[0].clientY);
-        }
-    };
-    drawingCanvas.ontouchmove = (e) => {
-        if (e.touches.length === 2) {
-            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            scale = Math.min(Math.max(1, scale * (dist / lastPinchDistance)), 4);
-            applyZoom();
-            lastPinchDistance = dist;
-        } else {
-            handleMove(e.touches[0].clientX, e.touches[0].clientY);
-        }
-    };
-    drawingCanvas.ontouchend = handleEnd;
+    // 드로잉 이벤트 (마우스/터치 통합)
+    setupDrawingEvents();
 }
 
+// [이하 기존과 동일한 녹화 및 드로잉 로직...]
 function startRecording() {
     if (!streamRef) return;
     recordedChunks = [];
@@ -113,7 +112,7 @@ function startRecording() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `kukgung_\${Date.now()}.webm`;
+            a.download = `kukgung_${Date.now()}.webm`;
             a.click();
             loadVideoForAnalysis(url);
         };
@@ -121,7 +120,7 @@ function startRecording() {
         isRecording = true;
         recordBtn.classList.add('recording');
     } catch (e) {
-        alert('녹화를 시작할 수 없습니다: ' + e.message);
+        alert('녹화 시작 실패: ' + e.message);
     }
 }
 
@@ -134,22 +133,8 @@ function stopRecording() {
 }
 
 function switchMode(mode) {
-    const shootView = document.getElementById('camera-section');
-    const analyzeView = document.getElementById('analysis-section');
-    const uploadLabel = document.getElementById('upload-label');
-    const rBtn = document.getElementById('record-btn');
-
-    if (mode === 'shoot') {
-        shootView.classList.remove('hidden');
-        analyzeView.classList.add('hidden');
-        uploadLabel.classList.add('hidden');
-        rBtn.classList.remove('hidden');
-    } else {
-        shootView.classList.add('hidden');
-        analyzeView.classList.remove('hidden');
-        uploadLabel.classList.remove('hidden');
-        rBtn.classList.add('hidden');
-    }
+    document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
+    document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
 }
 
 function loadVideoForAnalysis(url) {
@@ -180,6 +165,31 @@ function createAutoGuideLines() {
     drawAll();
 }
 
+function setupDrawingEvents() {
+    drawingCanvas.onmousedown = (e) => handleStart(e.clientX, e.clientY);
+    window.onmousemove = (e) => handleMove(e.clientX, e.clientY);
+    window.onmouseup = handleEnd;
+
+    drawingCanvas.ontouchstart = (e) => {
+        if (e.touches.length === 2) {
+            lastPinchDistance = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        } else {
+            handleStart(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    };
+    drawingCanvas.ontouchmove = (e) => {
+        if (e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            scale = Math.min(Math.max(1, scale * (dist / lastPinchDistance)), 4);
+            applyZoom();
+            lastPinchDistance = dist;
+        } else {
+            handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    };
+    drawingCanvas.ontouchend = handleEnd;
+}
+
 function handleStart(clientX, clientY) {
     const pos = getRelativePos(clientX, clientY);
     const clickedLine = findLineAt(pos);
@@ -207,7 +217,7 @@ function getRelativePos(clientX, clientY) {
 }
 
 function applyZoom() {
-    const transform = \`scale(\${scale})\`;
+    const transform = `scale(${scale})`;
     outputCanvas.style.transform = drawingCanvas.style.transform = transform;
 }
 
@@ -242,7 +252,7 @@ function calculateManualAngle() {
     const a2 = Math.atan2(l2.p2.y - l2.p1.y, l2.p2.x - l2.p1.x);
     let angle = Math.abs((a1 - a2) * 180 / Math.PI);
     if (angle > 90) angle = 180 - angle;
-    resManualAngle.innerText = \`\${angle.toFixed(1)}°\`;
+    resManualAngle.innerText = `${angle.toFixed(1)}°`;
 }
 
 function distToSegment(p, v, w) {
