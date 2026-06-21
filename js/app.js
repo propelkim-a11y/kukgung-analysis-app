@@ -9,7 +9,7 @@ let phoneRollAtRecord = 0;
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
 
-// 센서 초기화 (실패해도 앱이 멈추지 않도록 예외 처리 강화)
+// 센서 초기화 (실패해도 촬영에 지장 없도록 처리)
 const leveler = new DynamicLeveler((isLevel, roll) => {
     recordBtn.classList.toggle('ready', isLevel);
     phoneRollAtRecord = roll;
@@ -30,105 +30,122 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-    const permBtn = document.getElementById('btn-permission');
-    
-    permBtn.onclick = async () => {
-        console.log("Permission button clicked");
-        
-        // 1. 카메라 권한 먼저 요청 (가장 중요)
+    // 버튼 클릭 시 즉시 반응 확인을 위한 로그
+    console.log("App Initialized");
+
+    // 1. 권한 허용 및 카메라 시작
+    document.getElementById('btn-permission').onclick = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
+            // 카메라 먼저 켜기
+            streamRef = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: false 
             });
-            streamRef = stream;
-            video.srcObject = stream;
+            video.srcObject = streamRef;
             await video.play();
             document.getElementById('permission-overlay').classList.add('hidden');
-        } catch (err) {
-            console.error("Camera error:", err);
-            alert('카메라를 시작할 수 없습니다. 브라우저 설정에서 카메라 권한을 허용해 주세요.');
-            return; // 카메라 실패 시 중단
-        }
+            
+            // 카메라 켜진 후 버튼 강제 활성화 (센서 상관없이)
+            recordBtn.classList.add('ready');
+            recordBtn.style.pointerEvents = 'auto'; 
+            recordBtn.style.opacity = '1';
 
-        // 2. 센서 초기화 (카메라 성공 후 별도로 진행)
-        try {
-            await leveler.init();
+            // 그 다음 센서 시도
+            try { await leveler.init(); } catch(e) { console.warn("Sensor skipped"); }
         } catch (err) {
-            console.warn("Sensor init failed:", err);
-            // 센서 실패 시 수평계 기능만 안 될 뿐, 촬영은 가능하게 함
-            recordBtn.classList.add('ready'); 
+            alert('카메라 시작 실패: ' + err.message);
         }
     };
 
+    // 2. 녹화 버튼 로직 (가장 단순하게 변경)
     recordBtn.onclick = () => {
-        if (!isRecording) startRecording();
-        else stopRecording();
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
     };
 
-    // UI 모드 전환 및 기타 이벤트
+    // 모드 전환
     document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
     document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
     
+    // 파일 업로드
     document.getElementById('file-upload').onchange = (e) => {
         const file = e.target.files[0];
         if (file) loadVideoForAnalysis(URL.createObjectURL(file));
     };
 
+    // 초기화
     document.getElementById('btn-clear-draw').onclick = () => {
         lines = []; selectedLines = []; drawAll(); resManualAngle.innerText = "0°";
     };
 
-    // 분석용 비디오 엘리먼트 생성
-    const analysisVideo = document.createElement('video');
-    analysisVideo.hidden = true;
-    analysisVideo.playsInline = true;
-    analysisVideo.webkitPlaysInline = true;
-    document.body.appendChild(analysisVideo);
+    // 분석용 비디오 설정
+    const v = document.createElement('video');
+    v.hidden = true;
+    v.playsInline = true;
+    v.muted = true; // 분석용은 무조건 뮤트
+    document.body.appendChild(v);
+    window.analysisVideo = v;
 
-    document.getElementById('btn-video-play').onclick = () => analysisVideo.paused ? analysisVideo.play() : analysisVideo.pause();
-    document.getElementById('btn-video-prev').onclick = () => analysisVideo.currentTime -= 0.1;
-    document.getElementById('btn-video-next').onclick = () => analysisVideo.currentTime += 0.1;
+    document.getElementById('btn-video-play').onclick = () => v.paused ? v.play() : v.pause();
+    document.getElementById('btn-video-prev').onclick = () => v.currentTime -= 0.1;
+    document.getElementById('btn-video-next').onclick = () => v.currentTime += 0.1;
 
-    analysisVideo.ontimeupdate = () => { if (!analysisVideo.paused) renderToCanvas(analysisVideo); };
-    window.analysisVideo = analysisVideo;
+    v.ontimeupdate = () => { if (!v.paused) renderToCanvas(v); };
 
-    // 드로잉 이벤트 (마우스/터치 통합)
     setupDrawingEvents();
 }
 
-// [이하 기존과 동일한 녹화 및 드로잉 로직...]
 function startRecording() {
-    if (!streamRef) return;
+    if (!streamRef) {
+        alert('카메라가 연결되지 않았습니다.');
+        return;
+    }
+    
     recordedChunks = [];
-    let options = { mimeType: 'video/webm;codecs=vp8' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
+    // 가장 호환성 높은 순서대로 코덱 시도
+    const mimeTypes = [
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4'
+    ];
+    let selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
 
     try {
-        mediaRecorder = new MediaRecorder(streamRef, options);
+        mediaRecorder = new MediaRecorder(streamRef, selectedMime ? { mimeType: selectedMime } : {});
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const blob = new Blob(recordedChunks, { type: selectedMime || 'video/webm' });
             const url = URL.createObjectURL(blob);
+            
+            // 자동 다운로드
             const a = document.createElement('a');
             a.href = url;
             a.download = `kukgung_${Date.now()}.webm`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
+            
             loadVideoForAnalysis(url);
         };
+
         mediaRecorder.start(1000);
         isRecording = true;
         recordBtn.classList.add('recording');
+        console.log("Recording started");
     } catch (e) {
-        alert('녹화 시작 실패: ' + e.message);
+        alert('녹화 시작 에러: ' + e.message);
     }
 }
 
 function stopRecording() {
-    if (mediaRecorder && isRecording) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
+        console.log("Recording stopped");
     }
 }
 
