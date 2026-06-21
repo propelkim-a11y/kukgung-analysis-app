@@ -28,39 +28,32 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-    // 1. 권한 허용 버튼: 안드로이드 최적화 (비디오/오디오 분리 요청)
-    document.getElementById('btn-permission').addEventListener('click', async () => {
+    // 1. 권한 허용 버튼: 오디오 완전 제거 (audio: false)로 안드로이드 버그 해결
+    document.getElementById('btn-permission').onclick = async () => {
+        const sensorGranted = await leveler.init();
         try {
-            await leveler.init();
-            try {
-                streamRef = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: { ideal: 1280 } },
-                    audio: true 
-                });
-            } catch (audioErr) {
-                console.warn('마이크 제외하고 카메라만 시도');
-                streamRef = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } 
-                });
-            }
-            video.srcObject = streamRef;
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: false 
+            });
+            streamRef = stream;
+            video.srcObject = stream;
             video.play();
-            document.getElementById('permission-overlay').classList.add('hidden');
+            if (sensorGranted) document.getElementById('permission-overlay').classList.add('hidden');
         } catch (err) {
-            alert('카메라를 시작할 수 없습니다: ' + err.message);
+            alert('카메라 권한이 필요합니다. 설정에서 허용해 주세요.');
         }
-    });
+    };
 
-    document.getElementById('btn-mode-shoot').addEventListener('click', () => switchMode('shoot'));
-    document.getElementById('btn-mode-analyze').addEventListener('click', () => switchMode('analyze'));
-
-    // 2. 촬영 버튼: 중복 클릭 방지 및 상태 체크
-    recordBtn.onclick = (e) => {
-        e.preventDefault();
+    // 2. 촬영 버튼: 중복 리스너 제거 및 onclick 단일화로 충돌 해결
+    recordBtn.onclick = () => {
         if (!isRecording) startRecording();
         else stopRecording();
     };
 
+    document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
+    document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
+    
     document.getElementById('file-upload').onchange = (e) => {
         const file = e.target.files[0];
         if (file) loadVideoForAnalysis(URL.createObjectURL(file));
@@ -82,7 +75,6 @@ async function initApp() {
     analysisVideo.ontimeupdate = () => { if (!analysisVideo.paused) renderToCanvas(analysisVideo); };
     window.analysisVideo = analysisVideo;
 
-    // 3. 드로잉 및 줌 이벤트
     drawingCanvas.onmousedown = (e) => handleStart(e.clientX, e.clientY);
     window.onmousemove = (e) => handleMove(e.clientX, e.clientY);
     window.onmouseup = handleEnd;
@@ -107,40 +99,34 @@ async function initApp() {
     drawingCanvas.ontouchend = handleEnd;
 }
 
-// 4. 녹화 시작: 안드로이드 호환 코덱 자동 선택
 function startRecording() {
-    if (!streamRef) {
-        alert('카메라가 활성화되지 않았습니다.');
-        return;
-    }
-    
+    if (!streamRef) return;
     recordedChunks = [];
-    const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-    const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
+    let options = { mimeType: 'video/webm;codecs=vp8' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
 
     try {
-        mediaRecorder = new MediaRecorder(streamRef, supportedType ? { mimeType: supportedType } : {});
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder = new MediaRecorder(streamRef, options);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `kukgung_${Date.now()}.webm`;
+            a.download = `kukgung_\${Date.now()}.webm`;
             a.click();
             loadVideoForAnalysis(url);
         };
-
-        mediaRecorder.start(1000); // 1초 단위 데이터 수집으로 안정성 확보
+        mediaRecorder.start(1000);
         isRecording = true;
         recordBtn.classList.add('recording');
-    } catch (err) {
-        alert('녹화 시작 실패: ' + err.message);
+    } catch (e) {
+        alert('녹화를 시작할 수 없습니다: ' + e.message);
     }
 }
 
 function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (mediaRecorder && isRecording) {
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
@@ -221,7 +207,7 @@ function getRelativePos(clientX, clientY) {
 }
 
 function applyZoom() {
-    const transform = `scale(${scale})`;
+    const transform = \`scale(\${scale})\`;
     outputCanvas.style.transform = drawingCanvas.style.transform = transform;
 }
 
@@ -256,7 +242,7 @@ function calculateManualAngle() {
     const a2 = Math.atan2(l2.p2.y - l2.p1.y, l2.p2.x - l2.p1.x);
     let angle = Math.abs((a1 - a2) * 180 / Math.PI);
     if (angle > 90) angle = 180 - angle;
-    resManualAngle.innerText = `${angle.toFixed(1)}°`;
+    resManualAngle.innerText = \`\${angle.toFixed(1)}°\`;
 }
 
 function distToSegment(p, v, w) {
