@@ -1,5 +1,4 @@
-/* 
- * style.css
+/* style.css
  * 완전 투명 UI 및 확대/축소 정밀 분석 최적화
  */
 
@@ -65,6 +64,12 @@ body {
     position: absolute;
     bottom: 0;
     width: 100%;
+    pointer-events: none; /* 부모 레이어는 터치 이벤트를 통과시킴 */
+}
+
+/* 푸터 내부 콘텐츠는 터치가 작동해야 함 */
+.mode-selector, .action-zone {
+    pointer-events: auto;
 }
 
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
@@ -87,15 +92,17 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 섹션 */
+/* 분석 섹션 레이아웃 대폭 수정 (컨트롤러 밀림현상 방지) */
 #analysis-section { 
     z-index: 5;
     background: #000;
+    display: flex;
+    flex-direction: column;
 }
 
 .canvas-container { 
     width: 100%; 
-    height: 100%; 
+    flex: 1; /* 캔버스가 상단 남는 여백을 채우고 컨트롤러 공간을 보장 */
     position: relative; 
     overflow: hidden; 
     touch-action: none;
@@ -104,6 +111,8 @@ body {
 #manual-analysis-box canvas {
     transform-origin: center;
     transition: transform 0.1s ease-out;
+    image-rendering: -webkit-optimize-contrast; /* 모바일 사파리 확대 시 화질 깨짐 완화 */
+    image-rendering: crisp-edges;
 }
 
 /* 도구 및 컨트롤러 */
@@ -120,6 +129,7 @@ body {
 .video-controls {
     display: flex; justify-content: center; gap: 15px; 
     margin-bottom: 10px; z-index: 110;
+    pointer-events: auto;
 }
 .control-btn {
     padding: 10px 15px; background: rgba(255, 255, 255, 0.15); 
@@ -135,6 +145,7 @@ body {
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 110;
+    pointer-events: auto;
 }
 .main-result { text-align: center; }
 .main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
@@ -164,4 +175,4 @@ body {
     position: fixed; top:0; left:0; width:100%; height:100%; 
     background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
 }
-.btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; }
+#btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; }
