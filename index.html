@@ -12,19 +12,19 @@
 </head>
 <body>
 
-    <!-- iOS 센서 및 카메라 권한 팝업 -->
+    <!-- 권한 및 모드 선택 팝업 -->
     <div id="permission-overlay" class="overlay">
         <div class="overlay-content" style="text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px;">
             <h2 style="margin-bottom: 15px;">🏹 활터에 있소</h2>
-            <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px;">정밀한 국궁 자세 및 고각 분석을 위해<br>카메라 및 수평계 권한이 필요합니다.</p>
+            <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px;">정밀한 국궁 자세 분석을 위해<br>카메라(웹캠) 및 센서 권한이 필요합니다.</p>
             <button id="btn-permission">권한 허용 및 시작하기</button>
         </div>
     </div>
 
     <div class="container">
-        <!-- 상단 헤더: 수평계 상태 표시 -->
+        <!-- 상단 헤더: 수평계 상태 표시 (PC는 고정 모드 표시) -->
         <header class="header">
-            <div id="status-text">수평계 준비 중</div>
+            <div id="status-text">장치 준비 중</div>
             <div id="angle-text">0.0°</div>
         </header>
 
@@ -34,7 +34,7 @@
             <div id="camera-section" class="view-section">
                 <div class="video-wrapper" style="width: 100%; height: 100%; position: relative;">
                     <video id="video-preview" autoplay playsinline muted></video>
-                    <div class="level-container">
+                    <div id="level-container" class="level-container">
                         <div class="center-target"></div>
                         <div id="level-line" class="level-line"></div>
                     </div>
@@ -73,12 +73,12 @@
                 <button id="btn-mode-shoot" class="active">촬영하기</button>
                 <button id="btn-mode-analyze">결과보기</button>
             </div>
-            <div class="action-zone">
+            <div class="action-zone" style="display: flex; align-items: center; gap: 15px;">
                 <!-- 촬영 버튼 -->
                 <button id="record-btn" aria-label="녹화"></button>
                 <!-- 분석용 파일 업로드 버튼 -->
                 <input type="file" id="file-upload" accept="video/*" class="hidden">
-                <label for="file-upload" id="upload-label" class="btn-secondary hidden">영상 파일 업로드 분석</label>
+                <label for="file-upload" id="upload-label" class="btn-secondary">영상 업로드 분석</label>
             </div>
         </footer>
     </div>
