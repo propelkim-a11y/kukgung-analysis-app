@@ -9,12 +9,12 @@ let phoneRollAtRecord = 0;
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
 
-// 상태를 화면에 보여주기 위한 텍스트 엘리먼트 (없으면 생성)
+// 상태 로그 표시
 let statusLog = document.getElementById('status-log');
 if (!statusLog) {
     statusLog = document.createElement('div');
     statusLog.id = 'status-log';
-    statusLog.style = 'position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px; font-size:12px; z-index:9999; pointer-events:none;';
+    statusLog.style = 'position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px; font-size:12px; z-index:9999; pointer-events:none; border-radius:4px;';
     document.body.appendChild(statusLog);
 }
 
@@ -25,11 +25,12 @@ function log(msg) {
 
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
-    // 수평 여부에 따라 버튼 색상만 변경 (클릭은 항상 가능하게)
     if (isLevel) {
-        recordBtn.style.border = '5px solid #00ff00'; // 수평 맞으면 초록 테두리
+        recordBtn.style.border = '6px solid #00ff00';
+        recordBtn.style.boxShadow = '0 0 15px #00ff00';
     } else {
-        recordBtn.style.border = '5px solid #ff0000'; // 수평 안 맞으면 빨간 테두리
+        recordBtn.style.border = '6px solid #ff4444';
+        recordBtn.style.boxShadow = 'none';
     }
 });
 
@@ -48,10 +49,10 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-    log("앱 시작됨 - 권한 허용을 눌러주세요");
+    log("앱 준비 완료 - 권한 허용을 눌러주세요");
 
     document.getElementById('btn-permission').onclick = async () => {
-        log("카메라 권한 요청 중...");
+        log("카메라 활성화 중...");
         try {
             streamRef = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -61,84 +62,77 @@ async function initApp() {
             await video.play();
             document.getElementById('permission-overlay').classList.add('hidden');
             
-            // [중요] 촬영 버튼 강제 활성화 및 시각화
+            // 버튼 시각화 강제 설정
             recordBtn.style.opacity = '1';
-            recordBtn.style.pointerEvents = 'auto';
             recordBtn.style.display = 'block';
-            recordBtn.style.backgroundColor = 'white'; // 버튼이 보이도록 흰색 설정
-            log("카메라 연결 성공 - 촬영 가능");
+            recordBtn.style.backgroundColor = 'white';
+            recordBtn.style.pointerEvents = 'auto';
+            log("촬영 준비 완료");
 
-            try { await leveler.init(); log("센서 연결 성공"); } catch(e) { log("센서 미지원/거부"); }
+            try { await leveler.init(); } catch(e) { log("센서 권한 필요"); }
         } catch (err) {
-            log("카메라 에러: " + err.message);
-            alert('카메라 시작 실패: ' + err.message);
+            log("에러: " + err.message);
         }
     };
 
-    // 클릭 이벤트가 안 먹힐 경우를 대비해 touchstart도 연결
-    const handleRecordClick = (e) => {
-        if (e) e.preventDefault();
-        log("촬영 버튼 클릭됨! 현재 상태: " + (isRecording ? "녹화중" : "대기중"));
-        if (!isRecording) startRecording();
-        else stopRecording();
+    // [핵심 수정] 중복 클릭 방지를 위해 onclick 하나만 사용하고 딜레이 부여
+    let lastClickTime = 0;
+    recordBtn.onclick = (e) => {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastClickTime < 500) return; // 0.5초 이내 중복 클릭 무시
+        lastClickTime = now;
+
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
     };
 
-    recordBtn.onclick = handleRecordClick;
-    recordBtn.ontouchstart = (e) => {
-        if (!isRecording) handleRecordClick(e);
-    };
-
+    // 분석 모드 관련
     document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
     document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
-    
     document.getElementById('file-upload').onchange = (e) => {
         const file = e.target.files[0];
         if (file) loadVideoForAnalysis(URL.createObjectURL(file));
     };
-
     document.getElementById('btn-clear-draw').onclick = () => {
         lines = []; selectedLines = []; drawAll(); resManualAngle.innerText = "0°";
     };
 
     const v = document.createElement('video');
-    v.hidden = true;
-    v.playsInline = true;
-    v.muted = true;
+    v.hidden = true; v.playsInline = true; v.muted = true;
     document.body.appendChild(v);
     window.analysisVideo = v;
 
     document.getElementById('btn-video-play').onclick = () => v.paused ? v.play() : v.pause();
-    document.getElementById('btn-video-prev').onclick = () => v.currentTime -= 0.1;
-    document.getElementById('btn-video-next').onclick = () => v.currentTime += 0.1;
+    document.getElementById('btn-video-prev').onclick = () => v.currentTime -= 0.033; // 1프레임씩
+    document.getElementById('btn-video-next').onclick = () => v.currentTime += 0.033;
 
     v.ontimeupdate = () => { if (!v.paused) renderToCanvas(v); };
-
     setupDrawingEvents();
 }
 
 function startRecording() {
-    if (!streamRef) {
-        log("에러: 스트림 없음");
-        return;
-    }
-    
+    if (!streamRef) return;
     recordedChunks = [];
-    const mimeTypes = ['video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-    let selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    
+    // 모바일 호환성 최강 코덱 설정
+    const options = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') 
+                    ? { mimeType: 'video/webm;codecs=vp8' } 
+                    : {};
 
     try {
-        log("녹화 시작 시도 (" + selectedMime + ")");
-        mediaRecorder = new MediaRecorder(streamRef, selectedMime ? { mimeType: selectedMime } : {});
-        
-        mediaRecorder.ondataavailable = e => { 
-            if (e.data.size > 0) recordedChunks.push(e.data); 
-        };
+        mediaRecorder = new MediaRecorder(streamRef, options);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         
         mediaRecorder.onstop = () => {
-            log("녹화 종료 - 파일 생성 중");
-            const blob = new Blob(recordedChunks, { type: selectedMime || 'video/webm' });
+            log("저장 중...");
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
             
+            // 파일 다운로드
             const a = document.createElement('a');
             a.href = url;
             a.download = `kukgung_${Date.now()}.webm`;
@@ -147,16 +141,16 @@ function startRecording() {
             document.body.removeChild(a);
             
             loadVideoForAnalysis(url);
+            log("저장 완료! 분석 모드로 전환");
         };
 
-        mediaRecorder.start(1000);
+        mediaRecorder.start();
         isRecording = true;
-        recordBtn.classList.add('recording');
-        recordBtn.style.backgroundColor = 'red'; // 녹화 중일 때 빨간색으로 변경
-        log("● 녹화 중...");
+        recordBtn.style.backgroundColor = '#ff0000'; // 녹화 중 빨간색
+        recordBtn.innerHTML = '<span style="color:white; font-weight:bold;">STOP</span>';
+        log("● 녹화 중... (다시 누르면 정지)");
     } catch (e) {
-        log("녹화 에러: " + e.message);
-        alert('녹화 시작 에러: ' + e.message);
+        log("녹화 시작 에러: " + e.message);
     }
 }
 
@@ -164,9 +158,9 @@ function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
         isRecording = false;
-        recordBtn.classList.remove('recording');
         recordBtn.style.backgroundColor = 'white';
-        log("녹화 정지됨");
+        recordBtn.innerHTML = '';
+        log("녹화 중지됨. 파일 처리 중...");
     }
 }
 
@@ -198,7 +192,9 @@ function createAutoGuideLines() {
     const cx = w / 2, cy = h / 2;
     const rad = phoneRollAtRecord * (Math.PI / 180);
     lines = [];
+    // 수평선 (노란색 점선)
     lines.push({ p1: { x: cx - Math.cos(rad) * w, y: cy - Math.sin(rad) * w }, p2: { x: cx + Math.cos(rad) * w, y: cy + Math.sin(rad) * w }, color: '#ffeb3b', isDash: true });
+    // 수직선
     lines.push({ p1: { x: cx - Math.cos(rad + Math.PI/2) * h, y: cy - Math.sin(rad + Math.PI/2) * h }, p2: { x: cx + Math.cos(rad + Math.PI/2) * h, y: cy + Math.sin(rad + Math.PI/2) * h }, color: '#ffeb3b', isDash: true });
     drawAll();
 }
