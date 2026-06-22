@@ -1,4 +1,5 @@
 import { DynamicLeveler } from './sensor.js';
+import { ArcherySync } from './firebase-sync.js';
 
 let streamRef = null;
 let mediaRecorder = null;
@@ -6,6 +7,7 @@ let recordedChunks = [];
 let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
+let archerySync = null;
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
@@ -63,7 +65,19 @@ async function initApp() {
             recordBtn.style.pointerEvents = 'auto';
             
             log("카메라 스트림 연동 성공! 하단 버튼으로 녹화를 제어하세요.");
-            try { await leveler.init(); } catch(e) { log("기기 센서 마운트 스킵됨"); }
+            
+            try { 
+                await leveler.init(); 
+                
+                // 동기화 모듈 초기화 및 연결 (방 이름: my-kukgung-room)
+                archerySync = new ArcherySync(
+                    () => { if (!isRecording) startRecording(); }, // 원격 START 시 실행
+                    () => { if (isRecording) stopRecording(); }    // 원격 STOP 시 실행
+                );
+                archerySync.init('my-kukgung-room');
+            } catch(e) { 
+                log("센서/동기화 마운트 스킵됨"); 
+            }
         } catch (err) {
             log("장치 에러 상태: " + err.message);
         }
@@ -96,7 +110,7 @@ async function startRecording() {
     
     recordedChunks = [];
     const mime = getSupportedMimeType();
-    log(`매칭된 타겟 인코더: ${mime || '시스템 기본값 디폴트'}`);
+    log(`매칭된 타겟 인코더: ${mime || '시스템 기본값 디폴'}`);
     
     try {
         const options = mime ? { mimeType: mime } : {};
@@ -129,6 +143,9 @@ async function startRecording() {
         recordBtn.classList.add('recording');
         recordBtn.innerText = "STOP";
         log("● 실시간 레코딩 중... 정지하려면 한 번 더 터치하세요.");
+
+        // [동기화] 타 기기에 동시 시작 전송
+        if (archerySync) archerySync.sendSignal('START');
     } catch (e) {
         log("레코딩 초기화 예외: " + e.message);
     }
@@ -141,6 +158,9 @@ async function stopRecording() {
         isRecording = false;
         recordBtn.classList.remove('recording');
         recordBtn.innerText = "";
+
+        // [동기화] 타 기기에 동시 종료 전송
+        if (archerySync) archerySync.sendSignal('STOP');
     }
 }
 
@@ -148,7 +168,7 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 document.getElementById('file-upload').onchange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files;
     if (file) {
         activeVideoRoll = 0; 
         loadVideoForAnalysis(URL.createObjectURL(file));
