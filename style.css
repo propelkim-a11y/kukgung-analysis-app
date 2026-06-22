@@ -1,211 +1,229 @@
-/* style.css
- * 완전 투명 UI 및 확대/축소 정밀 분석 최적화 (분석 화면 긴급 교정판)
- */
+import { DynamicLeveler } from './sensor.js';
+import { BowAnalyzer } from './analyzer.js';
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+let streamRef = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let phoneRollAtRecord = 0;
+let activeVideoRoll = 0; 
+let bowAnalyzer = new BowAnalyzer();
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #000; color: #ffffff;
-    height: 100dvh;
-    overflow: hidden;
-}
+const video = document.getElementById('video-preview');
+const recordBtn = document.getElementById('record-btn');
+const statusText = document.getElementById('status-text');
 
-.container { 
-    display: flex; 
-    flex-direction: column; 
-    height: 100dvh;
-    background-color: #000;
-    position: relative;
-}
+const leveler = new DynamicLeveler((isLevel, roll) => {
+    phoneRollAtRecord = roll;
+    if (recordBtn && window.isMobileDevice) {
+        recordBtn.style.borderColor = isLevel ? '#00ff00' : '#ff0000';
+    }
+});
 
-.main-content { 
-    flex: 1; 
-    position: relative; 
-    background-color: #000;
-    overflow: hidden;
-}
-
-.view-section { 
-    width: 100%; 
-    height: 100%; 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    z-index: 1; 
+function getSupportedMimeType() {
+    const types = ['video/webm;codecs=vp8', 'video/mp4;codecs=avc1', 'video/webm', 'video/mp4'];
+    for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return ''; 
 }
 
-#video-preview, #output-canvas { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: contain; 
-    background: #000;
+function checkMobile() {
+    return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-/* 상하단 탭 기본 레이아웃 */
-.header { 
-    text-align: center; 
-    padding: 20px; 
-    background: transparent; 
-    z-index: 100; 
-    position: absolute;
-    top: 0;
-    width: 100%;
-    pointer-events: none; 
+async function initApp() {
+    window.isMobileDevice = checkMobile();
+
+    if (!window.isMobileDevice) {
+        const lvContainer = document.getElementById('level-container');
+        if (lvContainer) lvContainer.style.display = 'none';
+        if (statusText) statusText.innerText = "PC 에뮬레이션 모드";
+        document.getElementById('angle-text').innerText = "가상 고정";
+        recordBtn.style.border = '5px solid #007aff';
+        recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
+    }
+
+    document.getElementById('btn-permission').onclick = async () => {
+        if (statusText) statusText.innerText = "카메라 장치 탐색 중...";
+        
+        const videoConstraints = window.isMobileDevice 
+            ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
+
+        try {
+            streamRef = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+            video.srcObject = streamRef;
+            await video.play();
+            
+            document.getElementById('permission-overlay').style.display = 'none';
+            recordBtn.style.zIndex = '99999'; 
+            recordBtn.style.pointerEvents = 'auto';
+            if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
+            
+            setTimeout(async () => {
+                if (window.isMobileDevice) {
+                    try { await leveler.init(); } catch(e) {}
+                }
+            }, 100);
+
+        } catch (err) {
+            // ⚡ [PC 하드웨어 무부재 긴급 구제 패치] 웹캠/수평계가 아예 없어도 무조건 허용 처리
+            console.warn("실물 카메라 미감지: PC 분석 가상 테스트 모드로 진입합니다.");
+            document.getElementById('permission-overlay').style.display = 'none';
+            recordBtn.style.zIndex = '99999'; 
+            recordBtn.style.pointerEvents = 'auto';
+            
+            if (statusText) statusText.innerText = "PC 수동 업로드 대기중";
+            
+            // 실물 기기가 없으므로 가상의 연습용 캔버스 도화지 백그라운드를 즉시 가마운트 유도
+            loadDummyCanvasForPC();
+        }
+    };
+
+    let lastTriggerTime = 0;
+    const handleAction = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        const now = Date.now();
+        if (now - lastTriggerTime < 300) return; 
+        lastTriggerTime = now;
+
+        // 웹캠이 있는 경우에만 실물 녹화 제어
+        if (streamRef) {
+            if (!isRecording) startRecording();
+            else stopRecording();
+        } else {
+            // 웹캠이 없는 PC일 경우 셔터를 누르면 로컬 하드디스크의 동영상 수동 파일업로드 창을 즉시 오픈
+            document.getElementById('file-upload').click();
+        }
+    };
+
+    recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
+    recordBtn.addEventListener('click', handleAction, { capture: true });
 }
 
-.footer { 
-    background: rgba(0, 0, 0, 0.4); 
-    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
-    display: flex; 
-    flex-direction: column; 
-    gap: 12px; 
-    align-items: center; 
-    z-index: 100; 
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    pointer-events: none; 
-    backdrop-filter: blur(10px); 
-    -webkit-backdrop-filter: blur(10px);
+// ⚡ 웹캠이 전혀 없는 데스크톱용 가상 정지 화면 백그라운드 강제 빌더
+function loadDummyCanvasForPC() {
+    const dc = document.getElementById('drawing-canvas');
+    const oc = document.getElementById('output-canvas');
+    
+    // 일반적인 HD 비디오 해상도 규격을 가상 매핑
+    dc.width = oc.width = 1280;
+    dc.height = oc.height = 720;
+    
+    switchMode('analyze');
+    bowAnalyzer.init();
+    
+    const ctx = oc.getContext('2d');
+    ctx.fillStyle = '#111113';
+    ctx.fillRect(0, 0, oc.width, oc.height);
+    
+    // 안내 텍스트 렌더링
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏹 하단 [영상 파일 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
+    ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 
-.mode-selector, .action-zone {
-    pointer-events: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
+async function startRecording() {
+    if (!streamRef) return;
+    recordedChunks = [];
+    const mime = getSupportedMimeType();
+    
+    try {
+        mediaRecorder = new MediaRecorder(streamRef, mime ? { mimeType: mime } : {});
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            const ext = mime.includes('webm') ? 'webm' : 'mp4';
+            a.download = `kukgung_${Date.now()}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            activeVideoRoll = phoneRollAtRecord;
+            loadVideoForAnalysis(url);
+        };
+
+        mediaRecorder.start(1000); 
+        isRecording = true;
+        recordBtn.classList.add('recording');
+        recordBtn.innerText = "STOP";
+    } catch (e) {
+        console.error(e);
+    }
 }
 
-#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
-#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
-
-/* 수평계 */
-.level-container { 
-    position: absolute; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); 
-    pointer-events: none; 
-    z-index: 2; 
-}
-.center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
-.level-line { 
-    width: 220px; height: 2px; 
-    background-color: #ff4d4d; 
-    position: absolute; left: -110px; 
-    transition: transform 0.05s linear, background-color 0.3s; 
+async function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.innerText = "";
+    }
 }
 
-/* ⚡ [핵심 수정] 분석 모드는 독립적인 flex 구조를 취하고 촬영용 투명 헤더보다 무조건 위로 올림 */
-#analysis-section { 
-    z-index: 500; /* 헤더 z-index 100보다 높게 설정하여 촬영 수평계가 겹쳐 나오는 버그 원천 차단 */
-    background: #000;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: calc(85px + env(safe-area-inset-bottom)); /* 하단 탭 영역 공간 확보 */
+document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
+document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
+
+document.getElementById('file-upload').onchange = (e) => {
+    const file = e.target.files[0]; // 배열 버그 예외 노출 전면 고정
+    if (file) {
+        activeVideoRoll = 0; 
+        loadVideoForAnalysis(URL.createObjectURL(file));
+    }
+};
+
+function switchMode(mode) {
+    document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
+    document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
+    
+    document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
+    document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
+
+    const actionZone = document.querySelector('.action-zone');
+    if (actionZone) {
+        actionZone.classList.toggle('hidden', mode === 'analyze');
+    }
 }
 
-.canvas-container { 
-    width: 100%; 
-    flex: 1; 
-    position: relative; 
-    overflow: hidden; 
-    touch-action: none;
+function loadVideoForAnalysis(url) {
+    const v = document.createElement('video');
+    v.src = url; v.muted = true; v.playsInline = true;
+    window.analysisVideo = v;
+    
+    v.onloadedmetadata = () => {
+        const dc = document.getElementById('drawing-canvas');
+        const oc = document.getElementById('output-canvas');
+        
+        dc.width = oc.width = v.videoWidth;
+        dc.height = oc.height = v.videoHeight;
+        
+        v.currentTime = 0.1; 
+        switchMode('analyze');
+        
+        bowAnalyzer.init(); 
+        
+        v.onseeked = () => {
+            const ctx = oc.getContext('2d');
+            ctx.drawImage(v, 0, 0, oc.width, oc.height);
+        };
+    };
 }
 
-#drawing-canvas {
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    pointer-events: auto;
-}
+document.getElementById('btn-video-prev').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1); };
+document.getElementById('btn-video-next').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1); };
+document.getElementById('btn-video-play').onclick = () => { 
+    if(window.analysisVideo) {
+        if(window.analysisVideo.paused) window.analysisVideo.play();
+        else window.analysisVideo.pause();
+    }
+};
+document.getElementById('btn-clear-draw').onclick = () => { if (bowAnalyzer) bowAnalyzer.clear(); };
 
-#manual-analysis-box canvas {
-    image-rendering: -webkit-optimize-contrast; 
-    image-rendering: crisp-edges;
-}
-
-/* 도구 및 컨트롤러 */
-.tool-bar { 
-    position: absolute; top: 20px; right: 15px; /* 헤더가 가려지므로 상단 여백 보정 */
-    display: flex; flex-direction: column; gap: 10px; z-index: 600; 
-}
-.tool-btn { 
-    padding: 10px 15px; background: rgba(0,0,0,0.6); 
-    border: 1px solid rgba(255,255,255,0.2); color: #fff; 
-    border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px); cursor: pointer;
-}
-.angle-badge {
-    padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center; max-width: 200px;
-}
-
-.video-controls {
-    display: flex; justify-content: center; gap: 15px; 
-    margin: 15px 0 5px 0; z-index: 600;
-    pointer-events: auto;
-}
-.control-btn {
-    padding: 10px 15px; background: rgba(255, 255, 255, 0.15); 
-    border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; 
-    border-radius: 10px; backdrop-filter: blur(10px); font-size: 0.9rem; cursor: pointer;
-}
-
-/* ⚡ 결과 리포트 박스 위치 및 글자 겹침 해결 */
-.report-box { 
-    padding: 15px; 
-    background: rgba(255, 255, 255, 0.08); 
-    border-radius: 15px; 
-    margin: 0 15px; 
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 600;
-    pointer-events: auto;
-}
-.main-result { text-align: center; }
-.main-result span:first-child { display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 2px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 2.2rem; display: block; }
-
-/* 하단 인터랙션 컨트롤러 */
-.mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; cursor: pointer; }
-.mode-selector button.active { background: #007aff; }
-
-#record-btn { 
-    width: 65px; 
-    height: 65px; 
-    flex-shrink: 0; 
-    border-radius: 50%; 
-    border: 4px solid #ffffff; 
-    background: rgba(255, 255, 255, 0.2); 
-    transition: all 0.2s ease-in-out; 
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-}
-#record-btn.recording { 
-    border-radius: 12px; 
-    background: #ff4d4d; 
-    width: 55px;
-    height: 55px;
-    animation: pulse 1.5s infinite; 
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-    70% { transform: scale(0.9); box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
-    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
-}
-
-.hidden { display: none !important; }
-.btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; display: inline-block; cursor: pointer; }
-
-.overlay { 
-    position: fixed; top:0; left:0; width:100%; height:100%; 
-    background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
-}
-.overlay-content { text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px; }
-.overlay-content h2 { margin-bottom: 15px; }
-.overlay-content p { font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px; }
-#btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
+initApp();
