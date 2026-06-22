@@ -1,5 +1,4 @@
 import { DynamicLeveler } from './sensor.js';
-import { ArcherySync } from './firebase-sync.js';
 
 let streamRef = null;
 let mediaRecorder = null;
@@ -7,7 +6,6 @@ let recordedChunks = [];
 let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
-let archerySync = null;
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
@@ -68,15 +66,9 @@ async function initApp() {
             
             try { 
                 await leveler.init(); 
-                
-                // 동기화 모듈 초기화 및 연결 (방 이름: my-kukgung-room)
-                archerySync = new ArcherySync(
-                    () => { if (!isRecording) startRecording(); }, // 원격 START 시 실행
-                    () => { if (isRecording) stopRecording(); }    // 원격 STOP 시 실행
-                );
-                archerySync.init('my-kukgung-room');
+                log("기기 수평 자이로 센서 활성화 완료.");
             } catch(e) { 
-                log("센서/동기화 마운트 스킵됨"); 
+                log("센서 마운트 실패: " + e.message); 
             }
         } catch (err) {
             log("장치 에러 상태: " + err.message);
@@ -110,7 +102,7 @@ async function startRecording() {
     
     recordedChunks = [];
     const mime = getSupportedMimeType();
-    log(`매칭된 타겟 인코더: ${mime || '시스템 기본값 디폴'}`);
+    log(`사용 인코더 코덱: ${mime || '기본 디폴트값'}`);
     
     try {
         const options = mime ? { mimeType: mime } : {};
@@ -121,7 +113,7 @@ async function startRecording() {
         };
         
         mediaRecorder.onstop = () => {
-            log("스트림 파일 빌드 및 컨텍스트 로딩 중...");
+            log("스트림 파일 인코딩 및 컨텍스트 로딩 중...");
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
@@ -138,14 +130,11 @@ async function startRecording() {
             loadVideoForAnalysis(url);
         };
 
-        mediaRecorder.start(1000); // 안전한 스트리밍 저장을 위해 1초 블록화 처리
+        mediaRecorder.start(1000); 
         isRecording = true;
         recordBtn.classList.add('recording');
         recordBtn.innerText = "STOP";
-        log("● 실시간 레코딩 중... 정지하려면 한 번 더 터치하세요.");
-
-        // [동기화] 타 기기에 동시 시작 전송
-        if (archerySync) archerySync.sendSignal('START');
+        log("● 레코딩 중... 정지하려면 버튼을 터치하세요.");
     } catch (e) {
         log("레코딩 초기화 예외: " + e.message);
     }
@@ -153,14 +142,11 @@ async function startRecording() {
 
 async function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        log("레코딩 중단 신호 송신 중...");
+        log("레코딩 중단 처리 중...");
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
         recordBtn.innerText = "";
-
-        // [동기화] 타 기기에 동시 종료 전송
-        if (archerySync) archerySync.sendSignal('STOP');
     }
 }
 
@@ -189,7 +175,6 @@ function loadVideoForAnalysis(url) {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
         
-        // 디바이스 비디오 본래 비율에 맞춘 해상도 리셋 구조
         dc.width = oc.width = v.videoWidth;
         dc.height = oc.height = v.videoHeight;
         
@@ -199,7 +184,7 @@ function loadVideoForAnalysis(url) {
         v.onseeked = () => {
             const ctx = oc.getContext('2d');
             ctx.drawImage(v, 0, 0, oc.width, oc.height);
-            log(`분석 레이어 마운트 완료 (기준 수평 오프셋: ${activeVideoRoll.toFixed(1)}°)`);
+            log(`분석 레이어 완료 (수평 보정값: ${activeVideoRoll.toFixed(1)}°)`);
         };
     };
 }
