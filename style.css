@@ -1,7 +1,3 @@
-/* style.css
- * 완전 투명 UI 및 확대/축소 정밀 분석 최적화
- */
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -39,11 +35,10 @@ body {
 #video-preview, #output-canvas { 
     width: 100%; 
     height: 100%; 
-    object-fit: contain; /* 영상 원본 비율을 완벽 보존 */
+    object-fit: contain; 
     background: #000;
 }
 
-/* 상하단 레이어 투명 배경 및 터치 통과 처리 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -67,7 +62,6 @@ body {
     pointer-events: none; 
 }
 
-/* 실 작동 버튼 및 트리거 요소들은 터치 이벤트 정상화 복구 */
 .mode-selector, .action-zone {
     pointer-events: auto;
 }
@@ -75,7 +69,7 @@ body {
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
 #angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* 스마트폰 전용 수평계 배치 설계 */
+/* 수평계 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -92,7 +86,7 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 모드 세부 정렬 설정 (비디오 제어 컨트롤 바 공간 보장) */
+/* 분석 섹션 UI 고정 */
 #analysis-section { 
     z-index: 5;
     background: #000;
@@ -108,14 +102,21 @@ body {
     touch-action: none;
 }
 
+#drawing-canvas {
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    pointer-events: auto;
+}
+
 #manual-analysis-box canvas {
-    transform-origin: center;
-    transition: transform 0.1s ease-out;
     image-rendering: -webkit-optimize-contrast; 
     image-rendering: crisp-edges;
 }
 
-/* 우측 상단 플로팅 보정 도구 바 */
+/* 도구 및 컨트롤러 */
 .tool-bar { 
     position: absolute; top: 70px; right: 15px; 
     display: flex; flex-direction: column; gap: 10px; z-index: 110; 
@@ -124,6 +125,9 @@ body {
     padding: 10px 15px; background: rgba(0,0,0,0.6); 
     border: 1px solid rgba(255,255,255,0.2); color: #fff; 
     border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px);
+}
+.angle-badge {
+    padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;
 }
 
 .video-controls {
@@ -151,11 +155,10 @@ body {
 .main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
 .highlight { font-weight: bold; color: #00e676; font-size: 2.5rem; display: block; }
 
-/* 기능 전환 선택 탭 디자인 */
+/* 공통 버튼 */
 .mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; }
 .mode-selector button.active { background: #007aff; }
 
-/* 국궁 전통 카메라 셔터 스타일 테두리 조형 애니메이션 */
 #record-btn { 
     width: 70px; height: 70px; border-radius: 50%; border: 5px solid #fff; 
     background: rgba(255,255,255,0.2); transition: all 0.3s; 
@@ -169,4 +172,14 @@ body {
 }
 
 .hidden { display: none !important; }
-.btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; }
+.btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; display: inline-block; cursor: pointer; }
+
+/* 오버레이 팝업 스타일 지정 */
+.overlay { 
+    position: fixed; top:0; left:0; width:100%; height:100%; 
+    background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
+}
+.overlay-content { text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px; }
+.overlay-content h2 { margin-bottom: 15px; }
+.overlay-content p { font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px; }
+#btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
