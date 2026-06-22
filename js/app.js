@@ -9,10 +9,28 @@ let phoneRollAtRecord = 0;
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
 
-// 센서 초기화 (실패해도 촬영에 지장 없도록 처리)
+// 상태를 화면에 보여주기 위한 텍스트 엘리먼트 (없으면 생성)
+let statusLog = document.getElementById('status-log');
+if (!statusLog) {
+    statusLog = document.createElement('div');
+    statusLog.id = 'status-log';
+    statusLog.style = 'position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.7); color:white; padding:5px; font-size:12px; z-index:9999; pointer-events:none;';
+    document.body.appendChild(statusLog);
+}
+
+function log(msg) {
+    console.log(msg);
+    statusLog.innerText = msg;
+}
+
 const leveler = new DynamicLeveler((isLevel, roll) => {
-    recordBtn.classList.toggle('ready', isLevel);
     phoneRollAtRecord = roll;
+    // 수평 여부에 따라 버튼 색상만 변경 (클릭은 항상 가능하게)
+    if (isLevel) {
+        recordBtn.style.border = '5px solid #00ff00'; // 수평 맞으면 초록 테두리
+    } else {
+        recordBtn.style.border = '5px solid #ff0000'; // 수평 안 맞으면 빨간 테두리
+    }
 });
 
 const outputCanvas = document.getElementById('output-canvas');
@@ -30,13 +48,11 @@ let lastPinchDistance = 0;
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-    // 버튼 클릭 시 즉시 반응 확인을 위한 로그
-    console.log("App Initialized");
+    log("앱 시작됨 - 권한 허용을 눌러주세요");
 
-    // 1. 권한 허용 및 카메라 시작
     document.getElementById('btn-permission').onclick = async () => {
+        log("카메라 권한 요청 중...");
         try {
-            // 카메라 먼저 켜기
             streamRef = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: false 
@@ -45,47 +61,49 @@ async function initApp() {
             await video.play();
             document.getElementById('permission-overlay').classList.add('hidden');
             
-            // 카메라 켜진 후 버튼 강제 활성화 (센서 상관없이)
-            recordBtn.classList.add('ready');
-            recordBtn.style.pointerEvents = 'auto'; 
+            // [중요] 촬영 버튼 강제 활성화 및 시각화
             recordBtn.style.opacity = '1';
+            recordBtn.style.pointerEvents = 'auto';
+            recordBtn.style.display = 'block';
+            recordBtn.style.backgroundColor = 'white'; // 버튼이 보이도록 흰색 설정
+            log("카메라 연결 성공 - 촬영 가능");
 
-            // 그 다음 센서 시도
-            try { await leveler.init(); } catch(e) { console.warn("Sensor skipped"); }
+            try { await leveler.init(); log("센서 연결 성공"); } catch(e) { log("센서 미지원/거부"); }
         } catch (err) {
+            log("카메라 에러: " + err.message);
             alert('카메라 시작 실패: ' + err.message);
         }
     };
 
-    // 2. 녹화 버튼 로직 (가장 단순하게 변경)
-    recordBtn.onclick = () => {
-        if (!isRecording) {
-            startRecording();
-        } else {
-            stopRecording();
-        }
+    // 클릭 이벤트가 안 먹힐 경우를 대비해 touchstart도 연결
+    const handleRecordClick = (e) => {
+        if (e) e.preventDefault();
+        log("촬영 버튼 클릭됨! 현재 상태: " + (isRecording ? "녹화중" : "대기중"));
+        if (!isRecording) startRecording();
+        else stopRecording();
     };
 
-    // 모드 전환
+    recordBtn.onclick = handleRecordClick;
+    recordBtn.ontouchstart = (e) => {
+        if (!isRecording) handleRecordClick(e);
+    };
+
     document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
     document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
     
-    // 파일 업로드
     document.getElementById('file-upload').onchange = (e) => {
         const file = e.target.files[0];
         if (file) loadVideoForAnalysis(URL.createObjectURL(file));
     };
 
-    // 초기화
     document.getElementById('btn-clear-draw').onclick = () => {
         lines = []; selectedLines = []; drawAll(); resManualAngle.innerText = "0°";
     };
 
-    // 분석용 비디오 설정
     const v = document.createElement('video');
     v.hidden = true;
     v.playsInline = true;
-    v.muted = true; // 분석용은 무조건 뮤트
+    v.muted = true;
     document.body.appendChild(v);
     window.analysisVideo = v;
 
@@ -100,27 +118,27 @@ async function initApp() {
 
 function startRecording() {
     if (!streamRef) {
-        alert('카메라가 연결되지 않았습니다.');
+        log("에러: 스트림 없음");
         return;
     }
     
     recordedChunks = [];
-    // 가장 호환성 높은 순서대로 코덱 시도
-    const mimeTypes = [
-        'video/webm;codecs=vp8',
-        'video/webm',
-        'video/mp4'
-    ];
+    const mimeTypes = ['video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
     let selectedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
 
     try {
+        log("녹화 시작 시도 (" + selectedMime + ")");
         mediaRecorder = new MediaRecorder(streamRef, selectedMime ? { mimeType: selectedMime } : {});
-        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        
+        mediaRecorder.ondataavailable = e => { 
+            if (e.data.size > 0) recordedChunks.push(e.data); 
+        };
+        
         mediaRecorder.onstop = () => {
+            log("녹화 종료 - 파일 생성 중");
             const blob = new Blob(recordedChunks, { type: selectedMime || 'video/webm' });
             const url = URL.createObjectURL(blob);
             
-            // 자동 다운로드
             const a = document.createElement('a');
             a.href = url;
             a.download = `kukgung_${Date.now()}.webm`;
@@ -134,8 +152,10 @@ function startRecording() {
         mediaRecorder.start(1000);
         isRecording = true;
         recordBtn.classList.add('recording');
-        console.log("Recording started");
+        recordBtn.style.backgroundColor = 'red'; // 녹화 중일 때 빨간색으로 변경
+        log("● 녹화 중...");
     } catch (e) {
+        log("녹화 에러: " + e.message);
         alert('녹화 시작 에러: ' + e.message);
     }
 }
@@ -145,7 +165,8 @@ function stopRecording() {
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
-        console.log("Recording stopped");
+        recordBtn.style.backgroundColor = 'white';
+        log("녹화 정지됨");
     }
 }
 
