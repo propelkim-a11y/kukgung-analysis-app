@@ -1,6 +1,6 @@
 /**
  * sensor.js
- * PC 및 안드로이드/iOS 크로스 플랫폼 규격 완벽 대응 자이로 필터
+ * PC 및 안드로이드/iOS 크로스 플랫폼 최신 스마트폰 규격 완벽 대응 자이로 수평 필터
  */
 
 export class DynamicLeveler {
@@ -16,13 +16,13 @@ export class DynamicLeveler {
         this.angleText = document.getElementById('angle-text');
         this.levelLine = document.getElementById('level-line');
 
-        // 데스크톱 PC 웹 환경 브라우저일 경우 센서 마운트 안전 우회 처리
+        // 데스크톱 PC 웹 환경 브라우저일 경우 물리 센서 마운트 안전 우회 패치
         if (!window.isMobileDevice) {
-            console.log("PC 환경 감지됨: 자이로 수평 필터를 비활성화하고 가상 고정축을 바인딩합니다.");
+            console.log("PC 기기 감지: 자이로 연산 장치를 소프트웨어 가상 고정 상태로 대체합니다.");
             return true;
         }
 
-        // iOS 13+ 하드웨어 센서 샌드박스 권한 요청 구문
+        // iOS 13 이상 사파리 전용 샌드박스 센서 권한 강제 획득식
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const permissionState = await DeviceOrientationEvent.requestPermission();
@@ -32,21 +32,21 @@ export class DynamicLeveler {
                 }
                 return false;
             } catch (err) {
-                console.error("iOS 장치 센서 마운트 예외:", err);
+                console.error("iOS 하드웨어 가속도 축 참조 실패:", err);
                 return false;
             }
         } else {
-            // 안드로이드 갤럭시 스마트폰 및 표준 모바일 웹 표준 브라우저
+            // 안드로이드 갤럭시 크롬 및 모바일 오페라/웨일 브라우저 계열
             window.addEventListener('deviceorientation', (e) => this.handleOrientation(e));
             return true;
         }
     }
 
     handleOrientation(event) {
-        if (!window.isMobileDevice) return; // PC 모드일 경우 하드웨어 물리 필터 연산 스킵
+        if (!window.isMobileDevice) return; 
 
-        let roll = event.gamma || 0;  
-        let pitch = event.beta || 0;  
+        let roll = event.gamma || 0;  // 물리 좌우 틸트 값
+        let pitch = event.beta || 0;  // 물리 전후 틸트 값
         let displayAngle = roll;
 
         let screenAngle = 0;
@@ -56,6 +56,7 @@ export class DynamicLeveler {
             screenAngle = window.orientation;
         }
 
+        // 국궁 궁체 다각도 정사각 정렬을 위한 90도 가로회전 축 교정 매트릭스
         if (screenAngle === 90) {
             displayAngle = -pitch;
         } else if (screenAngle === 270 || screenAngle === -90) {
@@ -75,13 +76,14 @@ export class DynamicLeveler {
             this.angleText.innerText = `${displayAngle.toFixed(1)}°`;
         }
 
+        // 국궁 활대 고착 기하 오차 범위 가중치를 반영한 1.0도 정밀 수평 허용 기준 정의
         const IS_LEVEL = Math.abs(displayAngle) <= 1.0; 
         
         if (this.levelLine) {
             this.levelLine.style.backgroundColor = IS_LEVEL ? "#00e676" : "#ff4d4d";
         }
         if (this.statusText) {
-            this.statusText.innerText = IS_LEVEL ? "수평 일치" : "수평 조정 필요";
+            this.statusText.innerText = IS_LEVEL ? "수평 일치" : "수평 정렬 필";
             this.statusText.style.color = IS_LEVEL ? "#00e676" : "#ff4d4d";
         }
 
