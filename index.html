@@ -6,24 +6,24 @@
     <title>활터에 있소 - 국궁 다각도 자세 분석</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- ⚡ 로딩 고속화 패치: defer 속성을 부여하여 초기 진입 정체 차단 -->
+    <!-- ⚡ 로딩 고속화: defer 속성으로 화면 렌더링 블로킹 차단 -->
     <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
     <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
     <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <!-- 권한 허용 가이드 오버레이 팝업 -->
+    <!-- 권한 및 모드 선택 팝업 -->
     <div id="permission-overlay" class="overlay">
-        <div class="overlay-content" style="text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px;">
-            <h2 style="margin-bottom: 15px;">🏹 활터에 있소</h2>
-            <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px;">정밀한 국궁 자세 분석을 위해<br>카메라(웹캠) 및 센서 권한이 필요합니다.</p>
+        <div class="overlay-content">
+            <h2>활터에 있소</h2>
+            <p>정밀한 국궁 자세 분석을 위해<br>카메라 및 센서 권한이 필요합니다.</p>
             <button id="btn-permission">권한 허용 및 시작하기</button>
         </div>
     </div>
 
     <div class="container">
-        <!-- 상단 헤더: 수평계 및 모드 상태 표시바 -->
+        <!-- 상단 헤더 -->
         <header class="header">
             <div id="status-text">장치 준비 중</div>
             <div id="angle-text">0.0°</div>
@@ -31,9 +31,9 @@
 
         <!-- 메인 콘텐츠 화면 -->
         <main class="main-content">
-            <!-- 촬영 모드 (수평 가이드 가로선 포함) -->
+            <!-- 촬영 모드 -->
             <div id="camera-section" class="view-section">
-                <div class="video-wrapper" style="width: 100%; height: 100%; position: relative;">
+                <div class="video-wrapper">
                     <video id="video-preview" autoplay playsinline muted></video>
                     <div id="level-container" class="level-container">
                         <div class="center-target"></div>
@@ -42,17 +42,17 @@
                 </div>
             </div>
 
-            <!-- 분석 모드 (결과 리포트 및 터치 선긋기 화면) -->
+            <!-- 분석 모드 -->
             <div id="analysis-section" class="view-section hidden">
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
-                    <canvas id="drawing-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: auto;"></canvas>
+                    <canvas id="drawing-canvas"></canvas>
                 </div>
                 <div class="tool-bar">
                     <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
-                    <div id="angle-display" class="angle-badge" style="padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;">두 선을 선택하세요</div>
+                    <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
                 </div>
-                <!-- 비디오 미세 조정 컨트롤러 추가 -->
+                <!-- 비디오 컨트롤러 -->
                 <div class="video-controls">
                     <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
                     <button id="btn-video-play" class="control-btn">▶️ 재생/정지</button>
@@ -60,7 +60,7 @@
                 </div>
 
                 <div class="report-box">
-                    <div class="report-item main-result" style="border-bottom: none;">
+                    <div class="report-item main-result">
                         <span>📐 선택한 두 선의 각도</span>
                         <span id="res-manual-angle" class="highlight">0°</span>
                     </div>
@@ -68,23 +68,21 @@
             </div>
         </main>
 
-        <!-- 하단 탭 컨트롤바 -->
+        <!-- 하단 컨트롤바 -->
         <footer class="footer">
             <div class="mode-selector">
                 <button id="btn-mode-shoot" class="active">촬영하기</button>
                 <button id="btn-mode-analyze">결과보기</button>
             </div>
-            <div class="action-zone" style="display: flex; align-items: center; gap: 15px;">
-                <!-- 녹화 구동 제어 셔터 -->
+            <div class="action-zone">
                 <button id="record-btn" aria-label="녹화"></button>
-                <!-- 로컬 영상 수동 분석용 업로더 -->
                 <input type="file" id="file-upload" accept="video/*" class="hidden">
                 <label for="file-upload" id="upload-label" class="btn-secondary">영상 업로드 분석</label>
             </div>
         </footer>
     </div>
 
-    <!-- 스크립트 모듈 로드 -->
+    <!-- 스크립트 로드 -->
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>
