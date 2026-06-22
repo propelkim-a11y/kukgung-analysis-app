@@ -7,11 +7,11 @@ let recordedChunks = [];
 let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
-let poseDetector = null; 
 let bowAnalyzer = new BowAnalyzer();
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
+const statusText = document.getElementById('status-text');
 
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
@@ -32,44 +32,20 @@ function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// ⚡ 무거운 AI 엔진을 지연 로딩(Lazy Load)하여 실행 딜레이 현상 전면 해결
-async function ensurePoseModelLoaded() {
-    if (poseDetector) return; 
-    
-    if (typeof window.Pose === 'undefined') {
-        console.warn("AI 라이브러리가 백그라운드 다운로드 중입니다.");
-        return;
-    }
-
-    // @ts-ignore
-    poseDetector = new window.Pose({
-        locateFile: (file) => `https://jsdelivr.net{file}`
-    });
-
-    // 🚀 경량화 모델 고정 적용
-    poseDetector.setOptions({
-        modelComplexity: 0, 
-        smoothLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-    });
-
-    poseDetector.onResults(() => {});
-    console.log("AI 관절 인식 엔진 백그라운드 준비 완료.");
-}
-
 async function initApp() {
     window.isMobileDevice = checkMobile();
 
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
-        document.getElementById('status-text').innerText = "PC 웹캠 분석 모드";
+        if (statusText) statusText.innerText = "PC 웹캠 분석 모드";
         document.getElementById('angle-text').innerText = "고정";
         recordBtn.style.border = '5px solid #fff';
     }
 
     document.getElementById('btn-permission').onclick = async () => {
+        if (statusText) statusText.innerText = "카메라 시동 중...";
+        
         const videoConstraints = window.isMobileDevice 
             ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
             : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -82,12 +58,17 @@ async function initApp() {
             document.getElementById('permission-overlay').style.display = 'none';
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
+            if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
             
-            if (window.isMobileDevice) {
-                try { await leveler.init(); } catch(e) {}
-            }
+            // 시차를 주어 센서를 활성화함으로써 카메라 초기 구동 프리징 전면 차단
+            setTimeout(async () => {
+                if (window.isMobileDevice) {
+                    try { await leveler.init(); } catch(e) {}
+                }
+            }, 100);
+
         } catch (err) {
-            alert("카메라 장치 연결 실패: HTTPS 보안 주소에서 실행 중인지 확인하세요.");
+            alert("카메라 장치를 활성화할 수 없습니다. HTTPS 주소 상태 및 브라우저 권한 설정을 확인하세요.");
         }
     };
 
@@ -118,6 +99,7 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
+            // 촬영 원본 로컬 장치 클립보드 자동 다운로드 다운로더
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -149,16 +131,13 @@ async function stopRecording() {
 }
 
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
-document.getElementById('btn-mode-analyze').onclick = async () => {
-    switchMode('analyze');
-    await ensurePoseModelLoaded(); 
-};
+document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
 document.getElementById('file-upload').onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const file = e.target.files;
+    if (file && file[0]) {
         activeVideoRoll = 0; 
-        loadVideoForAnalysis(URL.createObjectURL(file));
+        loadVideoForAnalysis(URL.createObjectURL(file[0]));
     }
 };
 
@@ -176,15 +155,13 @@ function loadVideoForAnalysis(url) {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
         
-        // 내부 연산 해상도 강제 싱크
         dc.width = oc.width = v.videoWidth;
         dc.height = oc.height = v.videoHeight;
         
         v.currentTime = 0.1; 
         switchMode('analyze');
-        ensurePoseModelLoaded(); 
         
-        bowAnalyzer.init(); // 📐 터치 각도 분석기 장착
+        bowAnalyzer.init(); // 📐 순수 직선 터치 슬라이스 드로잉 모듈 결합
         
         v.onseeked = () => {
             const ctx = oc.getContext('2d');
@@ -193,7 +170,7 @@ function loadVideoForAnalysis(url) {
     };
 }
 
-// ⏪ -0.1s / ⏩ +0.1s 비디오 탐색 컨트롤러 로직 바인딩
+// ⏪ -0.1초 역탐색 / ⏩ +0.1초 정탐색 프레임 조작용 컨트롤러 구문 바인딩
 document.getElementById('btn-video-prev').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1); };
 document.getElementById('btn-video-next').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1); };
 document.getElementById('btn-video-play').onclick = () => { 
