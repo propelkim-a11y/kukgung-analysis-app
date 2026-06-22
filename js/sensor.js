@@ -31,7 +31,8 @@ export class DynamicLeveler {
     }
 
     handleOrientation(event) {
-        if (!window.isMobileDevice) return;
+        // ⚡ PC 모드이거나 센서 객체가 유실된 환경일 경우 고정축 스킵 방어 처리
+        if (!window.isMobileDevice || !event) return;
 
         let roll = event.gamma || 0;  
         let pitch = event.beta || 0;  
