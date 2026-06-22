@@ -1,4 +1,5 @@
 import { DynamicLeveler } from './sensor.js';
+import { BowAnalyzer } from './analyzer.js';
 
 let streamRef = null;
 let mediaRecorder = null;
@@ -6,11 +7,13 @@ let recordedChunks = [];
 let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
+let poseDetector = null; 
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
+const bowAnalyzer = new BowAnalyzer();
 
-// 1. PC 및 모바일 공용 디버깅 상단 로그 바
+// 1. 디버깅 전용 상단 실시간 모니터링 로그 바
 let statusLog = document.getElementById('status-log');
 if (!statusLog) {
     statusLog = document.createElement('div');
@@ -20,7 +23,7 @@ if (!statusLog) {
 }
 function log(m) { statusLog.innerText = m; console.log(m); }
 
-// 2. 모바일/PC 유연 변환 수평계 연동
+// 2. 하드웨어 수평 바인딩 콜백
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
     if (recordBtn && window.isMobileDevice) {
@@ -28,117 +31,111 @@ const leveler = new DynamicLeveler((isLevel, roll) => {
     }
 });
 
-// 3. PC/모바일 범용 최적 코덱 선별기
+// 3. 브라우저 엔진 인코더 검출
 function getSupportedMimeType() {
-    const types = [
-        'video/webm;codecs=vp8', // 구글 크롬, PC 브라우저 표준 호환
-        'video/mp4;codecs=avc1', // iOS, 모바일 사파리 최고 호환
-        'video/webm',
-        'video/mp4'
-    ];
+    const types = ['video/webm;codecs=vp8', 'video/mp4;codecs=avc1', 'video/webm', 'video/mp4'];
     for (const type of types) {
         if (MediaRecorder.isTypeSupported(type)) return type;
     }
     return ''; 
 }
 
-// 4. 모바일 환경 여부 검사기
 function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// 5. 어플리케이션 엔진 구동 구문
+// 4. 비디오 분석 모드 전용 경량화 AI 호출 엔진 기동
+async function ensurePoseModelLoaded() {
+    if (poseDetector) return; 
+    
+    log("📥 AI 관절 포인트 매핑 분석 인프라 준비 중...");
+    if (typeof window.Pose === 'undefined') {
+        log("⚠️ 라이브러리 준비 동기화 대기 중... 잠시 후 재시도하세요.");
+        return;
+    }
+
+    // @ts-ignore
+    poseDetector = new window.Pose({
+        locateFile: (file) => `https://jsdelivr.net{file}`
+    });
+
+    poseDetector.setOptions({
+        modelComplexity: 0, // Lite 무선 전송 모드로 강제 지정하여 네트워크 프리징 원천 봉쇄
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    poseDetector.onResults(() => { console.log("AI 좌표 동기화 성공"); });
+    log("🚀 AI 관절 분석 모델 탑재 완료.");
+}
+
+// 5. 핵심 앱 스타터 초기화 구문
 async function initApp() {
     window.isMobileDevice = checkMobile();
-    log(`기기 상태 확인: ${window.isMobileDevice ? '모바일 환경' : 'PC 데스크톱 환경'}`);
+    log(`기기 감지 분석: ${window.isMobileDevice ? '스마트폰 모바일' : 'PC 데스크톱 익스텐션'}`);
 
-    // PC 환경일 경우 불필요한 UI 숨김 및 리프레시 처리
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
-        if (lvContainer) lvContainer.style.display = 'none'; // PC에서는 실시간 수평계 라인 숨김
-        document.getElementById('status-text').innerText = "PC 모드 활성화";
-        document.getElementById('angle-text').innerText = "고정";
-        recordBtn.style.border = '5px solid #fff'; // PC 전용 상시 고정 버튼 스타일
+        if (lvContainer) lvContainer.style.display = 'none';
+        document.getElementById('status-text').innerText = "PC 웹캠 상태 고정";
+        document.getElementById('angle-text').innerText = "PC 모드";
+        recordBtn.style.border = '5px solid #fff';
     }
 
     document.getElementById('btn-permission').onclick = async () => {
-        log("미디어 입력 장치(카메라/웹캠) 연결 대기 중...");
-        
-        // PC 환경과 모바일 환경 맞춤형 카메라 탐색 옵션 분기 처리
+        log("미디어 스트림 노드 수집 중...");
         const videoConstraints = window.isMobileDevice 
-            ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } // 모바일 후면
-            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };        // PC 전면 웹캠
+            ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
 
         try {
-            streamRef = await navigator.mediaDevices.getUserMedia({ 
-                video: videoConstraints, 
-                audio: false 
-            });
+            streamRef = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
             video.srcObject = streamRef;
             await video.play();
             
             document.getElementById('permission-overlay').style.display = 'none';
-            
-            // 인터랙션 레이어 강제 복구
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
             
-            log("카메라 스트림 링크 연동 성공! 하단 셔터로 녹화를 제어하세요.");
+            log("카메라 초기 연결 성공! 촬영을 시작할 수 있습니다.");
             
             if (window.isMobileDevice) {
-                try { 
-                    await leveler.init(); 
-                    log("모바일 자이로 수평 필터 기동 완료.");
-                } catch(e) { log("센서 샌드박스 예외 스킵"); }
+                try { await leveler.init(); } catch(e) { log("센서 마운트 예외 통과"); }
             }
         } catch (err) {
-            log(`장치 접근 실패 (${err.name}): ${err.message}\n로컬 파일 더블클릭 실행이거나 HTTP 주소 접속일 수 있습니다. 깃허브 HTTPS 주소로 확인해 주세요.`);
+            log(`접근 거부: ${err.message}\n로컬 더블클릭 구동이거나 비보안 프로토콜(HTTP) 주소일 수 있습니다.`);
         }
     };
 
-    // 마우스 및 모바일 터치 오버랩 방지(Debounce) 인터랙션 핸들러
     let lastTriggerTime = 0;
     const handleAction = (e) => {
         if (e) { e.preventDefault(); e.stopPropagation(); }
-        
         const now = Date.now();
         if (now - lastTriggerTime < 300) return; 
         lastTriggerTime = now;
 
-        log("레코딩 제어 신호 트리거됨");
-        if (!isRecording) {
-            startRecording();
-        } else {
-            stopRecording();
-        }
+        if (!isRecording) startRecording();
+        else stopRecording();
     };
 
-    // 크로스 플랫폼 완벽 호환 이벤트 리스너 마운트
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 }
 
 async function startRecording() {
-    if (!streamRef) { log("컴포넌트 오류: 기동 가능한 카메라 스트림이 부재합니다."); return; }
-    
+    if (!streamRef) return;
     recordedChunks = [];
     const mime = getSupportedMimeType();
-    log(`인코더 타겟 포맷: ${mime || '기본 디폴트 컨테이너'}`);
     
     try {
-        const options = mime ? { mimeType: mime } : {};
-        mediaRecorder = new MediaRecorder(streamRef, options);
-        
-        mediaRecorder.ondataavailable = (e) => { 
-            if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
-        };
-        
+        mediaRecorder = new MediaRecorder(streamRef, mime ? { mimeType: mime } : {});
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
-            log("비디오 파싱 및 캔버스 마운팅 트랜스폼 중...");
+            log("스트림 디코더 빌드 변환 가동 중...");
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
-            // 영구 저장용 로컬 디바이스 자동 파일 클리퍼 작동
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -155,15 +152,14 @@ async function startRecording() {
         isRecording = true;
         recordBtn.classList.add('recording');
         recordBtn.innerText = "STOP";
-        log("● 비디오 레코딩 작동 중... 중단하려면 다시 터치/클릭하세요.");
+        log("● 자세 촬영 녹화 진행 중...");
     } catch (e) {
-        log("비디오 스트림 인코더 빌드 예외 발생: " + e.message);
+        log("미디어 레코더 기동 샌드박스 예외: " + e.message);
     }
 }
 
 async function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        log("레코딩 스트림 마감 종료 명령 송신 중...");
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
@@ -171,11 +167,15 @@ async function stopRecording() {
     }
 }
 
-// 레이아웃 변경 핸들러
+// 탭 모드 체인저 및 이벤트 바인딩
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
-document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
+document.getElementById('btn-mode-analyze').onclick = async () => {
+    switchMode('analyze');
+    await ensurePoseModelLoaded();
+};
+
 document.getElementById('file-upload').onchange = (e) => {
-    const file = e.target.files[0]; // 버그 패치: files 배열 단독 노드로 변경
+    const file = e.target.files[0];
     if (file) {
         activeVideoRoll = 0; 
         loadVideoForAnalysis(URL.createObjectURL(file));
@@ -195,20 +195,40 @@ function loadVideoForAnalysis(url) {
     v.onloadedmetadata = () => {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
-        
         dc.width = oc.width = v.videoWidth;
         dc.height = oc.height = v.videoHeight;
         
         v.currentTime = 0.1; 
         switchMode('analyze');
+        ensurePoseModelLoaded();
+        
+        // ⚡ 터치 분석 엔진 코어 기동 스위치 온
+        bowAnalyzer.init();
         
         v.onseeked = () => {
             const ctx = oc.getContext('2d');
             ctx.drawImage(v, 0, 0, oc.width, oc.height);
-            log(`분석 레이어 빌드 완료 ${window.isMobileDevice ? `(기준 수평값: ${activeVideoRoll.toFixed(1)}°)` : '(PC 모드 기준점 고정)'}`);
+            log(`분석 대상 프레임 배치 완료 ${window.isMobileDevice ? `(기울기 보정치: ${activeVideoRoll.toFixed(1)}°)` : '(PC 모드)'}`);
         };
     };
 }
 
-// 어플리케이션 스타터 기동
+// ⏩ 프레임 미세 전후방 컨트롤러 추가 기능 연동 리스너
+document.getElementById('btn-video-prev').onclick = () => {
+    if(window.analysisVideo) window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1);
+};
+document.getElementById('btn-video-next').onclick = () => {
+    if(window.analysisVideo) window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1);
+};
+document.getElementById('btn-video-play').onclick = () => {
+    if(window.analysisVideo) {
+        if(window.analysisVideo.paused) window.analysisVideo.play();
+        else window.analysisVideo.pause();
+    }
+};
+document.getElementById('btn-clear-draw').onclick = () => {
+    if (bowAnalyzer) bowAnalyzer.clear();
+};
+
+// 물리 기동
 initApp();
