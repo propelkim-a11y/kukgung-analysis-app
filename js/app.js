@@ -8,22 +8,11 @@ let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
 let poseDetector = null; 
+let bowAnalyzer = new BowAnalyzer();
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
-const bowAnalyzer = new BowAnalyzer();
 
-// 1. 디버깅 전용 상단 실시간 모니터링 로그 바
-let statusLog = document.getElementById('status-log');
-if (!statusLog) {
-    statusLog = document.createElement('div');
-    statusLog.id = 'status-log';
-    statusLog.style = 'position:fixed; top:0; left:0; width:100%; background:rgba(0,0,0,0.9); color:#0f0; font-size:11px; z-index:100000; padding:6px; font-weight:bold; pointer-events:none; word-break:break-all;';
-    document.body.appendChild(statusLog);
-}
-function log(m) { statusLog.innerText = m; console.log(m); }
-
-// 2. 하드웨어 수평 바인딩 콜백
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
     if (recordBtn && window.isMobileDevice) {
@@ -31,7 +20,6 @@ const leveler = new DynamicLeveler((isLevel, roll) => {
     }
 });
 
-// 3. 브라우저 엔진 인코더 검출
 function getSupportedMimeType() {
     const types = ['video/webm;codecs=vp8', 'video/mp4;codecs=avc1', 'video/webm', 'video/mp4'];
     for (const type of types) {
@@ -44,13 +32,12 @@ function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// 4. 비디오 분석 모드 전용 경량화 AI 호출 엔진 기동
+// ⚡ 무거운 AI 엔진을 지연 로딩(Lazy Load)하여 실행 딜레이 현상 전면 해결
 async function ensurePoseModelLoaded() {
     if (poseDetector) return; 
     
-    log("📥 AI 관절 포인트 매핑 분석 인프라 준비 중...");
     if (typeof window.Pose === 'undefined') {
-        log("⚠️ 라이브러리 준비 동기화 대기 중... 잠시 후 재시도하세요.");
+        console.warn("AI 라이브러리가 백그라운드 다운로드 중입니다.");
         return;
     }
 
@@ -59,32 +46,30 @@ async function ensurePoseModelLoaded() {
         locateFile: (file) => `https://jsdelivr.net{file}`
     });
 
+    // 🚀 경량화 모델 고정 적용
     poseDetector.setOptions({
-        modelComplexity: 0, // Lite 무선 전송 모드로 강제 지정하여 네트워크 프리징 원천 봉쇄
+        modelComplexity: 0, 
         smoothLandmarks: true,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
     });
 
-    poseDetector.onResults(() => { console.log("AI 좌표 동기화 성공"); });
-    log("🚀 AI 관절 분석 모델 탑재 완료.");
+    poseDetector.onResults(() => {});
+    console.log("AI 관절 인식 엔진 백그라운드 준비 완료.");
 }
 
-// 5. 핵심 앱 스타터 초기화 구문
 async function initApp() {
     window.isMobileDevice = checkMobile();
-    log(`기기 감지 분석: ${window.isMobileDevice ? '스마트폰 모바일' : 'PC 데스크톱 익스텐션'}`);
 
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
-        document.getElementById('status-text').innerText = "PC 웹캠 상태 고정";
-        document.getElementById('angle-text').innerText = "PC 모드";
+        document.getElementById('status-text').innerText = "PC 웹캠 분석 모드";
+        document.getElementById('angle-text').innerText = "고정";
         recordBtn.style.border = '5px solid #fff';
     }
 
     document.getElementById('btn-permission').onclick = async () => {
-        log("미디어 스트림 노드 수집 중...");
         const videoConstraints = window.isMobileDevice 
             ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
             : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -98,13 +83,11 @@ async function initApp() {
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
             
-            log("카메라 초기 연결 성공! 촬영을 시작할 수 있습니다.");
-            
             if (window.isMobileDevice) {
-                try { await leveler.init(); } catch(e) { log("센서 마운트 예외 통과"); }
+                try { await leveler.init(); } catch(e) {}
             }
         } catch (err) {
-            log(`접근 거부: ${err.message}\n로컬 더블클릭 구동이거나 비보안 프로토콜(HTTP) 주소일 수 있습니다.`);
+            alert("카메라 장치 연결 실패: HTTPS 보안 주소에서 실행 중인지 확인하세요.");
         }
     };
 
@@ -132,7 +115,6 @@ async function startRecording() {
         mediaRecorder = new MediaRecorder(streamRef, mime ? { mimeType: mime } : {});
         mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
-            log("스트림 디코더 빌드 변환 가동 중...");
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
@@ -152,9 +134,8 @@ async function startRecording() {
         isRecording = true;
         recordBtn.classList.add('recording');
         recordBtn.innerText = "STOP";
-        log("● 자세 촬영 녹화 진행 중...");
     } catch (e) {
-        log("미디어 레코더 기동 샌드박스 예외: " + e.message);
+        console.error(e);
     }
 }
 
@@ -167,11 +148,10 @@ async function stopRecording() {
     }
 }
 
-// 탭 모드 체인저 및 이벤트 바인딩
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = async () => {
     switchMode('analyze');
-    await ensurePoseModelLoaded();
+    await ensurePoseModelLoaded(); 
 };
 
 document.getElementById('file-upload').onchange = (e) => {
@@ -195,40 +175,33 @@ function loadVideoForAnalysis(url) {
     v.onloadedmetadata = () => {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
+        
+        // 내부 연산 해상도 강제 싱크
         dc.width = oc.width = v.videoWidth;
         dc.height = oc.height = v.videoHeight;
         
         v.currentTime = 0.1; 
         switchMode('analyze');
-        ensurePoseModelLoaded();
+        ensurePoseModelLoaded(); 
         
-        // ⚡ 터치 분석 엔진 코어 기동 스위치 온
-        bowAnalyzer.init();
+        bowAnalyzer.init(); // 📐 터치 각도 분석기 장착
         
         v.onseeked = () => {
             const ctx = oc.getContext('2d');
             ctx.drawImage(v, 0, 0, oc.width, oc.height);
-            log(`분석 대상 프레임 배치 완료 ${window.isMobileDevice ? `(기울기 보정치: ${activeVideoRoll.toFixed(1)}°)` : '(PC 모드)'}`);
         };
     };
 }
 
-// ⏩ 프레임 미세 전후방 컨트롤러 추가 기능 연동 리스너
-document.getElementById('btn-video-prev').onclick = () => {
-    if(window.analysisVideo) window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1);
-};
-document.getElementById('btn-video-next').onclick = () => {
-    if(window.analysisVideo) window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1);
-};
-document.getElementById('btn-video-play').onclick = () => {
+// ⏪ -0.1s / ⏩ +0.1s 비디오 탐색 컨트롤러 로직 바인딩
+document.getElementById('btn-video-prev').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1); };
+document.getElementById('btn-video-next').onclick = () => { if(window.analysisVideo) window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1); };
+document.getElementById('btn-video-play').onclick = () => { 
     if(window.analysisVideo) {
         if(window.analysisVideo.paused) window.analysisVideo.play();
         else window.analysisVideo.pause();
     }
 };
-document.getElementById('btn-clear-draw').onclick = () => {
-    if (bowAnalyzer) bowAnalyzer.clear();
-};
+document.getElementById('btn-clear-draw').onclick = () => { if (bowAnalyzer) bowAnalyzer.clear(); };
 
-// 물리 기동
 initApp();
