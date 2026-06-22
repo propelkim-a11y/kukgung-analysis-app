@@ -39,6 +39,7 @@ body {
     background: #000;
 }
 
+/* 상하단 레이어 완전 투명화 및 터치 통과 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -69,7 +70,7 @@ body {
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
 #angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* 수평계 */
+/* 수평계 UI 타겟 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -86,7 +87,7 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 섹션 UI 고정 */
+/* 분석 화면 레이아웃 고정 */
 #analysis-section { 
     z-index: 5;
     background: #000;
@@ -111,11 +112,6 @@ body {
     pointer-events: auto;
 }
 
-#manual-analysis-box canvas {
-    image-rendering: -webkit-optimize-contrast; 
-    image-rendering: crisp-edges;
-}
-
 /* 도구 및 컨트롤러 */
 .tool-bar { 
     position: absolute; top: 70px; right: 15px; 
@@ -124,7 +120,7 @@ body {
 .tool-btn { 
     padding: 10px 15px; background: rgba(0,0,0,0.6); 
     border: 1px solid rgba(255,255,255,0.2); color: #fff; 
-    border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px);
+    border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px); cursor: pointer;
 }
 .angle-badge {
     padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;
@@ -138,7 +134,7 @@ body {
 .control-btn {
     padding: 10px 15px; background: rgba(255, 255, 255, 0.15); 
     border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; 
-    border-radius: 10px; backdrop-filter: blur(10px); font-size: 0.9rem;
+    border-radius: 10px; backdrop-filter: blur(10px); font-size: 0.9rem; cursor: pointer;
 }
 
 .report-box { 
@@ -155,13 +151,13 @@ body {
 .main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
 .highlight { font-weight: bold; color: #00e676; font-size: 2.5rem; display: block; }
 
-/* 공통 버튼 */
-.mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; }
+/* 하단 버튼 및 레코딩 셔터 */
+.mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; cursor: pointer; }
 .mode-selector button.active { background: #007aff; }
 
 #record-btn { 
     width: 70px; height: 70px; border-radius: 50%; border: 5px solid #fff; 
-    background: rgba(255,255,255,0.2); transition: all 0.3s; 
+    background: rgba(255,255,255,0.2); transition: all 0.3s; cursor: pointer;
 }
 #record-btn.recording { border-radius: 15px; background: #ff4d4d; animation: pulse 1.5s infinite; }
 
@@ -174,7 +170,7 @@ body {
 .hidden { display: none !important; }
 .btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; display: inline-block; cursor: pointer; }
 
-/* 오버레이 팝업 스타일 지정 */
+/* 권한 오버레이 */
 .overlay { 
     position: fixed; top:0; left:0; width:100%; height:100%; 
     background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
