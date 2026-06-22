@@ -1,5 +1,5 @@
 /* style.css
- * 완전 투명 UI 및 확대/축소 정밀 분석 최적화
+ * 완전 투명 UI 및 확대/축소 정밀 분석 최적화 (분석 화면 긴급 교정판)
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,7 +15,6 @@ body {
     display: flex; 
     flex-direction: column; 
     height: 100dvh;
-    justify-content: space-between; 
     background-color: #000;
     position: relative;
 }
@@ -43,7 +42,7 @@ body {
     background: #000;
 }
 
-/* 상단 헤더 영역 설정 (터치 방해 금지) */
+/* 상하단 탭 기본 레이아웃 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -55,10 +54,9 @@ body {
     pointer-events: none; 
 }
 
-/* ⚡ 하단 푸터 영역 대폭 수정 (버튼 찌그러짐 차단 패치) */
 .footer { 
-    background: rgba(0, 0, 0, 0.4); /* 반투명 검은 배경으로 가독성 확보 */
-    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); /* 모바일 하단 바 노치 여백 완벽 대응 */
+    background: rgba(0, 0, 0, 0.4); 
+    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
     display: flex; 
     flex-direction: column; 
     gap: 12px; 
@@ -68,11 +66,10 @@ body {
     bottom: 0;
     width: 100%;
     pointer-events: none; 
-    backdrop-filter: blur(10px); /* 아이폰 스타일의 유리 블러 효과 */
+    backdrop-filter: blur(10px); 
     -webkit-backdrop-filter: blur(10px);
 }
 
-/* 푸터 내부 클릭/터치 활성화 고정 */
 .mode-selector, .action-zone {
     pointer-events: auto;
     display: flex;
@@ -84,7 +81,7 @@ body {
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
 #angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* 수평계 조준 타겟 */
+/* 수평계 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -101,12 +98,13 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 모드 세로 레이아웃 고정 */
+/* ⚡ [핵심 수정] 분석 모드는 독립적인 flex 구조를 취하고 촬영용 투명 헤더보다 무조건 위로 올림 */
 #analysis-section { 
-    z-index: 5;
+    z-index: 500; /* 헤더 z-index 100보다 높게 설정하여 촬영 수평계가 겹쳐 나오는 버그 원천 차단 */
     background: #000;
     display: flex;
     flex-direction: column;
+    padding-bottom: calc(85px + env(safe-area-inset-bottom)); /* 하단 탭 영역 공간 확보 */
 }
 
 .canvas-container { 
@@ -126,16 +124,15 @@ body {
     pointer-events: auto;
 }
 
-/* 분석용 드로잉 캔버스 해상도 화질 보정 */
 #manual-analysis-box canvas {
     image-rendering: -webkit-optimize-contrast; 
     image-rendering: crisp-edges;
 }
 
-/* 우측 상단 플로팅 도구 상자 */
+/* 도구 및 컨트롤러 */
 .tool-bar { 
-    position: absolute; top: 70px; right: 15px; 
-    display: flex; flex-direction: column; gap: 10px; z-index: 110; 
+    position: absolute; top: 20px; right: 15px; /* 헤더가 가려지므로 상단 여백 보정 */
+    display: flex; flex-direction: column; gap: 10px; z-index: 600; 
 }
 .tool-btn { 
     padding: 10px 15px; background: rgba(0,0,0,0.6); 
@@ -143,13 +140,12 @@ body {
     border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px); cursor: pointer;
 }
 .angle-badge {
-    padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;
+    padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center; max-width: 200px;
 }
 
-/* 분석 비디오 재생 컨트롤 바 */
 .video-controls {
     display: flex; justify-content: center; gap: 15px; 
-    margin-bottom: 10px; z-index: 110;
+    margin: 15px 0 5px 0; z-index: 600;
     pointer-events: auto;
 }
 .control-btn {
@@ -158,30 +154,29 @@ body {
     border-radius: 10px; backdrop-filter: blur(10px); font-size: 0.9rem; cursor: pointer;
 }
 
-/* 최하단 각도 리포트 상자 */
+/* ⚡ 결과 리포트 박스 위치 및 글자 겹침 해결 */
 .report-box { 
-    padding: 20px; 
-    background: rgba(0, 0, 0, 0.6); 
-    border-radius: 20px; 
-    margin: 0 15px 10px; 
+    padding: 15px; 
+    background: rgba(255, 255, 255, 0.08); 
+    border-radius: 15px; 
+    margin: 0 15px; 
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 110;
+    z-index: 600;
     pointer-events: auto;
 }
 .main-result { text-align: center; }
-.main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 2.5rem; display: block; }
+.main-result span:first-child { display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 2px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 2.2rem; display: block; }
 
-/* 탭 전환 상단 버튼 */
+/* 하단 인터랙션 컨트롤러 */
 .mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; cursor: pointer; }
 .mode-selector button.active { background: #007aff; }
 
-/* ⚡ 촬영 버튼 정중앙 배치 및 크기 왜곡 방지 고정 */
 #record-btn { 
     width: 65px; 
     height: 65px; 
-    flex-shrink: 0; /* 부모 상자에 짓눌려 납작해지는 현상 완벽 방지 */
+    flex-shrink: 0; 
     border-radius: 50%; 
     border: 4px solid #ffffff; 
     background: rgba(255, 255, 255, 0.2); 
@@ -189,8 +184,6 @@ body {
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
-
-/* 녹화 작동 중일 때 사각형 큐브 셔터로 트랜지션 및 펄스 효과 */
 #record-btn.recording { 
     border-radius: 12px; 
     background: #ff4d4d; 
@@ -208,7 +201,6 @@ body {
 .hidden { display: none !important; }
 .btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; display: inline-block; cursor: pointer; }
 
-/* 앱 최초 진입 인프라 차단용 권한 요청 스크린 */
 .overlay { 
     position: fixed; top:0; left:0; width:100%; height:100%; 
     background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
