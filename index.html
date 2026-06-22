@@ -5,15 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>활터에 있소 - 국궁 다각도 자세 분석</title>
     <link rel="stylesheet" href="style.css">
-    
-    <!-- ⚡ 로딩 고속화: defer 속성으로 화면 렌더링 블로킹 차단 -->
-    <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
-    <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
-    <script defer src="https://jsdelivr.net" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <!-- 권한 및 모드 선택 팝업 -->
+    <!-- 권한 및 기기 시작 팝업 -->
     <div id="permission-overlay" class="overlay">
         <div class="overlay-content">
             <h2>활터에 있소</h2>
@@ -23,7 +18,7 @@
     </div>
 
     <div class="container">
-        <!-- 상단 헤더 -->
+        <!-- 상단 헤더: 수평계 실시간 데이터 -->
         <header class="header">
             <div id="status-text">장치 준비 중</div>
             <div id="angle-text">0.0°</div>
@@ -33,7 +28,7 @@
         <main class="main-content">
             <!-- 촬영 모드 -->
             <div id="camera-section" class="view-section">
-                <div class="video-wrapper">
+                <div class="video-wrapper" style="width: 100%; height: 100%; position: relative;">
                     <video id="video-preview" autoplay playsinline muted></video>
                     <div id="level-container" class="level-container">
                         <div class="center-target"></div>
@@ -42,7 +37,7 @@
                 </div>
             </div>
 
-            <!-- 분석 모드 -->
+            <!-- 분석 모드 (결과 리포트 및 프레임 탐색) -->
             <div id="analysis-section" class="view-section hidden">
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
@@ -52,7 +47,7 @@
                     <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
                     <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
                 </div>
-                <!-- 비디오 컨트롤러 -->
+                <!-- 비디오 탐색 컨트롤러 -->
                 <div class="video-controls">
                     <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
                     <button id="btn-video-play" class="control-btn">▶️ 재생/정지</button>
@@ -75,14 +70,16 @@
                 <button id="btn-mode-analyze">결과보기</button>
             </div>
             <div class="action-zone">
+                <!-- 촬영 버튼 -->
                 <button id="record-btn" aria-label="녹화"></button>
+                <!-- 로컬 영상 업로드 버튼 -->
                 <input type="file" id="file-upload" accept="video/*" class="hidden">
-                <label for="file-upload" id="upload-label" class="btn-secondary">영상 업로드 분석</label>
+                <label for="file-upload" id="upload-label" class="btn-secondary">영상 파일 업로드 분석</label>
             </div>
         </footer>
     </div>
 
-    <!-- 스크립트 로드 -->
+    <!-- 핵심 스크립트 모듈 로드 -->
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>
