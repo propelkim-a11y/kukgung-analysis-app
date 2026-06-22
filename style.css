@@ -39,11 +39,11 @@ body {
 #video-preview, #output-canvas { 
     width: 100%; 
     height: 100%; 
-    object-fit: contain; /* 영상 전체가 다 보이도록 */
+    object-fit: contain; /* 영상 원본 비율을 완벽 보존 */
     background: #000;
 }
 
-/* 상하단 탭 완전 투명화 */
+/* 상하단 레이어 투명 배경 및 터치 통과 처리 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -52,7 +52,7 @@ body {
     position: absolute;
     top: 0;
     width: 100%;
-    pointer-events: none; /* 영상 터치 방해 금지 */
+    pointer-events: none; 
 }
 
 .footer { 
@@ -64,10 +64,10 @@ body {
     position: absolute;
     bottom: 0;
     width: 100%;
-    pointer-events: none; /* 부모 레이어는 터치 이벤트를 통과시킴 */
+    pointer-events: none; 
 }
 
-/* 푸터 내부 콘텐츠는 터치가 작동해야 함 */
+/* 실 작동 버튼 및 트리거 요소들은 터치 이벤트 정상화 복구 */
 .mode-selector, .action-zone {
     pointer-events: auto;
 }
@@ -75,7 +75,7 @@ body {
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
 #angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* 수평계 */
+/* 스마트폰 전용 수평계 배치 설계 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -92,7 +92,7 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 섹션 레이아웃 대폭 수정 (컨트롤러 밀림현상 방지) */
+/* 분석 모드 세부 정렬 설정 (비디오 제어 컨트롤 바 공간 보장) */
 #analysis-section { 
     z-index: 5;
     background: #000;
@@ -102,7 +102,7 @@ body {
 
 .canvas-container { 
     width: 100%; 
-    flex: 1; /* 캔버스가 상단 남는 여백을 채우고 컨트롤러 공간을 보장 */
+    flex: 1; 
     position: relative; 
     overflow: hidden; 
     touch-action: none;
@@ -111,11 +111,11 @@ body {
 #manual-analysis-box canvas {
     transform-origin: center;
     transition: transform 0.1s ease-out;
-    image-rendering: -webkit-optimize-contrast; /* 모바일 사파리 확대 시 화질 깨짐 완화 */
+    image-rendering: -webkit-optimize-contrast; 
     image-rendering: crisp-edges;
 }
 
-/* 도구 및 컨트롤러 */
+/* 우측 상단 플로팅 보정 도구 바 */
 .tool-bar { 
     position: absolute; top: 70px; right: 15px; 
     display: flex; flex-direction: column; gap: 10px; z-index: 110; 
@@ -151,10 +151,11 @@ body {
 .main-result span:first-child { display: block; font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px; }
 .highlight { font-weight: bold; color: #00e676; font-size: 2.5rem; display: block; }
 
-/* 공통 버튼 */
+/* 기능 전환 선택 탭 디자인 */
 .mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; }
 .mode-selector button.active { background: #007aff; }
 
+/* 국궁 전통 카메라 셔터 스타일 테두리 조형 애니메이션 */
 #record-btn { 
     width: 70px; height: 70px; border-radius: 50%; border: 5px solid #fff; 
     background: rgba(255,255,255,0.2); transition: all 0.3s; 
@@ -169,10 +170,3 @@ body {
 
 .hidden { display: none !important; }
 .btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #fff; font-weight: bold; }
-
-/* 오버레이 */
-.overlay { 
-    position: fixed; top:0; left:0; width:100%; height:100%; 
-    background:#000; z-index:1000; display:flex; justify-content:center; align-items:center; 
-}
-#btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; }
