@@ -6,19 +6,19 @@
     <title>활터에 있소 - 국궁 다각도 자세 분석</title>
     <link rel="stylesheet" href="style.css">
     <!-- MediaPipe Pose 필수 라이브러리 CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
     <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
     <!-- iOS 센서 및 카메라 권한 팝업 -->
     <div id="permission-overlay" class="overlay">
-        <div class="overlay-content">
-            <h2>🏹 활터에 있소</h2>
-            <p>정밀한 국궁 자세 및 고각 분석을 위해<br>카메라 및 수평계 권한이 필요합니다.</p>
+        <div class="overlay-content" style="text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px;">
+            <h2 style="margin-bottom: 15px;">🏹 활터에 있소</h2>
+            <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px;">정밀한 국궁 자세 및 고각 분석을 위해<br>카메라 및 수평계 권한이 필요합니다.</p>
             <button id="btn-permission">권한 허용 및 시작하기</button>
         </div>
     </div>
@@ -34,7 +34,7 @@
         <main class="main-content">
             <!-- 촬영 모드 (수평 가이드 오버레이 포함) -->
             <div id="camera-section" class="view-section">
-                <div class="video-wrapper">
+                <div class="video-wrapper" style="width: 100%; height: 100%; position: relative;">
                     <video id="video-preview" autoplay playsinline muted></video>
                     <div class="level-container">
                         <div class="center-target"></div>
@@ -47,11 +47,11 @@
             <div id="analysis-section" class="view-section hidden">
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
-                    <canvas id="drawing-canvas" style="position: absolute; top: 0; left: 0;"></canvas>
+                    <canvas id="drawing-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: auto;"></canvas>
                 </div>
                 <div class="tool-bar">
                     <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
-                    <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
+                    <div id="angle-display" class="angle-badge" style="padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;">두 선을 선택하세요</div>
                 </div>
                 <!-- 비디오 컨트롤러 추가 -->
                 <div class="video-controls">
@@ -63,7 +63,7 @@
                 <div class="report-box">
                     <div class="report-item main-result" style="border-bottom: none;">
                         <span>📐 선택한 두 선의 각도</span>
-                        <span id="res-manual-angle" class="highlight" style="font-size: 2rem;">0°</span>
+                        <span id="res-manual-angle" class="highlight">0°</span>
                     </div>
                 </div>
             </div>
@@ -76,8 +76,8 @@
                 <button id="btn-mode-analyze">결과보기</button>
             </div>
             <div class="action-zone">
-                <!-- 촬영 버튼 (수평이 맞아야 활성화) -->
-                <button id="record-btn" disabled aria-label="녹화"></button>
+                <!-- 촬영 버튼 -->
+                <button id="record-btn" aria-label="녹화"></button>
                 <!-- 분석용 파일 업로드 버튼 -->
                 <input type="file" id="file-upload" accept="video/*" class="hidden">
                 <label for="file-upload" id="upload-label" class="btn-secondary hidden">영상 파일 업로드 분석</label>
