@@ -18,7 +18,7 @@ export class BowAnalyzer {
         this.canvas.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
     }
 
-    // ⚡ 물리 화면 크기와 캔버스 내부 해상도간의 비례식을 계산하여 선이 어긋나는 버그 원천 차단
+    // 캔버스 박스 크기 비율을 대입하여 모바일 터치 선 어긋남 원천 방지 공식 적용
     getCanvasCoordinates(e) {
         const rect = this.canvas.getBoundingClientRect();
         let clientX = e.clientX;
@@ -44,9 +44,9 @@ export class BowAnalyzer {
         this.points.push(coord);
         this.draw();
 
-        if (this.points.length === 1 && this.badgeDisplay) this.badgeDisplay.innerText = "첫 번째 선의 끝점을 짚으세요.";
-        else if (this.points.length === 2 && this.badgeDisplay) this.badgeDisplay.innerText = "두 번째 선의 시작점을 짚으세요.";
-        else if (this.points.length === 3 && this.badgeDisplay) this.badgeDisplay.innerText = "두 번째 선의 끝점을 짚으세요.";
+        if (this.points.length === 1 && this.badgeDisplay) this.badgeDisplay.innerText = "첫 번째 선의 끝점을 선택하세요.";
+        else if (this.points.length === 2 && this.badgeDisplay) this.badgeDisplay.innerText = "두 번째 선의 시작점을 선택하세요.";
+        else if (this.points.length === 3 && this.badgeDisplay) this.badgeDisplay.innerText = "두 번째 선의 끝점을 선택하세요.";
         else if (this.points.length === 4) this.calculateAngle();
     }
 
