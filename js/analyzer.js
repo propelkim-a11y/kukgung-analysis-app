@@ -1,268 +1,270 @@
 /**
- * analyzer.js
- * 스타일러스 펜(S펜, 애플펜슬) 최적화, 피치 줌 고정 수리, 정밀 격자 그리드 및 렉 제거 다중 분석 엔진
+ * js/analyzer.js
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템
+ * - S펜 / 애플펜슬 Palm Rejection 및 포인터 분리
+ * - 줌/이동 변환 행렬 역산 (확대 상태에서도 정확한 조준점 매핑)
+ * - 삼각함수 기반 다중 선긋기 사잇각(고각) 초정밀 연산
  */
 
-export class BowAnalyzer {
+class BowAnalyzer {
     constructor() {
-        this.canvas = document.getElementById('drawing-canvas');
-        this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-        this.angleDisplay = document.getElementById('res-manual-angle');
-        this.badgeDisplay = document.getElementById('angle-display');
+        this.canvas = null;
+        this.ctx = null;
         
-        this.points = []; // 무제한 다중 선 긋기 좌표 배열
-        this.scale = 1.0;
-        this.offsetX = 0;
-        this.offsetY = 0;
-        this.isDragging = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.lastTouchDist = 0; 
-        this.toolMode = 'draw'; 
-        
-        // 스타일러스 펜 및 멀티 터치 인식을 위한 포인터 상태 추적 맵
-        this.activePointers = new Map();
+        // 다중 선 데이터 구조 (각 선은 시작점과 끝점 좌표 보유)
+        // [{ start: {x, y}, end: {x, y} }, ...]
+        this.lines = []; 
+        this.currentLine = null;
+
+        // 뷰포트 변환 상태 (app.js의 확대/축소/이동과 동기화 필요)
+        this.transform = {
+            scale: 1,
+            offsetX: 0,
+            offsetY: 0
+        };
+
+        // 활성화된 툴 모드 ('move' 또는 'draw')
+        this.toolMode = 'move'; 
+
+        // 바인딩
+        this.handlePointerDown = this.handlePointerDown.bind(this);
+        this.handlePointerMove = this.handlePointerMove.bind(this);
+        this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
-    init() {
-        if (!this.canvas || !this.ctx) return;
-
-        // 중복 등록 방지를 위해 기존 이벤트 완벽 제거 후 단 1회 재등록
-        this.canvas.removeEventListener('pointerdown', this.boundHandlePointerDown);
-        this.canvas.removeEventListener('pointermove', this.boundHandlePointerMove);
-        this.canvas.removeEventListener('pointerup', this.boundHandlePointerUp);
-        this.canvas.removeEventListener('pointercancel', this.boundHandlePointerUp);
-
-        this.boundHandlePointerDown = (e) => this.handlePointerDown(e);
-        this.boundHandlePointerMove = (e) => this.handlePointerMove(e);
-        this.boundHandlePointerUp = (e) => this.handlePointerUp(e);
-
-        this.canvas.addEventListener('pointerdown', this.boundHandlePointerDown);
-        this.canvas.addEventListener('pointermove', this.boundHandlePointerMove);
-        this.canvas.addEventListener('pointerup', this.boundHandlePointerUp);
-        this.canvas.addEventListener('pointercancel', this.boundHandlePointerUp);
-
-        this.canvas.removeEventListener('wheel', this.boundHandleWheel);
-        this.boundHandleWheel = (e) => this.handleWheel(e);
-        this.canvas.addEventListener('wheel', this.boundHandleWheel, { passive: false });
-
-        this.draw();
+    /**
+     * 캔버스 엘리먼트 초기화 및 포인터 이벤트 바인딩
+     */
+    init(canvasElement) {
+        this.canvas = canvasElement;
+        this.ctx = this.canvas.getContext('2d');
+        this.setupPointerEvents();
     }
 
-    setToolMode(mode) {
-        this.toolMode = mode; 
-        this.isDragging = false;
-        this.activePointers.clear();
+    /**
+     * 외부(app.js)에서 변환 행렬 값을 실시간으로 주입받는 동기화 메서드
+     */
+    updateTransform(scale, offsetX, offsetY) {
+        this.transform.scale = scale;
+        this.transform.offsetX = offsetX;
+        this.transform.offsetY = offsetY;
+        this.render();
     }
 
-    getCanvasCoordinates(clientX, clientY) {
+    /**
+     * 툴 모드 변경 ([확대] -> 'move', [선긋기] -> 'draw')
+     */
+    setMode(mode) {
+        this.toolMode = mode;
+    }
+
+    /**
+     * 그어진 모든 조준선 데이터 완전 초기화
+     */
+    clearLines() {
+        this.lines = [];
+        this.currentLine = null;
+        this.render();
+        this.broadcastAngle(0);
+    }
+
+    /**
+     * Pointer Events API 적용 (S펜/애플펜슬 분리 및 Palm Rejection)
+     */
+    setupPointerEvents() {
+        if (!this.canvas) return;
+
+        this.canvas.addEventListener('pointerdown', this.handlePointerDown);
+        this.canvas.addEventListener('pointermove', this.handlePointerMove);
+        this.canvas.addEventListener('pointerup', this.handlePointerUp);
+        this.canvas.addEventListener('pointercancel', this.handlePointerUp);
+    }
+
+    /**
+     * 화면 상의 절대 픽셀 좌표를 줌/이동이 적용된 비디오 캔버스의 로컬 좌표로 역산
+     */
+    getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const screenX = (clientX - rect.left) * (this.canvas.width / rect.width);
-        const screenY = (clientY - rect.top) * (this.canvas.height / rect.height);
         
-        return {
-            x: (screenX - this.offsetX) / this.scale,
-            y: (screenY - this.offsetY) / this.scale
+        // 1. 브라우저 창 내의 순수 마우스/터치 물리 좌표 추출
+        const clientX = event.clientX - rect.left;
+        const clientY = event.clientY - rect.top;
+
+        // 2. 확대 비율(Scale)과 화면 스크롤 스크린 이동 값(Offset)을 역산하여 본래 비디오 소스 좌표로 보정
+        const canvasX = (clientX - this.transform.offsetX) / this.transform.scale;
+        const canvasY = (clientY - this.transform.offsetY) / this.transform.scale;
+
+        return { x: canvasX, y: canvasY };
+    }
+
+    /**
+     * 터치/스타일러스 입력 시작
+     */
+    handlePointerDown(event) {
+        if (this.toolMode !== 'draw') return;
+
+        // Palm Rejection: 스타일러스 펜이 접근한 상태에서 손바닥 터치(touch)가 들어오면 전면 차단 무시
+        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) {
+            return; 
+        }
+        if (event.pointerType === 'pen') {
+            window.isStylusActive = true;
+        }
+
+        this.canvas.setPointerCapture(event.pointerId);
+        const coords = this.getCanvasCoordinates(event);
+
+        // 새로운 선 드로잉 개시
+        this.currentLine = {
+            start: { x: coords.x, y: coords.y },
+            end: { x: coords.x, y: coords.y }
         };
     }
 
-    handlePointerDown(e) {
-        e.preventDefault();
-        this.canvas.setPointerCapture(e.pointerId);
-        this.activePointers.set(e.pointerId, e);
+    /**
+     * 드래그 (선 긋는 중)
+     */
+    handlePointerMove(event) {
+        if (this.toolMode !== 'draw' || !this.currentLine) return;
 
-        const pointerType = e.pointerType; 
+        const coords = this.getCanvasCoordinates(event);
+        this.currentLine.end = { x: coords.x, y: coords.y };
         
-        // 손가락 2개가 화면에 닿았을 때 물리 화면 픽셀 거리 타겟팅 (피치 투 줌 복구 수식)
-        if (this.activePointers.size === 2) {
-            this.isDragging = false; 
-            const pointers = Array.from(this.activePointers.values());
-            this.lastTouchDist = this.getPointerDistance(pointers, pointers);
-            return;
+        this.render();
+        this.calculateAnglesInline();
+    }
+
+    /**
+     * 입력 종료 및 선 확정
+     */
+    handlePointerUp(event) {
+        if (event.pointerType === 'pen') {
+            setTimeout(() => { window.isStylusActive = false; }, 500); // 펜 이탈 후 딜레이 캐싱
         }
 
-        if (this.toolMode === 'move' || e.button === 2) { 
-            this.isDragging = true;
-            this.startX = e.clientX - this.offsetX;
-            this.startY = e.clientY - this.offsetY;
-            return;
+        if (this.toolMode !== 'draw' || !this.currentLine) return;
+
+        // 미세하게 터치만 하고 뗀 경우는 선으로 인정하지 않음 (노이즈 방지)
+        const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
+        if (dist > 5) {
+            this.lines.push(this.currentLine);
         }
+        
+        this.currentLine = null;
+        this.render();
+        this.calculateFinalAngle();
+    }
 
-        if (this.toolMode === 'draw') {
-            if (pointerType === 'touch' && this.hasPenActive()) return;
-
-            const coord = this.getCanvasCoordinates(e.clientX, e.clientY);
-            this.points.push(coord);
-            this.draw();
-            this.calculateAngles();
+    /**
+     * 삼각함수 atan2 기반 고각 및 사잇각 연산
+     */
+    calculateAnglesInline() {
+        if (this.lines.length === 0 && this.currentLine) {
+            // 단일 선만 그어지고 있을 때는 해당 선의 지면 대비 수평 고각 계산
+            const angle = this.getLineAngle(this.currentLine);
+            this.broadcastAngle(angle);
+        } else if (this.lines.length >= 1 && this.currentLine) {
+            // 기존 선이 존재하고 새 선을 추가 전 가이드 중일 때 두 선의 사잇각 연산
+            const angle = this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine);
+            this.broadcastAngle(angle);
         }
     }
 
-    hasPenActive() {
-        for (const p of this.activePointers.values()) {
-            if (p.pointerType === 'pen') return true;
-        }
-        return false;
-    }
-    handlePointerMove(e) {
-        if (!this.activePointers.has(e.pointerId)) return;
-        this.activePointers.set(e.pointerId, e); 
-
-        // 실시간 물리 거리를 계산하여 동적 스케일 조절 (확대/축소)
-        if (this.activePointers.size === 2 && this.lastTouchDist > 0) {
-            const pointers = Array.from(this.activePointers.values());
-            const dist = this.getPointerDistance(pointers, pointers);
-            const factor = dist / this.lastTouchDist;
-            
-            this.scale = Math.min(5.0, Math.max(1.0, this.scale * factor)); 
-            this.lastTouchDist = dist;
-            this.draw();
-            return;
-        }
-
-        // 화면 이동 제어 (확대 상태에서 밀어서 이동)
-        if (this.isDragging) {
-            this.offsetX = e.clientX - this.startX;
-            this.offsetY = e.clientY - this.startY;
-            this.draw();
+    calculateFinalAngle() {
+        if (this.lines.length >= 2) {
+            // 마지막에 그어진 2개 선의 사잇각을 최종 도출
+            const line1 = this.lines[this.lines.length - 2];
+            const line2 = this.lines[this.lines.length - 1];
+            const angle = this.getIntersectionAngle(line1, line2);
+            this.broadcastAngle(angle);
+        } else if (this.lines.length === 1) {
+            const angle = this.getLineAngle(this.lines[0]);
+            this.broadcastAngle(angle);
         }
     }
 
-    handlePointerUp(e) {
-        this.activePointers.delete(e.pointerId);
-        if (this.activePointers.size < 2) {
-            this.lastTouchDist = 0;
-        }
-        this.isDragging = false;
+    /**
+     * 단일 선의 절대 수평각 측정 (atan2)
+     */
+    getLineAngle(line) {
+        const dx = line.end.x - line.start.x;
+        const dy = line.end.y - line.start.y;
+        let angle = Math.atan2(-dy, dx) * (180 / Math.PI); // 컴퓨터 그래픽스 Y축 반전 보정
+        if (angle < 0) angle += 360;
+        return angle % 180; // 직선의 기울기 각도 범위(0~180) 평탄화
     }
 
-    handleWheel(e) {
-        e.preventDefault();
-        const zoomFactor = 1.1;
-        if (e.deltaY < 0) {
-            this.scale = Math.min(5.0, this.scale * zoomFactor);
-        } else {
-            this.scale = Math.max(1.0, this.scale / zoomFactor);
-        }
-        this.draw();
+    /**
+     * 두 선 사이의 사잇각(내각) 계산
+     */
+    getIntersectionAngle(line1, line2) {
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        
+        let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
+        if (diff > 180) diff = 360 - diff;
+        return diff;
     }
 
-    getPointerDistance(p1, p2) {
-        return Math.sqrt(Math.pow(p2.clientX - p1.clientX, 2) + Math.pow(p2.clientY - p1.clientY, 2));
+    /**
+     * 좌측 상단 플로팅 리포트에 각도 전달을 위한 이벤트 발행
+     */
+    broadcastAngle(angle) {
+        const angleEvent = new CustomEvent('bowAngleUpdate', {
+            detail: { angle: angle.toFixed(1) }
+        });
+        window.dispatchEvent(angleEvent);
     }
 
-    draw() {
-        if (!this.ctx) return;
+    /**
+     * 캔버스 선 디스플레이 렌더링 루프
+     */
+    render() {
+        if (!this.ctx || !this.canvas) return;
+
+        // 기존 궤적 청소
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.save();
-        this.ctx.translate(this.offsetX, this.offsetY);
-        this.ctx.scale(this.scale, this.scale);
+        // 중요: 메인 화면의 줌 행렬 상태(확대/이동)를 캔버스 컨텍스트에 그대로 주입
+        this.ctx.translate(this.transform.offsetX, this.transform.offsetY);
+        this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        // 1. 백그라운드 영상 프레임 렌더링
-        const v = window.analysisVideo;
-        if (v && v.videoWidth > 0) {
-            const vRatio = v.videoWidth / v.videoHeight;
-            const cRatio = this.canvas.width / this.canvas.height;
-            let drawW = this.canvas.width;
-            let drawH = this.canvas.height;
-            let drawX = 0;
-            let drawY = 0;
+        // 선 스타일 지정 (시인성이 좋은 형광 연두 계열 선조 조율)
+        this.ctx.lineWidth = 2 / this.transform.scale; // 확대 시에도 선 두께 일정 유지 보정
+        this.ctx.strokeStyle = '#00FF66';
+        this.ctx.fillStyle = '#00FF66';
 
-            if (vRatio > cRatio) {
-                drawH = this.canvas.width / vRatio;
-                drawY = (this.canvas.height - drawH) / 2;
-            } else {
-                drawW = this.canvas.height * vRatio;
-                drawX = (this.canvas.width - drawW) / 2;
-            }
-            this.ctx.drawImage(v, drawX, drawY, drawW, drawH);
+        // 1. 기 확정된 모든 조준선들 그리기
+        this.lines.forEach(line => this.drawSingleLine(line));
+
+        // 2. 현재 실시간으로 드래그 중인 임시 조준선 그리기
+        if (this.currentLine) {
+            this.ctx.strokeStyle = '#FFFF00'; // 드래그 중일 때는 황색 점조 가이드
+            this.ctx.fillStyle = '#FFFF00';
+            this.drawSingleLine(this.currentLine);
         }
 
-        // 2. 바둑판 정밀 격자 그리드(Grid) 제도 (50픽셀 모눈종이 규격)
-        this.ctx.lineWidth = 1.0 / this.scale;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; 
-        
-        const gridSize = 50;
-        this.ctx.beginPath();
-        for (let y = 0; y < this.canvas.height; y += gridSize) {
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-        }
-        for (let x = 0; x < this.canvas.width; x += gridSize) {
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-        }
-        this.ctx.stroke();
-
-        // 3. 상시 고정 센터 십자 기준선 투사
-        this.ctx.lineWidth = 1.5 / this.scale;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; 
-        this.ctx.setLineDash([8 / this.scale, 8 / this.scale]); 
-        
-        this.ctx.beginPath(); this.ctx.moveTo(0, this.canvas.height / 2); this.ctx.lineTo(this.canvas.width, this.canvas.height / 2); this.ctx.stroke();
-        this.ctx.beginPath(); this.ctx.moveTo(this.canvas.width / 2, 0); this.ctx.lineTo(this.canvas.width / 2, this.canvas.height); this.ctx.stroke();
-        this.ctx.setLineDash([]); 
-
-        // 4. 사용자 무제한 다중 선 렌더 루프
-        this.ctx.lineCap = 'round';
-        for (let i = 0; i < this.points.length; i++) {
-            const isEvenPair = Math.floor(i / 2) % 2 === 0;
-            const color = isEvenPair ? '#ff3b30' : '#007aff'; 
-            
-            this.ctx.beginPath();
-            this.ctx.arc(this.points[i].x, this.points[i].y, 4 / this.scale, 0, Math.PI * 2);
-            this.ctx.fillStyle = color; this.ctx.fill();
-            this.ctx.strokeStyle = '#ffffff'; this.ctx.lineWidth = 1.2 / this.scale; this.ctx.stroke();
-
-            if (i % 2 === 1) {
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = color;
-                this.ctx.lineWidth = 3 / this.scale;
-                this.ctx.moveTo(this.points[i-1].x, this.points[i-1].y);
-                this.ctx.lineTo(this.points[i].x, this.points[i].y);
-                this.ctx.stroke();
-            }
-        }
         this.ctx.restore();
     }
 
-    calculateAngles() {
-        const len = this.points.length;
-        if (len < 4 || len % 2 !== 0) {
-            if (this.badgeDisplay) this.badgeDisplay.innerText = `선 배치 상태: ${Math.floor(len / 2)}개 완료`;
-            return;
-        }
+    /**
+     * 선 및 시작/끝점 조준 앵커 그리기
+     */
+    drawSingleLine(line) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(line.start.x, line.start.y);
+        this.ctx.lineTo(line.end.x, line.end.y);
+        this.ctx.stroke();
 
-        const p1 = this.points[len - 4];
-        const p2 = this.points[len - 3];
-        const p3 = this.points[len - 2];
-        const p4 = this.points[len - 1];
-
-        const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
-        const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
-
-        const dotProduct = v1.x * v2.x + v1.y * v2.y;
-        const dist1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-        const dist2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-
-        if (dist1 === 0 || dist2 === 0) return;
-        
-        let cosTheta = Math.min(1.0, Math.max(-1.0, dotProduct / (dist1 * dist2)));
-        let angleDeg = Math.acos(cosTheta) * (180 / Math.PI);
-
-        if (angleDeg > 90) angleDeg = 180 - angleDeg;
-
-        const finalAngle = angleDeg.toFixed(1);
-        if (this.angleDisplay) this.angleDisplay.innerText = `${finalAngle}°`;
-        if (this.badgeDisplay) this.badgeDisplay.innerText = "연산 성공! 선을 이어서 계속 작도 가능합니다.";
-    }
-
-    clear() {
-        this.points = [];
-        this.scale = 1.0; this.offsetX = 0; this.offsetY = 0; 
-        this.draw();
-        if (this.angleDisplay) this.angleDisplay.innerText = '0.0°';
-        if (this.badgeDisplay) this.badgeDisplay.innerText = "분석 대기 중";
+        // 양 끝단에 정밀 조준용 미세 원형 앵커 배치
+        const radius = 4 / this.transform.scale;
+        this.ctx.beginPath();
+        this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
+        this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
+        this.ctx.fill();
     }
 }
+
+// 전역 싱글톤 인스턴스 내보내기
+window.bowAnalyzer = new BowAnalyzer();
