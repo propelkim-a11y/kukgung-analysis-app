@@ -79,20 +79,20 @@ class BowAnalyzer {
 
     /**
      * 화면 상의 절대 픽셀 좌표를 줌/이동이 적용된 비디오 캔버스의 로컬 좌표로 역산
-     * [요구사항 4 교정] CSS 디스플레이 스케일 비율과 기기 픽셀 비율을 동기화하여 선 쌀알 버그 박멸
+     * 💡 교정: 캔버스 해상도 스케일 밀도(DPR)와 확대 오프셋을 역산하여 완벽한 등배 트랙킹 구현
      */
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         
-        // CSS 픽셀 크기와 실제 캔버스 그래픽스 내부 픽셀 버퍼 크기 간의 배율 계산
+        // 디스플레이상의 좌표 비율 추출
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
 
-        // 1단계: 디바이스 물리 화면 스케일에 맞는 좌표로 일대일 확장 매핑
+        // 1단계: 화면 터치 위치를 캔버스 하드웨어 버퍼 내부 해상도로 변환
         const clientX = (event.clientX - rect.left) * scaleX;
         const clientY = (event.clientY - rect.top) * scaleY;
 
-        // 2단계: 확대 배율(Scale)과 이동 값(Offset)을 역산하여 본래 비디오 소스 좌표로 최종 복원
+        // 2단계: 확대 배율과 이동 오프셋을 해상도 비율에 맞춰 역산 처리 (동영상 그림에 정확히 고정)
         const canvasX = (clientX - (this.transform.offsetX * scaleX)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * scaleY)) / this.transform.scale;
 
@@ -105,7 +105,6 @@ class BowAnalyzer {
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
 
-        // Palm Rejection: 스타일러스 펜이 근접한 상태에서 손바닥 터치(touch)가 오면 전면 차단
         if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) {
             return; 
         }
@@ -140,12 +139,11 @@ class BowAnalyzer {
      */
     handlePointerUp(event) {
         if (event.pointerType === 'pen') {
-            setTimeout(() => { window.isStylusActive = false; }, 500); // 펜 이탈 딜레이 캐시
+            setTimeout(() => { window.isStylusActive = false; }, 500);
         }
 
         if (this.toolMode !== 'draw' || !this.currentLine) return;
 
-        // 미세 터치 노이즈 필터링 (물리 거리 5px 미만은 선으로 인정 안 함)
         const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
         if (dist > 5) {
             this.lines.push(this.currentLine);
@@ -187,7 +185,7 @@ class BowAnalyzer {
     getLineAngle(line) {
         const dx = line.end.x - line.start.x;
         const dy = line.end.y - line.start.y;
-        let angle = Math.atan2(-dy, dx) * (180 / Math.PI); // Y축 반전 그래픽스 보정
+        let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return angle % 180;
     }
@@ -220,15 +218,21 @@ class BowAnalyzer {
     render() {
         if (!this.ctx || !this.canvas) return;
 
+        // 캔버스 버퍼 전체 초기화
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.save();
-        // 화면 변환 행렬 주입
-        this.ctx.translate(this.transform.offsetX, this.transform.offsetY);
+        
+        // 💡 핵심 패치: 고해상도 디바이스 비율(DPR)에 맞춰 내부 행렬의 배율과 오프셋을 동영상 픽셀 크기와 일대일 매핑
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        
+        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        // 확대 배율에 반비례하도록 두께 보정하여 항상 일정한 2px 굵기 보장
-        this.ctx.lineWidth = 2 / this.transform.scale; 
+        // 줌 배율에 반비례하여 2px 두께 상시 유지
+        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
 
@@ -246,12 +250,15 @@ class BowAnalyzer {
     }
 
     drawSingleLine(line) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+
         this.ctx.beginPath();
         this.ctx.moveTo(line.start.x, line.start.y);
         this.ctx.lineTo(line.end.x, line.end.y);
         this.ctx.stroke();
 
-        const radius = 4 / this.transform.scale;
+        const radius = (4 * scaleX) / this.transform.scale;
         this.ctx.beginPath();
         this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
         this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
