@@ -39,13 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // [교정 1 적용] 촬영 화면의 확대 연동용 싱크 버튼 매핑
-    nodes.btnRecordMoveSync = document.getElementById('btn-record-move-sync');
+    // 💡 패치: 단일 대통합 하단 패널용 서브 레이어 노드 확보
+    nodes.subRecord = document.getElementById('content-sub-record');
+    nodes.subAnalyze = document.getElementById('content-sub-analyze');
 
     // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const rect = nodes.videoViewport.getBoundingClientRect();
-        // 기기 자체 픽셀 비율 밀도(devicePixelRatio)를 반영해 물리 도화지 크기 해상도 선언
         const dpr = window.devicePixelRatio || 1;
         nodes.drawCanvas.width = rect.width * dpr;
         nodes.drawCanvas.height = rect.height * dpr;
@@ -123,32 +123,35 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.cameraPreview.srcObject = null;
     }
 
-    // [촬영 화면 이탈 이동]
+    // 💡 패치: [촬영 화면 복귀 스위칭] 하단 패널 고정 후 알맹이 서브 레이어만 체인지
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
+        
+        nodes.subAnalyze.classList.remove('active');
+        nodes.subRecord.classList.add('active');
+        
         await startCamera();
         if (window.bowGyroSensor) window.bowGyroSensor.start();
     });
 
-    // [분석 화면 진입 이동 공통 함수]
+    // 💡 패치: [분석 화면 진입 스위칭] 하단 패널 고정 후 알맹이 서브 레이어만 체인지
     function transitToAnalyzeMode() {
         stopCamera();
         nodes.sceneRecord.classList.remove('active');
         nodes.sceneAnalyze.classList.add('active');
+        
+        nodes.subRecord.classList.remove('active');
+        nodes.subAnalyze.classList.add('active');
+        
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
         setTimeout(resizeCanvasToDisplay, 100);
     }
 
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
-
-    // [교정 1 적용] 촬영 화면의 확대 싱크 버튼 터치 시 바로 분석 화면의 확대 인터랙션 모드로 순간 이동
-    if (nodes.btnRecordMoveSync) {
-        nodes.btnRecordMoveSync.addEventListener('click', transitToAnalyzeMode);
-    }
     /**
      * 실시간 카메라 프리뷰 기반 미디어 레코더 녹화 제어
      */
@@ -243,11 +246,11 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
     nodes.videoInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files;
+        if (!file || file.length === 0) return;
 
-        await core.saveCache('lastVideoBlob', file);
-        const url = URL.createObjectURL(file);
+        await core.saveCache('lastVideoBlob', file[0]);
+        const url = URL.createObjectURL(file[0]);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
 
