@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 2. 캔버스 해상도를 화면 기기 물리 크기와 강제 1:1 일치화 (선긋기 오차 박멸)
+    // 2. 💡 [핵심 교정] 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const rect = nodes.videoViewport.getBoundingClientRect();
         nodes.drawCanvas.width = rect.width;
@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gesture.applyTransform();
     });
 
-    // 영상 로딩 완료 시 슬라이더 범위 제약 연계
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         nodes.videoSlider.max = nodes.mainVideo.duration;
         resizeCanvasToDisplay();
@@ -79,13 +78,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * =================================================================
-     *  💡 촬영 전 수평 조준용 자이로 센서 하드웨어 잠금 해제 루틴
+     *  💡 [핵심 교정] 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      * =================================================================
      */
-    const triggerSensorUnlock = () => {
+    const triggerSensorUnlock = async () => {
         if (window.bowGyroSensor) {
             window.bowGyroSensor.start();
-            nodes.recordStatus.textContent = '수평계 연동 성공 - 거치대를 정렬하세요.';
+        }
+        if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
+            await startCamera();
         }
         window.removeEventListener('click', triggerSensorUnlock);
         window.removeEventListener('touchstart', triggerSensorUnlock);
@@ -94,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     /**
-     * 하드웨어 후면 카메라 스트리밍 구동부
+     * 후면 카메라 스트리밍 구동부
      */
     async function startCamera() {
         try {
@@ -103,8 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
+            nodes.recordStatus.textContent = '카메라 및 수평계 연동 성공 - 거치대를 정렬하세요.';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치 권한이 잠겨있습니다.';
+            nodes.recordStatus.textContent = '카메라 접근 권한이 차단되었습니다.';
             console.error(err);
         }
     }
@@ -134,11 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.sceneAnalyze.classList.add('active');
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
-        setTimeout(resizeCanvasToDisplay, 50);
+        setTimeout(resizeCanvasToDisplay, 100);
     });
-
-    // 초기 스트림 점화
-    startCamera();
 
     /**
      * 실시간 카메라 프리뷰 기반 미디어 레코더 녹화 제어
@@ -173,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.bowAnalyzer.clearLines();
                     window.bowAnalyzer.setMode('move');
                 }
-                setTimeout(resizeCanvasToDisplay, 50);
+                setTimeout(resizeCanvasToDisplay, 100);
                 
                 nodes.btnRecordToggle.textContent = '녹화시작';
                 nodes.btnRecordToggle.classList.remove('recording');
@@ -196,7 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     /**
      * js/app.js (Part 2 - 첫 번째 박스 바로 아래에 빈칸 없이 이어 붙이세요)
-     * 국궁 자세 분석 시스템 - 통합 마스터 컨트롤러 (전체 파일 분할 2)
+     * - 💡 [핵심 보정] 비디오 재생 시간 및 물리 픽셀 크기 실시간 비례 매핑
+     * - 미세 프레임 스킵 및 슬라이딩 터치 개폐 동기화
      */
 
     const FRAME_TIME = 1 / 30;
@@ -235,13 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + FRAME_TIME);
     });
 
-    /**
-     * 4대 분석 버튼 기하학 액션
-     */
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
     nodes.videoInput.addEventListener('change', async (e) => {
-        const file = e.target.files;
+        const file = e.target.files[0];
         if (!file) return;
 
         await core.saveCache('lastVideoBlob', file);
@@ -264,9 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('draw');
     });
 
-    /**
-     * 💡 초기화 버튼 클릭 시 줄긋기 초기화 + 비디오 배율 및 위치 상태까지 중앙 전면 복원 리셋
-     */
     nodes.btnReset.addEventListener('click', () => {
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
@@ -282,9 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
         core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
     });
 
-    /**
-     * 터치/클릭 시 완전 투명해지며 슬라이딩 개폐 처리되는 물리 핸들러
-     */
     nodes.panelHandle.addEventListener('click', () => {
         core.state.isPanelOpen = !core.state.isPanelOpen;
         if (core.state.isPanelOpen) {
@@ -294,11 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    /**
-     * 데이터 중계 파이프라인
-     */
     window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `📐 ${e.detail.angle}°`;
+        // 투명하고 세련된 글자 중심의 각도 표기 동기화
+        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
         if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
 
