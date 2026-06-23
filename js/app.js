@@ -37,6 +37,48 @@ function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// ⚡ [신설] 대용량 비디오 파일 영구 기억용 IndexedDB 브릿지 유틸리티 클래스
+const videoStore = {
+    dbName: 'KukgungVideoDB',
+    storeName: 'last_video_store',
+    
+    init() {
+        return new Promise((resolve) => {
+            const request = indexedDB.open(this.dbName, 1);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    db.createObjectStore(this.storeName);
+                }
+            };
+            request.onsuccess = (e) => resolve(e.target.result);
+            request.onerror = () => resolve(null);
+        });
+    },
+    async save(blob) {
+        const db = await this.init();
+        if (!db) return;
+        return new Promise((resolve) => {
+            const tx = db.transaction(this.storeName, 'readwrite');
+            const store = tx.objectStore(this.storeName);
+            const request = store.put(blob, 'saved_file');
+            request.onsuccess = () => resolve(true);
+            request.onerror = () => resolve(false);
+        });
+    },
+    async load() {
+        const db = await this.init();
+        if (!db) return null;
+        return new Promise((resolve) => {
+            const tx = db.transaction(this.storeName, 'readonly');
+            const store = tx.objectStore(this.storeName);
+            const request = store.get('saved_file');
+            request.onsuccess = (e) => resolve(e.target.result || null);
+            request.onerror = () => resolve(null);
+        });
+    }
+};
+
 // 4. 어플리케이션 스타터 및 스위치 기동
 async function initApp() {
     window.isMobileDevice = checkMobile();
@@ -45,7 +87,7 @@ async function initApp() {
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
-        if (statusText) statusText.innerText = "PC 에뮬레전 분석 모드";
+        if (statusText) statusText.innerText = "PC 에뮬레이션 분석 모드";
         document.getElementById('angle-text').innerText = "고정";
         recordBtn.style.border = '5px solid #007aff';
         recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
@@ -74,6 +116,7 @@ async function initApp() {
                 }
             }, 100);
         } catch (err) {
+            console.warn("카메라 장치 무부재: 우회 처리 진입");
             document.getElementById('permission-overlay').style.display = 'none';
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
@@ -101,6 +144,7 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
+    // 4대 버튼 인터랙션 리스너
     document.getElementById('btn-tool-move').onclick = () => {
         setActiveToolButton('btn-tool-move');
         bowAnalyzer.setToolMode('move');
@@ -111,14 +155,26 @@ async function initApp() {
         bowAnalyzer.setToolMode('draw');
     };
 
-    // ⚡ [신설 패치] 하단 컨트롤 패널 터치 개폐 인터랙션 스위치 장착
+    // 하단 컨트롤 패널 터치 개폐 인터랙션 스위치
     const panel = document.getElementById('unified-control-center');
     const handle = document.getElementById('panel-handle');
     if (handle && panel) {
         handle.onclick = (e) => {
             e.preventDefault();
-            panel.classList.toggle('collapsed'); // collapsed 클래스를 넣고 빼며 상하 슬라이딩
+            panel.classList.toggle('collapsed'); 
         };
+    }
+
+    // ⚡ [신설 핵심 복원식] 앱이 켜지자마자 백그라운드 데이터베이스에서 지난번 분석용 비디오 자동 로드 검사 수행
+    try {
+        const savedBlob = await videoStore.load();
+        if (savedBlob) {
+            console.log("💾 지난 회차 마지막 분석 영상 복원 파이프라인 가동 성공.");
+            activeVideoRoll = parseFloat(localStorage.getItem('saved_video_roll') || '0');
+            loadVideoForAnalysis(URL.createObjectURL(savedBlob));
+        }
+    } catch (e) {
+        console.warn("자동 복원 버퍼 유예", e);
     }
 }
 
@@ -133,7 +189,7 @@ function setActiveToolButton(activeId) {
     });
 }
 
-// 5. 웹캠이 없는 PC용 가상 캔버스 안내 도화지 빌더
+// 가상 캔버스 안내 도화지 빌더
 function loadDummyCanvasForPC() {
     const dc = document.getElementById('drawing-canvas');
     const oc = document.getElementById('output-canvas');
@@ -155,7 +211,7 @@ async function startRecording() {
     try {
         mediaRecorder = new MediaRecorder(streamRef, mime ? { mimeType: mime } : {});
         mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
+        mediaRecorder.onstop = async () => {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
@@ -168,6 +224,13 @@ async function startRecording() {
             document.body.removeChild(a);
             
             activeVideoRoll = phoneRollAtRecord;
+            
+            // ⚡ [자동 복원 패치] 촬영된 비디오 데이터를 IndexedDB 및 로컬스토리지 백업 저장소에 실시간 캐싱 동기화
+            try {
+                await videoStore.save(blob);
+                localStorage.setItem('saved_video_roll', activeVideoRoll.toString());
+            } catch (err) { console.error("촬영 저장소 버퍼 실패", err); }
+
             loadVideoForAnalysis(url);
         };
         mediaRecorder.start(1000); 
@@ -191,15 +254,23 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. 파일 데이터 읽기 참조 연동
+// 9. 파일 데이터 읽기 참조 연동 (수동 업로드 파트)
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
-    fileUploadInput.onchange = (e) => {
+    fileUploadInput.onchange = async (e) => {
         if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]; 
             activeVideoRoll = 0; 
+            
+            // ⚡ [자동 복원 패치] 사용자가 수동 업로드한 파일 블록도 다음 구동 시 자동 복제되도록 영구 보관소에 동기화
+            try {
+                await videoStore.save(file);
+                localStorage.setItem('saved_video_roll', '0');
+            } catch (err) { console.error("업로드 저장소 버퍼 실패", err); }
+
             setActiveToolButton('upload-label');
             bowAnalyzer.setToolMode('move'); 
-            loadVideoForAnalysis(URL.createObjectURL(e.target.files[0]));
+            loadVideoForAnalysis(URL.createObjectURL(file));
         }
     };
 }
@@ -216,7 +287,6 @@ function switchMode(mode) {
     const shootComponents = document.getElementById('shoot-components');
     const headerElement = document.querySelector('.header');
     
-    // ⚡ [슬라이딩 초기화] 촬영창으로 넘어갈 때는 강제로 슬라이딩 다운 클래스 해제 보정
     const panel = document.getElementById('unified-control-center');
     if (panel) panel.classList.remove('collapsed');
 
@@ -286,7 +356,7 @@ if (timelineSlider) {
         if (v) {
             v.pause(); 
             v.currentTime = parseFloat(e.target.value);
-            document.getElementById('btn-video-play').innerText = "▶️ 재생";
+            document.getElementById('btn-video-play').innerText = "재생";
         }
     });
 }
@@ -294,40 +364,43 @@ if (timelineSlider) {
 // 초당 30프레임 표준 1프레임 단위(0.033초) 미세 정밀 조작
 const FRAME_TIME = 1 / 30; 
 
+// ⚡ [텍스트 전환 패치] 기민한 1프레임 정밀 역탐색 제어
 document.getElementById('btn-video-prev').onclick = () => { 
     const v = window.analysisVideo;
     if(v) {
         v.pause();
         v.currentTime = Math.max(0, v.currentTime - FRAME_TIME); 
         if (timelineSlider) timelineSlider.value = v.currentTime;
-        document.getElementById('btn-video-play').innerText = "▶️ 재생";
+        document.getElementById('btn-video-play').innerText = "재생";
     }
 };
 
+// ⚡ [텍스트 전환 패치] 기민한 1프레임 정밀 정탐색 제어
 document.getElementById('btn-video-next').onclick = () => { 
     const v = window.analysisVideo;
     if(v) {
         v.pause();
         v.currentTime = Math.min(v.duration, v.currentTime + FRAME_TIME); 
         if (timelineSlider) timelineSlider.value = v.currentTime;
-        document.getElementById('btn-video-play').innerText = "▶️ 재생";
+        document.getElementById('btn-video-play').innerText = "재생";
     }
 };
 
+// ⚡ [텍스트 전환 패치] 세련된 텍스트 전환 리스너
 document.getElementById('btn-video-play').onclick = () => { 
     const v = window.analysisVideo;
     if(v) {
         if(v.paused) {
             v.play();
-            document.getElementById('btn-video-play').innerText = "⏸️ 정지";
+            document.getElementById('btn-video-play').innerText = "정지";
         } else {
             v.pause();
-            document.getElementById('btn-video-play').innerText = "▶️ 재생";
+            document.getElementById('btn-video-play').innerText = "재생";
         }
     }
 };
 
-// ⚡ [버그 정밀 패치] 누락되었던 텍스트 버튼 초기화 클릭 이벤트를 바인딩하여 드로잉 리셋 활성화
+// 텍스트 버튼 초기화 클릭 이벤트 리스너 복구 보존
 document.getElementById('btn-clear-draw').onclick = () => { 
     if (bowAnalyzer) bowAnalyzer.clear(); 
 };
