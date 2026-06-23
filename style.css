@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (통합 패널 테마 완결)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (동영상 위 실시간 연동 그리드 완비)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -49,7 +49,8 @@ body, html {
     overflow: hidden;
 }
 
-#camera-preview, #main-video, #draw-canvas {
+/* 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단으로 일치 */
+#camera-preview, #main-video, #draw-canvas, .background-grid-layer {
     position: absolute;
     top: 0;
     left: 0;
@@ -63,35 +64,31 @@ body, html {
     z-index: 2;
 }
 
-#draw-canvas {
+/* 💡 교정: 바둑판 그리드가 동영상 위, 선긋기 캔버스 아래에 정밀하게 얹어지도록 레이어 순서(z-index)와 스케일 기준 보정 */
+.background-grid-layer {
     z-index: 3;
+    pointer-events: none;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+}
+
+#draw-canvas {
+    z-index: 4;
     pointer-events: auto;
 }
 
-/* 4. 은은한 바둑판 그리드 및 시인성 높은 십자 가이드 */
-.background-grid-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    z-index: 1;
-    pointer-events: none;
-}
-
+/* 시인성 높은 십자 가이드 (비디오 변환과 독립적으로 중앙 상시 고정) */
 .center-crosshair-v {
     left: 50%;
     top: 0;
     width: 1px;
     height: 100%;
-    border-left: 1px dashed rgba(255, 255, 255, 0.15);
+    border-left: 1px dashed rgba(255, 255, 255, 0.2);
     position: absolute;
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
 }
 
 .center-crosshair-h {
@@ -99,10 +96,10 @@ body, html {
     left: 0;
     height: 1px;
     width: 100%;
-    border-top: 1px dashed rgba(255, 255, 255, 0.15);
+    border-top: 1px dashed rgba(255, 255, 255, 0.2);
     position: absolute;
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
 }
 
 /* 5. 초정밀 실물 수평기 자이로 UI 및 실시간 각도 숫자 매핑 */
@@ -114,7 +111,7 @@ body, html {
     height: 1px;
     background-color: rgba(255, 59, 48, 0.8);
     transform-origin: center;
-    z-index: 4;
+    z-index: 6;
     pointer-events: none;
     transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
 }
@@ -137,7 +134,7 @@ body, html {
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
 
-/* 6. 우측 상단 플로팅 각도 리포트 (SF 모던 서체 적용) */
+/* 6. 우측 상단 플로팅 각도 리포트 */
 .floating-report {
     position: absolute;
     top: calc(24px + env(safe-area-inset-top));
@@ -151,9 +148,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* ================================================================= */
-/* 7. 대통합 단일 개폐 패널 스타일 (인프라 통합 완료) */
-/* ================================================================= */
+/* 7. 대통합 개폐 패널 공통 레이아웃 구조 */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -162,30 +157,31 @@ body, html {
     height: 33.333vh;
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-    
-    /* 공통 프리미엄 글래스모피즘 디자인 고정 */
-    background: rgba(15, 15, 20, 0.45);
-    backdrop-filter: blur(35px) saturate(210%);
-    -webkit-backdrop-filter: blur(35px) saturate(210%);
-    border-top: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 28px 28px 0 0;
-    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4);
+    background: rgba(15, 15, 20, 0.45) !important;
+    backdrop-filter: blur(35px) saturate(210%) !important;
+    -webkit-backdrop-filter: blur(35px) saturate(210%) !important;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 28px 28px 0 0 !important;
+    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4) !important;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s, backdrop-filter 0.3s;
 }
 
-/* 패널 축소(collapsed) 애니메이션 스타일 */
-.unified-panel-box.collapsed {
+/* 분석 화면 전용 접힘 애니메이션 */
+#scene-analyze .unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
     background: rgba(0, 0, 0, 0.0) !important;
     backdrop-filter: blur(0px) saturate(100%) !important;
     -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
-    border-top-color: transparent;
-    box-shadow: none;
+    border-top-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.panel-slider-handle, .panel-slider-handle-dummy {
+    width: 100%;
+    height: 34px;
 }
 
 .panel-slider-handle {
-    width: 100%;
-    height: 34px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -201,37 +197,27 @@ body, html {
 
 .panel-content-wrapper {
     height: calc(100% - 34px);
-    position: relative;
-    overflow: hidden;
-}
-
-/* 💡 화면 변환 시 내부 컨텐츠만 페이드 스위칭되도록 연동하는 분기 클래스 */
-.panel-inner-content {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
+    display: flex;
     flex-direction: column;
     justify-content: space-between;
     padding: 8px 24px 16px 24px;
-    opacity: 0;
-    transition: opacity 0.25s ease;
 }
 
-.panel-inner-content.active {
-    display: flex;
-    opacity: 1;
-}
-
-/* 8. 4대 텍스트 메뉴 정렬 */
-.text-menu-bar {
+/* 8. 4대 텍스트 메뉴 */
+.text-menu-bar, .text-menu-bar-placeholder {
     display: flex;
     width: 100%;
-    background-color: rgba(255, 255, 255, 0.06);
+    height: 44px;
     padding: 3px;
+}
+
+.text-menu-bar {
+    background-color: rgba(255, 255, 255, 0.06);
     border-radius: 13px;
+}
+
+.text-menu-bar-placeholder {
+    background-color: transparent;
 }
 
 .menu-btn {
@@ -252,6 +238,11 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
+}
+
+.menu-btn-spacer {
+    flex: 1;
+    height: 38px;
 }
 
 /* 9. 비디오 슬라이더 타임라인 */
@@ -356,4 +347,11 @@ body, html {
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
+}
+
+/* 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
+.text-menu-bar-sync, #btn-record-move-sync {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
