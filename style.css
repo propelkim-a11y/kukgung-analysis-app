@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 규격 완전 패치)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (Apple Design 정체성 보존 완결본)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -23,7 +23,7 @@ body, html {
     letter-spacing: -0.5px;
 }
 
-/* 2. 💡 [핵심 교정] 두 화면 간의 레이아웃 상호 간섭 원천 차단 */
+/* 2. 두 화면 간의 레이아웃 상호 간섭 원천 차단 */
 .app-scene {
     position: absolute;
     top: 0;
@@ -31,27 +31,23 @@ body, html {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    
-    /* 비활성화 상태일 때는 절대 레이아웃 공간을 차지하지 못하도록 완벽 격리 */
     display: none !important;
 }
 
-/* 활성화 상태일 때만 위아래 분할형 플렉스 상자로 독점 전개 */
 .app-scene.active {
     display: flex !important;
     flex-direction: column !important;
 }
 
-/* 3. 💡 [핵심 교정] 상단 비디오/카메라 영역 (하단 패널과 절대 겹치지 않는 공간 독점) */
+/* 3. 상단 비디오/카메라 영역 */
 .viewport-container {
     position: relative;
     width: 100%;
-    flex: 1; /* 하단 패널을 제외한 위쪽 공간 전체를 정밀하게 채움 */
+    flex: 1; 
     overflow: hidden;
     background-color: #050507;
 }
 
-/* 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단으로 수평 일치 */
 #camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
@@ -71,12 +67,7 @@ body, html {
     pointer-events: auto;
 }
 
-/* 외부 CSS 격자 레이어는 수동 캔버스 그리드로 대체되어 전면 비활성화 유지 */
-.background-grid-layer {
-    display: none !important;
-}
-
-/* 시인성 높은 십자 가이드 (중앙 상시 고정) */
+/* 4. 시인성 높은 십자 가이드 (중앙 상시 고정) */
 .center-crosshair-v {
     left: 50%;
     top: 0;
@@ -145,11 +136,11 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 💡 [핵심 교정] 하단 패널 영역 (상단 비디오 영역 밑에 완벽히 격리 배치) */
+/* 7. 하단 패널 영역 (Apple 특유의 반투명 블러 마감 처리) */
 .unified-panel-box {
     position: relative;
     width: 100%;
-    height: 33.333vh; /* 화면의 정확히 1/3을 독점 보유 */
+    height: 33.333vh; 
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
     background: rgba(15, 15, 20, 0.45) !important;
@@ -160,7 +151,6 @@ body, html {
     box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* 분석 화면 패널 전용: 접혔을 때 아래로 슬라이딩 무빙 제어 */
 #scene-analyze .unified-panel-box {
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -169,12 +159,9 @@ body, html {
     transform: translateY(calc(100% - 34px));
 }
 
-.panel-slider-handle, .panel-slider-handle-dummy {
+.panel-slider-handle {
     width: 100%;
     height: 34px;
-}
-
-.panel-slider-handle {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -196,22 +183,20 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 8. 4대 텍스트 메뉴 및 촬영 화면 동기화 프레임 바 */
-.text-menu-bar, .text-menu-bar-placeholder {
+/* 💡 촬영 화면용 미니멀리즘 여백 가변 보정 레이아웃 */
+.apple-record-layout {
+    padding: 34px 24px 16px 24px !important; /* 상단 핸들바가 없으므로 정밀 상단 패딩 보정 */
+    justify-content: space-between !important;
+}
+
+/* 8. 분석 화면용 4대 텍스트 메뉴 */
+.text-menu-bar {
     display: flex;
     width: 100%;
     height: 44px;
     padding: 3px;
-}
-
-.text-menu-bar {
     background-color: rgba(255, 255, 255, 0.06);
     border-radius: 13px;
-}
-
-/* 촬영 화면용 투명 플레이스홀더 (수직 구조 정렬 완벽 일치용) */
-.text-menu-bar-placeholder {
-    background-color: transparent;
 }
 
 .menu-btn {
@@ -232,11 +217,6 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
-}
-
-.menu-btn-spacer {
-    flex: 1;
-    height: 38px;
 }
 
 /* 9. 비디오 슬라이더 타임라인 */
@@ -341,11 +321,4 @@ body, html {
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
-}
-
-/* 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
-.text-menu-bar-sync, #btn-record-move-sync {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
 }
