@@ -1,5 +1,5 @@
 /* style.css
- * 컨트롤 패널 완전 일체화, 녹화 버튼 상단 이동 및 하단 탭 위치 완벽 동기화 버전
+ * 우측 상단 미니 초기화 버튼, 안내 문구 삭제 및 인터페이스 최적화 버전
  */
 
 * { 
@@ -47,7 +47,7 @@ body {
     background: #000000;
 }
 
-/* 촬영 모드 전용 수평계 투명 헤더 상단부 */
+/* 촬영 모드 전용 수평계 투명 헤더 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -118,15 +118,46 @@ body {
     image-rendering: crisp-edges;
 }
 
+/* ⚡ [신설] 분석 화면 오른쪽 상단 플로팅 툴바 바 패널 */
+.top-floating-toolbar {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 2000; /* 동영상 도화지 위에 뜨도록 레이어 격상 */
+    pointer-events: auto;
+}
+
+/* ⚡ [피드백 적용] 프리미엄 미니멀 초기화 아이콘 버튼 디자인 */
+.mini-icon-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    font-size: 1.1rem;
+    border-radius: 50%; /* 완전한 원형 단추 연출 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: all 0.2s;
+}
+.mini-icon-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(0.92);
+}
+
 /* ==========================================
- * ⚡ [대통합 패치] 단 하나의 공용 반투명 하단 컨트롤 패널 상자
+ * [대통합 패치] 단 하나의 공용 반투명 하단 컨트롤 패널 상자
  * ========================================== */
 .unified-panel {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
-    /* 촬영과 결과보기의 고정된 크기 일체화를 위해 높이를 동적 가변형식으로 일치 */
     height: auto; 
     min-height: 160px;
     max-height: 35dvh; 
@@ -135,7 +166,6 @@ body {
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    /* 패널 내부 간격 및 모바일 네비게이션 여백 완전 동기화 */
     padding: 12px 16px calc(15px + env(safe-area-inset-bottom)) 16px; 
     
     background: rgba(0, 0, 0, 0.12) !important; 
@@ -150,13 +180,13 @@ body {
 .panel-inner-block {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    margin-bottom: 10px; /* 공통 푸터 탭 바와의 정밀 여백 확보 */
+    margin-bottom: 12px; 
     pointer-events: auto;
 }
 
-/* 선 긋기 모드 스위칭 탭 바 */
+/* ⚡ 캡슐형 조작 모드 메뉴 전환 탭 바 */
 .menu-tab-bar {
     display: flex;
     background: rgba(0, 0, 0, 0.3);
@@ -167,10 +197,10 @@ body {
 }
 .menu-tab-btn {
     flex: 1;
-    padding: 6px;
+    padding: 7px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.45);
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: 8px;
@@ -181,30 +211,6 @@ body {
     background: rgba(255, 255, 255, 0.15);
     color: #ffffff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-/* 초기화 리셋 바 */
-.tool-bar-inner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-.tool-btn { 
-    padding: 6px 12px; 
-    background: rgba(255, 255, 255, 0.1); 
-    border: 1px solid rgba(255, 255, 255, 0.15); 
-    color: #ffffff; 
-    border-radius: 8px; 
-    font-size: 0.75rem; 
-    cursor: pointer;
-}
-.angle-badge {
-    padding: 6px 10px; 
-    background: rgba(0, 0, 0, 0.4); 
-    border-radius: 8px; 
-    font-size: 0.75rem; 
-    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* 슬라이더 트랙 */
@@ -244,7 +250,7 @@ body {
     cursor: pointer;
 }
 
-/* 정밀 각도 결과 리포트 창 및 업로드 통합 패널 */
+/* 정밀 각도 결과 리포트 창 및 업로드 통합 패널 (안내 배지 스타일 마크 영구 정제) */
 .report-box { 
     padding: 8px 12px; 
     background: rgba(255, 255, 255, 0.03); 
@@ -275,19 +281,19 @@ body {
     border: 1px solid rgba(0, 122, 255, 0.2); 
 }
 
-/* ⚡ [위치 패치] 촬영 모드의 녹화 버튼 구역을 하단 탭 버튼 상단으로 수직 정렬 유도 */
+/* 촬영 모드의 녹화 버튼 구역 */
 .action-zone {
     display: flex;
     justify-content: center;
     width: 100%;
-    margin-bottom: 15px; /* 하단 전환 탭 바 위쪽에 자연스럽게 안착하도록 여백 부여 */
+    margin-bottom: 15px; 
     pointer-events: auto;
 }
 
 /* 촬영 모드 셔터 원형 버튼 */
 #record-btn { 
-    width: 58px; 
-    height: 58px; 
+    width: 55px; 
+    height: 55px; 
     flex-shrink: 0; 
     border-radius: 50%; 
     border: 4px solid #ffffff; 
@@ -299,13 +305,11 @@ body {
 #record-btn.recording { 
     border-radius: 12px; 
     background: #ff4d4d; 
-    width: 48px;
-    height: 48px;
+    width: 45px;
+    height: 45px;
 }
 
-/* ==========================================
- * ⚡ 공통 하단 전환 탭 스위치 구역 (크기 및 위치 단 1픽셀도 무조건 고정 일치)
- * ========================================== */
+/* 공통 하단 전환 탭 스위치 구역 */
 .panel-global-footer {
     display: flex;
     justify-content: center;
