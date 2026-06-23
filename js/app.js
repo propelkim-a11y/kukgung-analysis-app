@@ -1,7 +1,3 @@
-/**
- * app.js (1번째 조각)
- * 국궁 자세 분석 어플리케이션 전체 인프라 동기화 및 라이프사이클 통제 메인 허브
- */
 import { DynamicLeveler } from './sensor.js';
 import { BowAnalyzer } from './analyzer.js';
 
@@ -12,25 +8,22 @@ let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
 
-// 글로벌 분석 인스턴스 싱글톤 마운트
+// 글로벌 분석 인스턴스 마운트
 let bowAnalyzer = new BowAnalyzer();
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
 const statusText = document.getElementById('status-text');
 
-// 기기 실시간 자이로 수평계 이벤트 연동 결속
+// 기기 실시간 자이로 수평계 연동
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
     if (recordBtn && window.isMobileDevice) {
-        // 규격 수평 오차 만족 상태에 따라 셔터 테두리 불빛 색상 치환 피드백
         recordBtn.style.borderColor = isLevel ? '#00ff00' : '#ff0000';
     }
 });
 
-/**
- * 접속 디바이스 환경 범용 녹화 코덱 정밀 탐지기
- */
+// 범용 녹화 코덱 감지 구문
 function getSupportedMimeType() {
     const types = ['video/webm;codecs=vp8', 'video/mp4;codecs=avc1', 'video/webm', 'video/mp4'];
     for (const type of types) {
@@ -39,17 +32,12 @@ function getSupportedMimeType() {
     return ''; 
 }
 
-/**
- * 접속 유저 모바일/PC 물리 장치 에뮬레이션 상태 판별 검사기
- */
+// 접속 디바이스 환경 검사기
 function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-/**
- * [규격 6: 대용량 비디오 파일 영구 기억용 IndexedDB 인프라 데이터베이스 구축]
- * 브라우저 샌드박스 제한을 해제하고 대용량 캐시 유지가 가능한 영구 저장 스토리지 파이프라인
- */
+// 대용량 비디오 파일 영구 기억용 IndexedDB 인프라 데이터베이스 구축 객체
 const videoStore = {
     dbName: 'KukgungVideoDB',
     storeName: 'last_video_store',
@@ -90,67 +78,49 @@ const videoStore = {
         });
     }
 };
-/**
- * 어플리케이션 시스템 엔트리포인트 코어 초기화 명세
- */
+
+// 어플리케이션 초기화 구문
 async function initApp() {
     window.isMobileDevice = checkMobile();
 
-    // PC 환경 접속 시 상용 수평계 UI 에뮬레이션 바이패스 처리
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
         if (statusText) statusText.innerText = "PC 에뮬레이션 분석 모드";
-        const angleTextHUD = document.getElementById('angle-text');
-        if (angleTextHUD) angleTextHUD.innerText = "고정";
-        if (recordBtn) {
-            recordBtn.style.border = '5px solid #007aff';
-            recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
+        document.getElementById('angle-text').innerText = "고정";
+        recordBtn.style.border = '5px solid #007aff';
+        recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
+    }
+
+    document.getElementById('btn-permission').onclick = async () => {
+        if (statusText) statusText.innerText = "카메라 노드 연결 중...";
+        const videoConstraints = window.isMobileDevice 
+            ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
+
+        try {
+            streamRef = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+            video.srcObject = streamRef;
+            await video.play();
+            
+            document.getElementById('permission-overlay').style.display = 'none';
+            recordBtn.style.zIndex = '99999'; 
+            recordBtn.style.pointerEvents = 'auto';
+            if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
+            
+            setTimeout(async () => {
+                if (window.isMobileDevice) {
+                    try { await leveler.init(); } catch(e) {}
+                }
+            }, 100);
+        } catch (err) {
+            document.getElementById('permission-overlay').style.display = 'none';
+            recordBtn.style.zIndex = '99999'; 
+            recordBtn.style.pointerEvents = 'auto';
+            if (statusText) statusText.innerText = "수동 영상 파일 대기 중";
+            loadDummyCanvasForPC();
         }
-    }
-
-    // 팝업 권한 허용 및 스트림 터널 개방 점화 구문
-    const btnPermission = document.getElementById('btn-permission');
-    if (btnPermission) {
-        btnPermission.onclick = async () => {
-            if (statusText) statusText.innerText = "카메라 노드 연결 중...";
-            const videoConstraints = window.isMobileDevice 
-                ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-                : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
-
-            try {
-                streamRef = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
-                if (video) {
-                    video.srcObject = streamRef;
-                    await video.play();
-                }
-                
-                const overlay = document.getElementById('permission-overlay');
-                if (overlay) overlay.style.display = 'none';
-                
-                if (recordBtn) {
-                    recordBtn.style.zIndex = '99999'; 
-                    recordBtn.style.pointerEvents = 'auto';
-                }
-                if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
-                
-                setTimeout(async () => {
-                    if (window.isMobileDevice) {
-                        try { await leveler.init(); } catch(e) { console.error(e); }
-                    }
-                }, 100);
-            } catch (err) {
-                const overlay = document.getElementById('permission-overlay');
-                if (overlay) overlay.style.display = 'none';
-                if (recordBtn) {
-                    recordBtn.style.zIndex = '99999'; 
-                    recordBtn.style.pointerEvents = 'auto';
-                }
-                if (statusText) statusText.innerText = "수동 영상 파일 대기 중";
-                loadDummyCanvasForPC();
-            }
-        };
-    }
+    };
 
     let lastTriggerTime = 0;
     const handleAction = (e) => {
@@ -168,28 +138,20 @@ async function initApp() {
         }
     };
 
-    if (recordBtn) {
-        recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
-        recordBtn.addEventListener('click', handleAction, { capture: true });
-    }
+    recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
+    recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    const btnToolMove = document.getElementById('btn-tool-move');
-    if (btnToolMove) {
-        btnToolMove.onclick = () => {
-            setActiveToolButton('btn-tool-move');
-            bowAnalyzer.setToolMode('move');
-        };
-    }
+    document.getElementById('btn-tool-move').onclick = () => {
+        setActiveToolButton('btn-tool-move');
+        bowAnalyzer.setToolMode('move');
+    };
 
-    const btnToolDraw = document.getElementById('btn-tool-draw');
-    if (btnToolDraw) {
-        btnToolDraw.onclick = () => {
-            setActiveToolButton('btn-tool-draw');
-            bowAnalyzer.setToolMode('draw');
-        };
-    }
+    document.getElementById('btn-tool-draw').onclick = () => {
+        setActiveToolButton('btn-tool-draw');
+        bowAnalyzer.setToolMode('draw');
+    };
 
-    // [규격 10] 하단 컨트롤 패널 터치 개폐 인터랙션 핸들 바인딩
+    // 하단 컨트롤 패널 터치 개폐 인터랙션 핸들 바인딩
     const panel = document.getElementById('unified-control-center');
     const handle = document.getElementById('panel-handle');
     if (handle && panel) {
@@ -199,7 +161,7 @@ async function initApp() {
         };
     }
 
-    // [규격 6] 앱 기동 즉시 지난번 최종 동영상이 보관소에 남아있다면 100% 자동 영구 복원 점화
+    // 앱 기동 즉시 지난번 최종 동영상이 보관소에 남아있다면 100% 자동 영구 복원 점화
     try {
         const savedBlob = await videoStore.load();
         if (savedBlob) {
@@ -209,15 +171,9 @@ async function initApp() {
         }
     } catch (e) { console.warn("복원 유예", e); }
 }
-/**
- * 4대 메뉴 상단 단추 전용 가로폭 25% 라이트 활성화 체인저
- */
+
 function setActiveToolButton(activeId) {
-    const txtButtons = [
-        document.getElementById('upload-label'), 
-        document.getElementById('btn-tool-move'), 
-        document.getElementById('btn-tool-draw')
-    ];
+    const txtButtons = [document.getElementById('upload-label'), document.getElementById('btn-tool-move'), document.getElementById('btn-tool-draw')];
     txtButtons.forEach(btn => {
         if (btn) {
             if (btn.id === activeId) btn.classList.add('active');
@@ -231,19 +187,14 @@ function loadDummyCanvasForPC() {
     const oc = document.getElementById('output-canvas');
     const container = document.getElementById('manual-analysis-box');
     
-    if (container && dc && oc) {
-        const rect = container.getBoundingClientRect();
-        dc.width = oc.width = rect.width;
-        dc.height = oc.height = rect.height;
-    }
+    const rect = container.getBoundingClientRect();
+    dc.width = oc.width = rect.width;
+    dc.height = oc.height = rect.height;
     
     switchMode('analyze');
     bowAnalyzer.init();
 }
-
-/**
- * 비디오 카메라 캔버스 소스 실시간 인코딩 레코딩 개시 구문
- */
+// 6. 비디오 녹화 시작 구문
 async function startRecording() {
     if (!streamRef) return;
     recordedChunks = [];
@@ -251,9 +202,7 @@ async function startRecording() {
     
     try {
         mediaRecorder = new MediaRecorder(streamRef, mime ? { mimeType: mime } : {});
-        mediaRecorder.ondataavailable = (e) => { 
-            if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
-        };
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
@@ -278,28 +227,26 @@ async function startRecording() {
         };
         mediaRecorder.start(1000); 
         isRecording = true;
-        if (recordBtn) recordBtn.classList.add('recording');
+        recordBtn.classList.add('recording');
     } catch (e) {
         console.error(e);
     }
 }
 
+// 7. 비디오 녹화 중지 구문
 async function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
         isRecording = false;
-        if (recordBtn) recordBtn.classList.remove('recording');
+        recordBtn.classList.remove('recording');
     }
 }
 
-// 탭 스위치 전환 이벤트 결속
-const btnModeShoot = document.getElementById('btn-mode-shoot');
-if (btnModeShoot) btnModeShoot.onclick = () => switchMode('shoot');
+// 8. 모드 전환 리스너 매핑
+document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
+document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-const btnModeAnalyze = document.getElementById('btn-mode-analyze');
-if (btnModeAnalyze) btnModeAnalyze.onclick = () => switchMode('analyze');
-
-// 파일 수동 선택 로더 파이프라인
+// 9. 파일 데이터 읽기 참조 연동 (수동 업로드 파트)
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = async (e) => {
@@ -320,9 +267,7 @@ if (fileUploadInput) {
     };
 }
 
-/**
- * [규격 4] 촬영하기 / 분석하기 핵심 뷰포트 상태 전환 스위치 엔진
- */
+// 10. 상하단 레이아웃 분리 모듈
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -339,43 +284,33 @@ function switchMode(mode) {
 
     if (mode === 'analyze') {
         if (analysisComponents) analysisComponents.classList.remove('hidden'); 
-        if (shootComponents) shootComponents.add('hidden'); 
+        if (shootComponents) shootComponents.classList.add('hidden'); 
         if (headerElement) headerElement.classList.add('hidden'); 
         
-        // 규격 4: 분석하기 최초 진입 제어 규칙 동기 가동
         setActiveToolButton('upload-label');
         bowAnalyzer.setToolMode('move'); 
     } else {
-        if (analysisComponents) analysisComponents.add('hidden'); 
-        if (shootComponents) shootComponents.remove('hidden'); 
-        if (headerElement) headerElement.remove('hidden'); 
+        if (analysisComponents) analysisComponents.classList.add('hidden'); 
+        if (shootComponents) shootComponents.classList.remove('hidden'); 
+        if (headerElement) headerElement.classList.remove('hidden'); 
     }
 }
 
-/**
- * [버그 수리 완결판] 비디오 파이프라인 마운트 핸들러 및 프레임 레이트 틱 루프 바인딩
- * 영상 업로드 즉시 화면에 강제 렌더링하고 재생 루프 오작동을 완벽히 수리했습니다.
- */
+// 11. 분석 화면 동적 데이터 마운트 로더
 function loadVideoForAnalysis(url) {
     const v = document.createElement('video');
-    v.src = url; 
-    v.muted = true; 
-    v.playsInline = true;
-    v.preload = "auto"; // 브라우저 데이터 선제 로딩 지시
+    v.src = url; v.muted = true; v.playsInline = true;
     window.analysisVideo = v;
     
-    // 1단계: 비디오의 기본 메타데이터(길이, 해상도 등)가 파악되었을 때
     v.onloadedmetadata = () => {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
         const timeline = document.getElementById('video-timeline');
         const container = document.getElementById('manual-analysis-box');
         
-        if (container && dc && oc) {
-            const rect = container.getBoundingClientRect();
-            dc.width = oc.width = rect.width;
-            dc.height = oc.height = rect.height;
-        }
+        const rect = container.getBoundingClientRect();
+        dc.width = oc.width = rect.width;
+        dc.height = oc.height = rect.height;
         
         if (timeline) {
             timeline.min = 0;
@@ -384,45 +319,28 @@ function loadVideoForAnalysis(url) {
             timeline.step = 0.01;
         }
         
+        v.currentTime = 0.1; 
         switchMode('analyze');
         bowAnalyzer.init(); 
         
-        // 첫 프레임을 강제로 띄우기 위해 미세 조작
-        v.currentTime = 0.033; 
-    };
-
-    // 2단계: 브라우저가 영상을 화면에 뿌릴 준비가 끝났을 때 (초기화 버튼 없이 바로 띄우는 핵심 코드)
-    v.oncanplay = () => {
-        if (bowAnalyzer) {
-            bowAnalyzer.draw(); 
-        }
-    };
-    
-    // 3단계: 프레임 미세 조정 이동 시 실시간 캔버스 동기화
-    v.onseeked = () => {
-        if (bowAnalyzer) {
-            bowAnalyzer.draw();
-        }
-    };
-    
-    // 4단계: [재생 오작동 수리] 재생 루프가 끊기지 않고 화면을 지속적으로 갱신하도록 분리
-    const renderLoop = () => {
-        if (!v.paused && !v.ended) {
+        v.onseeked = () => {
             if (bowAnalyzer) bowAnalyzer.draw();
-            const timeline = document.getElementById('video-timeline');
-            if (timeline) timeline.value = v.currentTime;
-            requestAnimationFrame(renderLoop);
-        } else if (!v.paused) {
-            requestAnimationFrame(renderLoop);
-        }
-    };
-
-    v.onplay = () => {
-        requestAnimationFrame(renderLoop);
+        };
+        
+        v.onplay = () => {
+            const updateLoop = () => {
+                if (!v.paused && !v.ended) {
+                    if (bowAnalyzer) bowAnalyzer.draw();
+                    if (timeline) timeline.value = v.currentTime;
+                    requestAnimationFrame(updateLoop);
+                }
+            };
+            requestAnimationFrame(updateLoop);
+        };
     };
 }
 
-// 비디오 프레임 재생 트랙 타임라인 인풋 동기화
+// 12. 슬라이더 및 재생 제어 바인딩
 const timelineSlider = document.getElementById('video-timeline');
 if (timelineSlider) {
     timelineSlider.addEventListener('input', (e) => {
@@ -430,69 +348,53 @@ if (timelineSlider) {
         if (v) {
             v.pause(); 
             v.currentTime = parseFloat(e.target.value);
-            const btnPlay = document.getElementById('btn-video-play');
-            if (btnPlay) btnPlay.innerText = "재생";
+            document.getElementById('btn-video-play').innerText = "재생";
         }
     });
 }
 
-// [규격 5] 초당 30프레임 표준 정밀 규격 세팅 (1클릭 = 1프레임 = 약 0.033초)
+// 초당 30프레임 표준 1프레임 단위(0.033초) 미세 정밀 조작
 const FRAME_TIME = 1 / 30; 
 
-// 뒤로 미세 이동
-const btnVideoPrev = document.getElementById('btn-video-prev');
-if (btnVideoPrev) {
-    btnVideoPrev.onclick = () => { 
-        const v = window.analysisVideo;
-        if (v) {
+// 뒤로 (1프레임 후진)
+document.getElementById('btn-video-prev').onclick = () => { 
+    const v = window.analysisVideo;
+    if(v) {
+        v.pause();
+        v.currentTime = Math.max(0, v.currentTime - FRAME_TIME); 
+        if (timelineSlider) timelineSlider.value = v.currentTime;
+        document.getElementById('btn-video-play').innerText = "재생";
+    }
+};
+
+// 앞으로 (1프레임 전진)
+document.getElementById('btn-video-next').onclick = () => { 
+    const v = window.analysisVideo;
+    if(v) {
+        v.pause();
+        v.currentTime = Math.min(v.duration, v.currentTime + FRAME_TIME); 
+        if (timelineSlider) timelineSlider.value = v.currentTime;
+        document.getElementById('btn-video-play').innerText = "재생";
+    }
+};
+
+// 재생 / 정지 토글 버튼
+document.getElementById('btn-video-play').onclick = () => { 
+    const v = window.analysisVideo;
+    if(v) {
+        if(v.paused) {
+            v.play();
+            document.getElementById('btn-video-play').innerText = "정지";
+        } else {
             v.pause();
-            v.currentTime = Math.max(0, v.currentTime - FRAME_TIME); 
-            if (timelineSlider) timelineSlider.value = v.currentTime;
-            const btnPlay = document.getElementById('btn-video-play');
-            if (btnPlay) btnPlay.innerText = "재생";
+            document.getElementById('btn-video-play').innerText = "재생";
         }
-    };
-}
+    }
+};
 
-// 앞으로 미세 이동
-const btnVideoNext = document.getElementById('btn-video-next');
-if (btnVideoNext) {
-    btnVideoNext.onclick = () => { 
-        const v = window.analysisVideo;
-        if (v) {
-            v.pause();
-            v.currentTime = Math.min(v.duration, v.currentTime + FRAME_TIME); 
-            if (timelineSlider) timelineSlider.value = v.currentTime;
-            const btnPlay = document.getElementById('btn-video-play');
-            if (btnPlay) btnPlay.innerText = "재생";
-        }
-    };
-}
+// 🔄 초기화 텍스트 버튼 클릭 이벤트 리스너 마운트
+document.getElementById('btn-clear-draw').onclick = () => { 
+    if (bowAnalyzer) bowAnalyzer.clear(); 
+};
 
-// 재생 및 일시정지 토글 컨트롤러
-const btnVideoPlay = document.getElementById('btn-video-play');
-if (btnVideoPlay) {
-    btnVideoPlay.onclick = () => { 
-        const v = window.analysisVideo;
-        if (v) {
-            if (v.paused) {
-                v.play();
-                btnVideoPlay.innerText = "정지";
-            } else {
-                v.pause();
-                btnVideoPlay.innerText = "재생";
-            }
-        }
-    };
-}
-
-// [규격 10] 리셋 단추 연동 커맨더
-const btnClearDraw = document.getElementById('btn-clear-draw');
-if (btnClearDraw) {
-    btnClearDraw.onclick = () => { 
-        if (bowAnalyzer) bowAnalyzer.clear(); 
-    };
-}
-
-// 전체 시스템 가동
 initApp();
