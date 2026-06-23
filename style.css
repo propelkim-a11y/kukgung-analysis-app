@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (디자인 일체감 통합 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (변환 기준축 보정 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -49,23 +49,22 @@ body, html {
     overflow: hidden;
 }
 
-#camera-preview, #main-video {
+/* 💡 교정: 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단(top left)으로 완벽하게 일치시킵니다. */
+#camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     object-fit: contain;
-    transform-origin: center center;
+    transform-origin: top left !important;
+}
+
+#camera-preview, #main-video {
     z-index: 2;
 }
 
 #draw-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
     z-index: 3;
     pointer-events: auto;
 }
@@ -162,8 +161,6 @@ body, html {
     height: 33.333vh;
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-    
-    /* 💡 패치: 두 패널 모두 프리미엄 매트 블랙 반투명과 블러 필터로 통일 */
     background: rgba(15, 15, 20, 0.45) !important;
     backdrop-filter: blur(35px) saturate(210%) !important;
     -webkit-backdrop-filter: blur(35px) saturate(210%) !important;
@@ -340,7 +337,7 @@ body, html {
     to { transform: scale(1.04); }
 }
 
-/* 💡 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
+/* 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
 .text-menu-bar-sync, #btn-record-move-sync {
     display: none !important;
     visibility: hidden !important;
