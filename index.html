@@ -56,6 +56,11 @@
         <!-- [완벽 대통합] 1/3 크기 및 위치가 고정된 하단 반투명 컨트롤러 센터 박스 -->
         <div id="unified-control-center" class="unified-panel">
             
+            <!-- ⚡ [신설] 패널을 위아래로 접고 펼칠 수 있는 슬라이딩 드래그 손잡이 바 -->
+            <div id="panel-handle" class="panel-drag-handle">
+                <div class="handle-bar"></div>
+            </div>
+            
             <!-- [분석 모드 전용 내부 컴포넌트 라인] -->
             <div id="analysis-components" class="panel-inner-block hidden">
                 
@@ -71,21 +76,21 @@
                     <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
                 </div>
 
-                <!-- ⚡ [피드백 적용] 순수 아이콘 대신 텍스트 단추 전환 및 순서 전면 개정 [열기 - 확대 - 선긋기 - 초기화] -->
+                <!-- 4대 텍스트 메뉴 단추 탭 바 -->
                 <div class="menu-tab-bar">
-                    <!-- 1. 열기 (파일 업로드 바인딩 라벨) -->
+                    <!-- 1. 열기 -->
                     <div class="analysis-actions">
                         <input type="file" id="file-upload" accept="video/*" class="hidden">
                         <label for="file-upload" id="upload-label" class="menu-tab-btn-txt active">열기</label>
                     </div>
                     
-                    <!-- 2. 확대 (기존 tool-move) -->
+                    <!-- 2. 확대 -->
                     <button id="btn-tool-move" class="menu-tab-btn-txt" aria-label="확대">확대</button>
                     
-                    <!-- 3. 선긋기 (기존 tool-draw) -->
+                    <!-- 3. 선긋기 -->
                     <button id="btn-tool-draw" class="menu-tab-btn-txt" aria-label="선긋기 모드">선긋기</button>
                     
-                    <!-- 4. 초기화 (기존 center-reset) -->
+                    <!-- 4. 초기화 -->
                     <button id="btn-clear-draw" class="menu-tab-btn-txt-reset" aria-label="초기화">초기화</button>
                 </div>
 
