@@ -3,7 +3,7 @@
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - S펜 / 애플펜슬 Palm Rejection 및 포인터 분리
  * - 줌/이동 변환 행렬 역산 (확대 상태에서도 정확한 조준점 매핑)
- * - [핵심 패치] 확대 및 축소 상태에 상관없이 상시 균일한 정밀 각도 연산 인프라 구축
+ * - [내장형 격자 인프라] 캔버스 내부 엔진에서 직접 격자를 구현하여 꼬임 현상 원천 영구 소거
  */
 
 class BowAnalyzer {
@@ -11,18 +11,15 @@ class BowAnalyzer {
         this.canvas = null;
         this.ctx = null;
         
-        // 다중 선 데이터 구조 [{ start: {x, y}, end: {x, y} }, ...]
         this.lines = []; 
         this.currentLine = null;
 
-        // 뷰포트 변환 상태 (app.js의 확대/축소/이동과 실시간 동기화)
         this.transform = {
             scale: 1,
             offsetX: 0,
             offsetY: 0
         };
 
-        // 활성화된 툴 모드 ('move' 또는 'draw')
         this.toolMode = 'move'; 
 
         this.handlePointerDown = this.handlePointerDown.bind(this);
@@ -30,18 +27,12 @@ class BowAnalyzer {
         this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
-    /**
-     * 캔버스 초기화 및 포인터 이벤트 바인딩
-     */
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
         this.setupPointerEvents();
     }
 
-    /**
-     * 외부(app.js)에서 변환 행렬 값을 실시간으로 주입받는 메커니즘
-     */
     updateTransform(scale, offsetX, offsetY) {
         this.transform.scale = scale;
         this.transform.offsetX = offsetX;
@@ -49,16 +40,10 @@ class BowAnalyzer {
         this.render();
     }
 
-    /**
-     * 툴 모드 변경 ([확대] -> 'move', [선긋기] -> 'draw')
-     */
     setMode(mode) {
         this.toolMode = mode;
     }
 
-    /**
-     * 그어진 모든 조준선 데이터 완전 초기화
-     */
     clearLines() {
         this.lines = [];
         this.currentLine = null;
@@ -66,9 +51,6 @@ class BowAnalyzer {
         this.broadcastAngle(0);
     }
 
-    /**
-     * Pointer Events API 적용 (S펜/애플펜슬 분리 및 Palm Rejection)
-     */
     setupPointerEvents() {
         if (!this.canvas) return;
         this.canvas.addEventListener('pointerdown', this.handlePointerDown);
@@ -77,30 +59,20 @@ class BowAnalyzer {
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
 
-    /**
-     * 화면 상의 절대 픽셀 좌표를 줌/이동이 적용된 비디오 캔버스의 로컬 좌표로 역산
-     */
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        
-        // 디스플레이상의 좌표 비율 추출
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
 
-        // 1단계: 화면 터치 위치를 캔버스 하드웨어 버퍼 내부 해상도로 변환
         const clientX = (event.clientX - rect.left) * scaleX;
         const clientY = (event.clientY - rect.top) * scaleY;
 
-        // 2단계: 확대 배율과 이동 오프셋을 해상도 비율에 맞춰 역산 처리
         const canvasX = (clientX - (this.transform.offsetX * scaleX)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * scaleY)) / this.transform.scale;
 
         return { x: canvasX, y: canvasY };
     }
 
-    /**
-     * 터치/스타일러스 입력 시작
-     */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
 
@@ -120,9 +92,6 @@ class BowAnalyzer {
         };
     }
 
-    /**
-     * 드래그 (선 긋는 중)
-     */
     handlePointerMove(event) {
         if (this.toolMode !== 'draw' || !this.currentLine) return;
 
@@ -133,9 +102,6 @@ class BowAnalyzer {
         this.calculateAnglesInline();
     }
 
-    /**
-     * 입력 종료 및 선 확정
-     */
     handlePointerUp(event) {
         if (event.pointerType === 'pen') {
             setTimeout(() => { window.isStylusActive = false; }, 500);
@@ -153,9 +119,6 @@ class BowAnalyzer {
         this.calculateFinalAngle();
     }
 
-    /**
-     * 삼각함수 atan2 기반 고각 및 사잇각 연산
-     */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
             const angle = this.getLineAngle(this.currentLine);
@@ -178,27 +141,18 @@ class BowAnalyzer {
         }
     }
 
-    /**
-     * 💡 교정: 캔버스의 하드웨어 해상도 종횡비(화면비) 차이로 생기는 삼각함수 왜곡 보정
-     * 단일 선의 지면 대비 수평 고각 측정
-     */
     getLineAngle(line) {
         const rect = this.canvas.getBoundingClientRect();
-        // 실제 화면의 물리 스케일 비율을 역산하여 왜곡 제거
         const aspectCorrection = rect.height / rect.width;
 
         const dx = line.end.x - line.start.x;
-        const dy = (line.end.y - line.start.y) * aspectCorrection; // 화면비 보정값 주입
+        const dy = (line.end.y - line.start.y) * aspectCorrection;
 
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return angle % 180;
     }
 
-    /**
-     * 💡 교정: 확대 배율에 독립적인 구면 삼각 픽셀 아크 매핑 적용
-     * 두 선 사이의 사잇각(내각) 계산
-     */
     getIntersectionAngle(line1, line2) {
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
@@ -211,9 +165,6 @@ class BowAnalyzer {
         return diff;
     }
 
-    /**
-     * 전역 시스템에 연산된 정밀 각도 이벤트 브로드캐스팅
-     */
     broadcastAngle(angle) {
         const angleEvent = new CustomEvent('bowAngleUpdate', {
             detail: { angle: angle.toFixed(1) }
@@ -222,8 +173,38 @@ class BowAnalyzer {
     }
 
     /**
-     * 캔버스 선 디스플레이 렌더링 루프
+     * 💡 교정: 외부 레이어를 흔드는 간섭식 그리드 대신, 
+     * 확대 비율이 완전 반영된 내부 행렬 매트릭스 안에서 직접 50px 간격 격자선을 부드럽게 사출합니다.
      */
+    drawBackgroundGrid(scaleX, scaleY) {
+        this.ctx.save();
+        this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'; // 은은한 다크 격자 컬러 선언
+
+        const gridSize = 50; // 50px 물리 규격 고정
+        
+        // 무한 격자 그리기 루프 범위 설정
+        const widthBound = this.canvas.width * 5;
+        const heightBound = this.canvas.height * 5;
+
+        // 세로선 그리기
+        for (let x = -widthBound; x <= widthBound; x += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, -heightBound);
+            this.ctx.lineTo(x, heightBound);
+            this.ctx.stroke();
+        }
+
+        // 가로선 그리기
+        for (let y = -heightBound; y <= heightBound; y += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(-widthBound, y);
+            this.ctx.lineTo(widthBound, y);
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+    }
+
     render() {
         if (!this.ctx || !this.canvas) return;
 
@@ -235,17 +216,20 @@ class BowAnalyzer {
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
         
+        // 1단계: 변환 행렬 전사
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
+        // 2단계: 💡 동영상 위에 연동되는 50px 정밀 격자선 직접 렌더링
+        this.drawBackgroundGrid(scaleX, scaleY);
+
+        // 3단계: 기 확정된 조준선 그리기
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
-
-        // 1. 기 확정된 조준선 그리기
         this.lines.forEach(line => this.drawSingleLine(line));
 
-        // 2. 실시간 드래그 가이드라인 그리기
+        // 4단계: 실시간 드래그 가이드라인 그리기
         if (this.currentLine) {
             this.ctx.strokeStyle = '#FFFF00';
             this.ctx.fillStyle = '#FFFF00';
@@ -272,5 +256,4 @@ class BowAnalyzer {
     }
 }
 
-// 전역 인스턴스 노출
 window.bowAnalyzer = new BowAnalyzer();
