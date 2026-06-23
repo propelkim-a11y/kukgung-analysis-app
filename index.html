@@ -47,12 +47,12 @@
             </div>
         </main>
 
-        <!-- ⚡ [대통합 구현] 촬영/분석 통합 하단 1/3 반투명 컨트롤러 센터 박스 -->
+        <!-- ⚡ [완벽 대통합] 1/3 크기 및 위치가 고정된 단 하나의 하단 반투명 컨트롤러 센터 박스 -->
         <div id="unified-control-center" class="unified-panel">
             
             <!-- ⚡ [분석 모드 전용 내부 컴포넌트 라인] -->
             <div id="analysis-components" class="panel-inner-block hidden">
-                <!-- 🛠️ 신설: 선 긋기 / 화면 이동 모드 전환 메뉴 바 -->
+                <!-- 선 긋기 / 화면 이동 모드 전환 메뉴 바 -->
                 <div class="menu-tab-bar">
                     <button id="btn-tool-draw" class="menu-tab-btn active">✏️ 선 긋기 모드</button>
                     <button id="btn-tool-move" class="menu-tab-btn">🔍 화면 이동/확대</button>
@@ -89,14 +89,16 @@
                 </div>
             </div>
 
-            <!-- ⚡ [공통 및 촬영 전용 하단 인터랙션 컨트롤 레이아웃] -->
+            <!-- ⚡ [촬영 모드 전용 내부 컴포넌트 라인: 녹화 단추를 상단 배치 처리] -->
+            <div id="shoot-components" class="action-zone">
+                <button id="record-btn" aria-label="녹화"></button>
+            </div>
+
+            <!-- ⚡ [공통 내장 하단 탭 스위치 라인] 촬영/결과보기 전환 버튼은 어떤 모드이든 '언제나 동일한 크기와 고정 위치'를 취함 -->
             <div class="panel-global-footer">
                 <div class="mode-selector">
                     <button id="btn-mode-shoot" class="active">촬영하기</button>
                     <button id="btn-mode-analyze">결과보기</button>
-                </div>
-                <div class="action-zone">
-                    <button id="record-btn" aria-label="녹화"></button>
                 </div>
             </div>
         </div>
