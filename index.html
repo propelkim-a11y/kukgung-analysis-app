@@ -1,3 +1,6 @@
+<!-- ==========================================
+     index.html
+     ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -8,22 +11,27 @@
 </head>
 <body>
 
-    <!-- 1. 비디오 투사 및 드로잉 도화지 전체 화면 영역 -->
+    <!-- 비디오 투사 및 드로잉 도화지 전체 화면 영역 -->
     <div id="video-viewport" class="viewport-container">
         
-        <!-- 명세 8번: 바둑판 그리드 격자 및 상시 점선 십자가 배경 가이드라인 -->
+        <!-- 바둑판 그리드 격자 및 상시 점선 십자가 배경 가이드라인 -->
         <div class="background-grid-layer">
+            <!-- 실시간 자이로 연동 물리 수평계 가이드선 -->
+            <div id="gyro-horizon-line"></div>
             <div class="center-crosshair-v"></div>
             <div class="center-crosshair-h"></div>
         </div>
 
-        <!-- 풀스크린 왜곡 없는 비디오 요소 -->
+        <!-- 실시간 웹캠/스마트폰 카메라 촬영 스트리밍 레이어 -->
+        <video id="camera-preview" autoplay playsinline muted style="display: none;"></video>
+
+        <!-- 풀스크린 왜곡 없는 분석용 비디오 요소 -->
         <video id="main-video" playsinline muted loop></video>
 
         <!-- 정밀 조준선 맵핑용 투명 캔버스 레이어 -->
         <canvas id="draw-canvas"></canvas>
 
-        <!-- 명세 9번: 좌측 상단 플로팅 각도 리포트 결과창 (초기값 0.0°) -->
+        <!-- 좌측 상단 플로팅 각도 리포트 결과창 (초기값 0.0°) -->
         <div id="angle-report" class="floating-report">📐 0.0°</div>
         
     </div>
@@ -31,26 +39,25 @@
     <!-- 파일 아날로그 입력을 유인하기 위한 숨김 단추 -->
     <input type="file" id="video-input" accept="video/*" style="display: none;">
 
-    <!-- ================================================================= -->
-    <!-- 명세 1번: 하단 패널 대통합 (촬영 및 분석 제어바 - unified-panel) -->
-    <!-- ================================================================= -->
+    <!-- 하단 패널 대통합 (촬영 및 분석 제어바 - unified-panel) -->
     <div id="unified-panel" class="unified-panel-box">
         
-        <!-- 명세 10번: 슬라이딩 패널 개폐 제어용 물리 손잡이 핸들 -->
+        <!-- 슬라이딩 패널 개폐 제어용 물리 손잡이 핸들 -->
         <div id="panel-handle" class="panel-slider-handle">
             <div class="handle-bar"></div>
         </div>
 
         <div class="panel-content-wrapper">
-            <!-- [상단부] 명세 3&4번: 4대 텍스트 메뉴 정렬 (가로폭 25% 정밀 균등 배분) -->
+            <!-- 5대 텍스트 메뉴 정렬 (가로폭 20% 정밀 균등 배분) -->
             <nav class="text-menu-bar">
                 <button id="btn-open" class="menu-btn active">열기</button>
+                <button id="btn-camera" class="menu-btn">촬영</button>
                 <button id="btn-move" class="menu-btn">확대</button>
                 <button id="btn-draw" class="menu-btn">선긋기</button>
                 <button id="btn-reset" class="menu-btn">초기화</button>
             </nav>
 
-            <!-- [하단부] 명세 5번: 텍스트 비디오 컨트롤러 (패밀리 룩 디자인) -->
+            <!-- 텍스트 비디오 컨트롤러 (패밀리 룩 디자인) -->
             <div class="video-control-bar">
                 <button id="btn-frame-prev" class="control-btn">[뒤로]</button>
                 <button id="btn-play-pause" class="control-btn">[재생]</button>
@@ -60,9 +67,7 @@
 
     </div>
 
-    <!-- ================================================================= -->
     <!-- 의존성 정렬 백엔드 스크립트 이식 파이프라인 -->
-    <!-- ================================================================= -->
     <script src="js/sensor.js"></script>
     <script src="js/analyzer.js"></script>
     <script src="js/app_core.js"></script>
