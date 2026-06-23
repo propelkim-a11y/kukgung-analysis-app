@@ -1,6 +1,3 @@
-<!-- ==========================================
-     index.html
-     ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -11,63 +8,98 @@
 </head>
 <body>
 
-    <!-- 비디오 투사 및 드로잉 도화지 전체 화면 영역 -->
-    <div id="video-viewport" class="viewport-container">
-        
-        <!-- 바둑판 그리드 격자 및 상시 점선 십자가 배경 가이드라인 -->
-        <div class="background-grid-layer">
-            <!-- 실시간 자이로 연동 물리 수평계 가이드선 -->
+    <!-- ================================================================= -->
+    <!-- [화면 1] 실시간 촬영 및 수평계 자이로 녹화 뷰어 (View: Capture) -->
+    <!-- ================================================================= -->
+    <div id="view-capture" class="app-view active">
+        <div class="viewport-container">
+            <!-- 자이로 센서 연동 실시간 물리 수평선 가이드 UI -->
             <div id="gyro-horizon-line"></div>
-            <div class="center-crosshair-v"></div>
-            <div class="center-crosshair-h"></div>
+            
+            <!-- 상시 고정 십자선 및 모눈종이 배경 격자 -->
+            <div class="background-grid-layer">
+                <div class="center-crosshair-v"></div>
+                <div class="center-crosshair-h"></div>
+            </div>
+
+            <!-- 하드웨어 후면 카메라 스트리밍 프리뷰 레이어 -->
+            <video id="camera-preview" autoplay playsinline muted></video>
         </div>
 
-        <!-- 실시간 웹캠/스마트폰 카메라 촬영 스트리밍 레이어 -->
-        <video id="camera-preview" autoplay playsinline muted style="display: none;"></video>
-
-        <!-- 풀스크린 왜곡 없는 분석용 비디오 요소 -->
-        <video id="main-video" playsinline muted loop></video>
-
-        <!-- 정밀 조준선 맵핑용 투명 캔버스 레이어 -->
-        <canvas id="draw-canvas"></canvas>
-
-        <!-- 좌측 상단 플로팅 각도 리포트 결과창 (초기값 0.0°) -->
-        <div id="angle-report" class="floating-report">📐 0.0°</div>
-        
-    </div>
-
-    <!-- 파일 아날로그 입력을 유인하기 위한 숨김 단추 -->
-    <input type="file" id="video-input" accept="video/*" style="display: none;">
-
-    <!-- 하단 패널 대통합 (촬영 및 분석 제어바 - unified-panel) -->
-    <div id="unified-panel" class="unified-panel-box">
-        
-        <!-- 슬라이딩 패널 개폐 제어용 물리 손잡이 핸들 -->
-        <div id="panel-handle" class="panel-slider-handle">
-            <div class="handle-bar"></div>
-        </div>
-
-        <div class="panel-content-wrapper">
-            <!-- 5대 텍스트 메뉴 정렬 (가로폭 20% 정밀 균등 배분) -->
-            <nav class="text-menu-bar">
-                <button id="btn-open" class="menu-btn active">열기</button>
-                <button id="btn-camera" class="menu-btn">촬영</button>
-                <button id="btn-move" class="menu-btn">확대</button>
-                <button id="btn-draw" class="menu-btn">선긋기</button>
-                <button id="btn-reset" class="menu-btn">초기화</button>
-            </nav>
-
-            <!-- 텍스트 비디오 컨트롤러 (패밀리 룩 디자인) -->
-            <div class="video-control-bar">
-                <button id="btn-frame-prev" class="control-btn">[뒤로]</button>
-                <button id="btn-play-pause" class="control-btn">[재생]</button>
-                <button id="btn-frame-next" class="control-btn">[앞으로]</button>
+        <!-- 촬영 화면 전용 하단 1/3 대통합 유리 패널 -->
+        <div id="capture-panel" class="unified-panel-box">
+            <div id="capture-handle" class="panel-slider-handle">
+                <div class="handle-bar"></div>
+            </div>
+            <div class="panel-content-wrapper">
+                <!-- 촬영부 고급 텍스트 하드웨어 제어바 -->
+                <nav class="text-menu-bar">
+                    <button id="btn-rec-toggle" class="menu-btn rec-ready">녹화시작</button>
+                    <button id="btn-go-analyze" class="menu-btn mode-switch-btn">분석화면 이동</button>
+                </nav>
+                <div class="panel-status-text">수평계를 확인한 뒤 녹화를 진행하세요.</div>
             </div>
         </div>
-
     </div>
 
-    <!-- 의존성 정렬 백엔드 스크립트 이식 파이프라인 -->
+    <!-- ================================================================= -->
+    <!-- [화면 2] 고정밀 시공간 선긋기 기하학 분석 뷰어 (View: Analyze) -->
+    <!-- ================================================================= -->
+    <div id="view-analyze" class="app-view">
+        <div id="video-viewport" class="viewport-container">
+            <!-- 상시 고정 십자선 및 모눈종이 배경 격자 (분석 화면용) -->
+            <div class="background-grid-layer">
+                <div class="center-crosshair-v"></div>
+                <div class="center-crosshair-h"></div>
+            </div>
+
+            <!-- 변환행렬(확대/이동)이 실시간으로 먹히는 렌더링 소스 비디오 -->
+            <video id="main-video" playsinline muted loop></video>
+
+            <!-- S펜/애플펜슬 포인터 좌표 역산 필터 드로잉 도화지 -->
+            <canvas id="draw-canvas"></canvas>
+
+            <!-- 좌측 상단 플로팅 삼각함수 고각 리포트 결과창 -->
+            <div id="angle-report" class="floating-report">📐 0.0°</div>
+        </div>
+
+        <!-- 분석 화면 전용 하단 1/3 대통합 유리 패널 -->
+        <div id="unified-panel" class="unified-panel-box">
+            <div id="panel-handle" class="panel-slider-handle">
+                <div class="handle-bar"></div>
+            </div>
+            
+            <div class="panel-content-wrapper">
+                <!-- 파일 아날로그 입력을 위한 숨김 폼 컨트롤 -->
+                <input type="file" id="video-input" accept="video/*" style="display: none;">
+
+                <!-- 명세 3&4번: 4대 핵심 텍스트 메뉴 균등 배분 배선 -->
+                <nav class="text-menu-bar">
+                    <button id="btn-open" class="menu-btn">열기</button>
+                    <button id="btn-move" class="menu-btn active">확대</button>
+                    <button id="btn-draw" class="menu-btn">선긋기</button>
+                    <button id="btn-reset" class="menu-btn">초기화</button>
+                </nav>
+
+                <!-- 추가 요건: 탐색 효율 증대를 위한 초정밀 비디오 재생 슬라이더 타임라인 -->
+                <div class="timeline-slider-container">
+                    <input type="range" id="video-slider" min="0" max="100" value="0" step="0.01">
+                </div>
+
+                <!-- 명세 5번: 1프레임 미세조정 패밀리룩 텍스트 비디오 컨트롤러 및 촬영 복귀 단추 -->
+                <div class="video-control-bar">
+                    <button id="btn-go-capture" class="control-btn switch-back-btn">[촬영복귀]</button>
+                    <button id="btn-frame-prev" class="control-btn">[뒤로]</button>
+                    <button id="btn-play-pause" class="control-btn">[재생]</button>
+                    <button id="btn-frame-next" class="control-btn">[앞으로]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 시스템 연동 백엔드 스크립트 이식 파이프라인 -->
+    <!-- ================================================================= -->
     <script src="js/sensor.js"></script>
     <script src="js/analyzer.js"></script>
     <script src="js/app_core.js"></script>
