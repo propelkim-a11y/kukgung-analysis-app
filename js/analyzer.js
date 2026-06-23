@@ -1,6 +1,6 @@
 /**
  * analyzer.js
- * 렉 제거 최적화, 비디오 원본 비율 보존 및 자유 확대/축소 다중 분석 엔진 (선긋기 모드 메뉴 연동판)
+ * 렉 제거 최적화, 비디오 원본 비율 보존 및 자유 확대/축소 다중 분석 엔진 (텍스트 정제판)
  */
 
 export class BowAnalyzer {
@@ -21,7 +21,7 @@ export class BowAnalyzer {
         this.startY = 0;
         this.lastTouchDist = 0; 
 
-        // 🛠️ 신설: 모드 메뉴 제어 변수 (기본값은 'draw' 선 긋기 모드)
+        // 작동 모드 메뉴 제어 변수 (기본값은 'draw' 선 긋기 모드)
         this.toolMode = 'draw'; 
     }
 
@@ -55,11 +55,11 @@ export class BowAnalyzer {
         this.draw();
     }
 
-    // ⚡ 외부 app.js 메뉴 탭 버튼 클릭 시 모드를 전환해주는 통제 함수
+    // 외부 app.js 메뉴 탭 버튼 클릭 시 모드를 전환해주는 통제 함수
     setToolMode(mode) {
         this.toolMode = mode; // 'draw' 또는 'move' 수신
         this.isDragging = false;
-        console.log(`[작동 모드 변경] 현재 전환된 모드: ${mode === 'draw' ? '✏️ 선 긋기' : '🔍 화면 조작'}`);
+        console.log(`[작동 모드 변경] 현재 전환된 모자: ${mode === 'draw' ? '✏️ 선 긋기' : '🔍 화면 조작'}`);
     }
 
     // 화면 비율 스케일을 역산하여 드래그나 확대 중에도 점이 마우스/손가락 끝에 정확히 물리게 매핑하는 함수
@@ -75,7 +75,7 @@ export class BowAnalyzer {
     }
 
     handleStart(e) {
-        // 🛠️ 마우스 제어 시 'move' 모드이거나 우클릭(또는 Ctrl+클릭) 시 드래그 가동
+        // 마우스 제어 시 'move' 모드이거나 우클릭(또는 Ctrl+클릭) 시 드래그 가동
         if (this.toolMode === 'move' || e.button === 2 || e.ctrlKey) { 
             this.isDragging = true;
             this.startX = e.clientX - this.offsetX;
@@ -100,21 +100,21 @@ export class BowAnalyzer {
     handleTouchStart(e) {
         if (e.cancelable) e.preventDefault();
         
-        // 1. 손가락 2개 멀티터치는 어떤 모드이든 상관없이 무조건 피치 줌 확대/축소 작동
+        // 손가락 2개 멀티터치는 어떤 모드이든 상관없이 무조건 피치 줌 확대/축소 작동
         if (e.touches.length === 2) { 
-            this.lastTouchDist = this.getTouchDistance(e.touches[0], e.touches[1]);
+            this.lastTouchDist = this.getTouchDistance(e.touches, e.touches);
         } 
-        // 2. 한 손가락 터치 시 모드별 분기
+        // 한 손가락 터치 시 모드별 분기
         else if (e.touches.length === 1) {
-            // 🛠️ 메뉴 탭이 '화면 이동/확대' 모드인 경우 밀어서 화면 스크롤 제어
+            // 메뉴 탭이 '화면 이동/확대' 모드인 경우 밀어서 화면 스크롤 제어
             if (this.toolMode === 'move') { 
                 this.isDragging = true;
-                this.startX = e.touches[0].clientX - this.offsetX;
-                this.startY = e.touches[0].clientY - this.offsetY;
+                this.startX = e.touches.clientX - this.offsetX;
+                this.startY = e.touches.clientY - this.offsetY;
             } 
-            // 🛠️ 메뉴 탭이 '선 긋기' 모드인 경우 렉 없이 실시간 점 찍기 작동
+            // 메뉴 탭이 '선 긋기' 모드인 경우 렉 없이 실시간 점 찍기 작동
             else {
-                const coord = this.getCanvasCoordinates(e.touches[0].clientX, e.touches[0].clientY);
+                const coord = this.getCanvasCoordinates(e.touches.clientX, e.touches.clientY);
                 this.points.push(coord);
                 this.draw();
                 this.calculateAngles();
@@ -127,7 +127,7 @@ export class BowAnalyzer {
         
         // 멀티터치 실시간 배율 확대 연산
         if (e.touches.length === 2 && this.lastTouchDist > 0) {
-            const dist = this.getTouchDistance(e.touches[0], e.touches[1]);
+            const dist = this.getTouchDistance(e.touches, e.touches);
             const factor = dist / this.lastTouchDist;
             this.scale = Math.min(5.0, Math.max(1.0, this.scale * factor)); // 최대 5배 확대 락
             this.lastTouchDist = dist;
@@ -135,8 +135,8 @@ export class BowAnalyzer {
         } 
         // 한 손가락 캔버스 이동 제어
         else if (e.touches.length === 1 && this.isDragging) {
-            this.offsetX = e.touches[0].clientX - this.startX;
-            this.offsetY = e.touches[0].clientY - this.startY;
+            this.offsetX = e.touches.clientX - this.startX;
+            this.offsetY = e.touches.clientY - this.startY;
             this.draw();
         }
     }
@@ -175,7 +175,7 @@ export class BowAnalyzer {
             // 동영상 프레임 캔버스 투사
             this.ctx.drawImage(v, drawX, drawY, drawW, drawH);
 
-            // ⚡ 영상 뒤편에 상시 고정되어 지워지지 않는 은은한 격자 크로스 수직수평선 투사
+            // 영상 뒤편에 상시 고정되어 지워지지 않는 은은한 격자 크로스 수직수평선 투사
             this.ctx.lineWidth = 1.5 / this.scale;
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'; 
             this.ctx.setLineDash([8 / this.scale, 8 / this.scale]); 
@@ -216,7 +216,8 @@ export class BowAnalyzer {
     calculateAngles() {
         const len = this.points.length;
         if (len < 4 || len % 2 !== 0) {
-            if (this.badgeDisplay) this.badgeDisplay.innerText = `분석 중... (배치된 총 직선: ${Math.floor(len / 2)}개)`;
+            // ⚡ [피드백 적용] 불필요한 "두 선을 선택하세요" 배지 텍스트를 제거하고 진행 상태만 로그 출력 처리
+            if (this.badgeDisplay) this.badgeDisplay.innerText = `선 배치 상태: ${Math.floor(len / 2)}개 완료`;
             return;
         }
 
@@ -241,7 +242,7 @@ export class BowAnalyzer {
         // 소수점 첫째 자리 표기 강제 슬라이스 연산 (.toFixed(1))
         const finalAngle = angleDeg.toFixed(1);
         if (this.angleDisplay) this.angleDisplay.innerText = `${finalAngle}°`;
-        if (this.badgeDisplay) this.badgeDisplay.innerText = "분석 완료! 선을 이어서 계속 그을 수 있습니다.";
+        if (this.badgeDisplay) this.badgeDisplay.innerText = "연산 성공! 선을 이어서 계속 작도 가능합니다.";
     }
 
     clear() {
@@ -249,6 +250,6 @@ export class BowAnalyzer {
         this.scale = 1.0; this.offsetX = 0; this.offsetY = 0; 
         this.draw();
         if (this.angleDisplay) this.angleDisplay.innerText = '0.0°';
-        if (this.badgeDisplay) this.badgeDisplay.innerText = "두 선을 선택하세요.";
+        if (this.badgeDisplay) this.badgeDisplay.innerText = "분석 대기 중";
     }
 }
