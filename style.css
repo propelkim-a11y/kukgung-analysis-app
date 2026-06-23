@@ -1,18 +1,13 @@
 /**
+ * ==========================================
  * style.css
- * 국궁 자세 분석 시스템 통합 스타일시트
- * - 풀스크린 비디오 및 도화지 적층 레이아웃
- * - 하단 1/3 통합 패널 Glassmorphism 및 슬라이딩 애니메이션
- * - 4대 메뉴 가로폭 25% 정밀 균등 배분 정렬
- * - 50px 간격 은은한 바둑판 그리드 및 상시 점선 십자가
+ * ==========================================
  */
-
-/* 1. 하드웨어 리셋 및 풀뷰포트 환경 격리 */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    -webkit-user-select: none; /* 드로잉 시 텍스트 블록 지정 노이즈 차단 */
+    -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
 }
@@ -25,25 +20,24 @@ body, html {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* 2. 풀스크린 비디오 투사 도화지 컨테이너 */
 .viewport-container {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%; /* 하단 패널 뒷공간 맨 바닥 끝까지 유기적으로 확장 */
+    height: 100%;
     z-index: 1;
     overflow: hidden;
 }
 
-#main-video {
+#main-video, #camera-preview {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* 동영상 고유 비율 왜곡 없이 칼같이 보존 */
-    transform-origin: top left; /* 줌 행렬 연산 기준점 고정 */
+    object-fit: contain;
+    transform-origin: top left;
     z-index: 2;
 }
 
@@ -53,11 +47,11 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: auto; /* 스타일러스 터치 이벤트를 받아내기 위해 개방 */
+    pointer-events: auto;
     z-index: 3;
 }
 
-/* 3. 명세 8번: 50픽셀 간격 바둑판 그리드 격자 및 상시 점선 십자가 */
+/* 50픽셀 간격 바둑판 그리드 격자 및 상시 점선 십자가 */
 .background-grid-layer {
     position: absolute;
     top: 0;
@@ -67,7 +61,7 @@ body, html {
     background-image: 
         linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 50px 50px; /* 은은한 50픽셀 간격 모눈종이 */
+    background-size: 50px 50px;
     z-index: 1;
     pointer-events: none;
 }
@@ -84,7 +78,7 @@ body, html {
     top: 0;
     width: 1px;
     height: 100%;
-    border-left: 1px dashed rgba(255, 255, 255, 0.25); /* 상시 세로 점선 십자가 */
+    border-left: 1px dashed rgba(255, 255, 255, 0.25);
 }
 
 .center-crosshair-h {
@@ -92,46 +86,62 @@ body, html {
     left: 0;
     height: 1px;
     width: 100%;
-    border-top: 1px dashed rgba(255, 255, 255, 0.25); /* 상시 가로 점선 십자가 */
+    border-top: 1px dashed rgba(255, 255, 255, 0.25);
 }
 
-/* 4. 명세 9번: 좌측 상단 플로팅 각도 리포트 결과창 */
+/* 실시간 자이로 연동 실물 수평 가이드선 */
+#gyro-horizon-line {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    width: 80%;
+    height: 2px;
+    background-color: #FF3366; /* 비수평 상태: 적색 */
+    transform-origin: center;
+    transition: background-color 0.2s ease, transform 0.05s linear;
+    z-index: 1;
+}
+
+#gyro-horizon-line.perfect-level {
+    background-color: #00FF66; /* 수평 일치 상태: 형광 연두 */
+    box-shadow: 0 0 10px #00FF66;
+}
+
+/* 좌측 상단 플로팅 각도 리포트 결과창 */
 .floating-report {
     position: absolute;
-    top: calc(20px + env(safe-area-inset-top)); /* 노치 방어 */
+    top: calc(20px + env(safe-area-inset-top));
     left: 20px;
     font-size: 24px;
     font-weight: 700;
-    color: #00FF66; /* 고시인성 형광 연두 */
+    color: #00FF66;
     text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.8);
     z-index: 4;
-    font-variant-numeric: tabular-nums; /* 각도 변경 시 자출 흔들림 방지 */
+    font-variant-numeric: tabular-nums;
 }
 
-/* 5. 명세 1번 & 10번: 하단 대통합 1/3 Glassmorphism 패널 상자 */
+/* 하단 대통합 1/3 Glassmorphism 패널 상자 */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 33.333vh; /* 정확히 화면 세로 크기의 1/3 고정 */
-    background: rgba(25, 25, 25, 0.55); /* 반투명 유리 기재 */
-    backdrop-filter: blur(20px); /* 상용급 고급 Glassmorphism 핵심 블러 */
+    height: 33.333vh;
+    background: rgba(25, 25, 25, 0.55);
+    backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
     z-index: 5;
-    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); /* 부드러운 슬라이딩 슥 개폐 */
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 슬라이딩 패널 접힘 접지 상태 클래스 */
 .unified-panel-box.collapsed {
-    transform: translateY(calc(100% - 30px)); /* 물리 손잡이 핸들바만 남기고 슥 내려감 */
+    transform: translateY(calc(100% - 30px));
 }
 
-/* 패널 손잡이 바 핸들 (—) */
 .panel-slider-handle {
     width: 100%;
     height: 30px;
@@ -149,7 +159,6 @@ body, html {
     border-radius: 2px;
 }
 
-/* 패널 내부 정밀 제어 그리드 배치 wrapper */
 .panel-content-wrapper {
     height: calc(100% - 30px);
     display: flex;
@@ -158,18 +167,18 @@ body, html {
     padding: 0 16px 12px 16px;
 }
 
-/* 6. 명세 3번: 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) */
+/* 5대 텍스트 메뉴 정렬 (가로폭 20% 정밀 균등 배분) */
 .text-menu-bar {
     display: flex;
     width: 100%;
-    gap: 1px; /* 격자 분할선 효과 */
+    gap: 1px;
     background-color: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     overflow: hidden;
 }
 
 .menu-btn {
-    flex: 1; /* 단 하나의 선언으로 가로폭 정확히 25%씩 칼같이 균등 배분 */
+    flex: 1; /* 5개 버튼이므로 자동으로 정확히 20%씩 분할 안착 */
     height: 48px;
     background: rgba(40, 40, 40, 0.6);
     border: none;
@@ -181,24 +190,23 @@ body, html {
     transition: all 0.2s ease;
 }
 
-/* 명세 4번: 활성화(Active) 불빛 시인성 조율 */
 .menu-btn.active {
     background: rgba(255, 255, 255, 0.12);
-    color: #00FF66; /* 안전 모드 불빛 피드백 */
+    color: #00FF66;
     font-weight: 700;
-    box-shadow: inset 0 -3px 0 #00FF66; /* 하단 엣지 바 형태 불빛 고정 */
+    box-shadow: inset 0 -3px 0 #00FF66;
 }
 
 .menu-btn:active {
     background: rgba(255, 255, 255, 0.18);
 }
 
-/* 7. 명세 5번: 텍스트 비디오 컨트롤러 패밀리 룩 디자인 */
+/* 텍스트 비디오 컨트롤러 디자인 */
 .video-control-bar {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 32px; /* 버튼 간 세련된 이격 간격 */
+    gap: 32px;
 }
 
 .control-btn {
@@ -214,5 +222,5 @@ body, html {
 }
 
 .control-btn:active {
-    color: #00FF66; /* 터치 시 미세 피드백 광원 */
+    color: #00FF66;
 }
