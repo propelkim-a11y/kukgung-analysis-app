@@ -39,57 +39,67 @@
 
             <!-- 분석 모드 -->
             <div id="analysis-section" class="view-section hidden">
-                <!-- 상단 2/3 영역: 동영상 원본 비율 유지 및 피치 줌 영역 -->
+                <!-- 동영상 원본 비율 유지 및 피치 줌 백그라운드 구역 -->
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
                     <canvas id="drawing-canvas"></canvas>
                 </div>
-                
-                <!-- 하단 1/3 영역: 완전 투명 인터페이스 제어 패널 -->
-                <div class="analysis-control-panel">
-                    <!-- 툴바 (초기화) -->
-                    <div class="tool-bar-inner">
-                        <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
-                        <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
-                    </div>
-
-                    <!-- 실시간 비디오 탐색 슬라이더 바 -->
-                    <div class="slider-container">
-                        <input type="range" id="video-timeline" value="0" min="0" max="100" step="0.01">
-                    </div>
-
-                    <!-- 비디오 미세 탐색 컨트롤러 -->
-                    <div class="video-controls">
-                        <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
-                        <button id="btn-video-play" class="control-btn">▶️ 재생</button>
-                        <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
-                    </div>
-
-                    <!-- 분석 결과창 및 파일 업로드 구역 -->
-                    <div class="report-box">
-                        <div class="report-item main-result">
-                            <span>📐 선택한 두 선의 각도</span>
-                            <span id="res-manual-angle" class="highlight">0.0°</span>
-                        </div>
-                        <div class="analysis-actions">
-                            <input type="file" id="file-upload" accept="video/*" class="hidden">
-                            <label for="file-upload" id="upload-label" class="btn-secondary">📁 영상 파일 업로드 분석</label>
-                        </div>
-                    </div>
-                </div>
             </div>
         </main>
 
-        <!-- 최하단 모드 탭 컨트롤바 (촬영 모드에서 제어) -->
-        <footer class="footer">
-            <div class="mode-selector">
-                <button id="btn-mode-shoot" class="active">촬영하기</button>
-                <button id="btn-mode-analyze">결과보기</button>
+        <!-- ⚡ [대통합 구현] 촬영/분석 통합 하단 1/3 반투명 컨트롤러 센터 박스 -->
+        <div id="unified-control-center" class="unified-panel">
+            
+            <!-- ⚡ [분석 모드 전용 내부 컴포넌트 라인] -->
+            <div id="analysis-components" class="panel-inner-block hidden">
+                <!-- 🛠️ 신설: 선 긋기 / 화면 이동 모드 전환 메뉴 바 -->
+                <div class="menu-tab-bar">
+                    <button id="btn-tool-draw" class="menu-tab-btn active">✏️ 선 긋기 모드</button>
+                    <button id="btn-tool-move" class="menu-tab-btn">🔍 화면 이동/확대</button>
+                </div>
+
+                <!-- 툴바 (초기화 및 실시간 로그 안내) -->
+                <div class="tool-bar-inner">
+                    <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
+                    <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
+                </div>
+
+                <!-- 실시간 비디오 탐색 슬라이더 바 -->
+                <div class="slider-container">
+                    <input type="range" id="video-timeline" value="0" min="0" max="100" step="0.01">
+                </div>
+
+                <!-- 비디오 미세 탐색 컨트롤러 -->
+                <div class="video-controls">
+                    <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
+                    <button id="btn-video-play" class="control-btn">▶️ 재생</button>
+                    <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
+                </div>
+
+                <!-- 정밀 각도 결과 리포트 창 및 업로드 팩 -->
+                <div class="report-box">
+                    <div class="report-item main-result">
+                        <span>📐 선택한 두 선의 각도</span>
+                        <span id="res-manual-angle" class="highlight">0.0°</span>
+                    </div>
+                    <div class="analysis-actions">
+                        <input type="file" id="file-upload" accept="video/*" class="hidden">
+                        <label for="file-upload" id="upload-label" class="btn-secondary">📁 영상 업로드 분석</label>
+                    </div>
+                </div>
             </div>
-            <div class="action-zone">
-                <button id="record-btn" aria-label="녹화"></button>
+
+            <!-- ⚡ [공통 및 촬영 전용 하단 인터랙션 컨트롤 레이아웃] -->
+            <div class="panel-global-footer">
+                <div class="mode-selector">
+                    <button id="btn-mode-shoot" class="active">촬영하기</button>
+                    <button id="btn-mode-analyze">결과보기</button>
+                </div>
+                <div class="action-zone">
+                    <button id="record-btn" aria-label="녹화"></button>
+                </div>
             </div>
-        </footer>
+        </div>
     </div>
 
     <!-- 스크립트 엔진 장착 -->
