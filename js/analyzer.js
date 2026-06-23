@@ -1,7 +1,5 @@
 /**
- * ==========================================
- * js/analyzer.js
- * ==========================================
+ * js/analyzer.js - 고각 분석 및 스타일러스 펜 드로잉 연산기
  */
 class BowAnalyzer {
     constructor() {
@@ -53,27 +51,21 @@ class BowAnalyzer {
         const rect = this.canvas.getBoundingClientRect();
         const clientX = event.clientX - rect.left;
         const clientY = event.clientY - rect.top;
-
-        // 변환 행렬 스케일 및 오프셋 물리 역산 (조준점 일치 핵심 수식)
-        const canvasX = (clientX - this.transform.offsetX) / this.transform.scale;
-        const canvasY = (clientY - this.transform.offsetY) / this.transform.scale;
-        return { x: canvasX, y: canvasY };
+        // 5배 줌 상태에서도 빗나감 없는 조준점 역산 행렬 공식
+        return {
+            x: (clientX - this.transform.offsetX) / this.transform.scale,
+            y: (clientY - this.transform.offsetY) / this.transform.scale
+        };
     }
 
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
-
-        // Palm Rejection 하드웨어 필터링
-        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) return; 
+        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) return; // Palm Rejection
         if (event.pointerType === 'pen') window.isStylusActive = true;
 
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
-
-        this.currentLine = {
-            start: { x: coords.x, y: coords.y },
-            end: { x: coords.x, y: coords.y }
-        };
+        this.currentLine = { start: { x: coords.x, y: coords.y }, end: { x: coords.x, y: coords.y } };
     }
 
     handlePointerMove(event) {
@@ -89,10 +81,8 @@ class BowAnalyzer {
             setTimeout(() => { window.isStylusActive = false; }, 500);
         }
         if (this.toolMode !== 'draw' || !this.currentLine) return;
-
         const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
         if (dist > 5) this.lines.push(this.currentLine);
-        
         this.currentLine = null;
         this.render();
         this.calculateFinalAngle();
@@ -141,7 +131,7 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX, this.transform.offsetY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        this.ctx.lineWidth = 2 / this.transform.scale; // 확대 시에도 조준선 굵기 2px 유지
+        this.ctx.lineWidth = 2 / this.transform.scale; // 확대 연동 선 굵기 평탄화 보정
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
 
@@ -159,11 +149,10 @@ class BowAnalyzer {
         this.ctx.moveTo(line.start.x, line.start.y);
         this.ctx.lineTo(line.end.x, line.end.y);
         this.ctx.stroke();
-
-        const radius = 4 / this.transform.scale;
+        const r = 4 / this.transform.scale;
         this.ctx.beginPath();
-        this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
-        this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
+        this.ctx.arc(line.start.x, line.start.y, r, 0, 2 * Math.PI);
+        this.ctx.arc(line.end.x, line.end.y, r, 0, 2 * Math.PI);
         this.ctx.fill();
     }
 }
