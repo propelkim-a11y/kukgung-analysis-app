@@ -101,6 +101,19 @@ async function initApp() {
 
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
+
+    // ⚡ [신설] 선 긋기 모드와 화면 이동/확대 제어 스위칭 리스너 결합
+    document.getElementById('btn-tool-draw').onclick = () => {
+        document.getElementById('btn-tool-draw').classList.add('active');
+        document.getElementById('btn-tool-move').classList.remove('active');
+        bowAnalyzer.setToolMode('draw');
+    };
+
+    document.getElementById('btn-tool-move').onclick = () => {
+        document.getElementById('btn-tool-move').classList.add('active');
+        document.getElementById('btn-tool-draw').classList.remove('active');
+        bowAnalyzer.setToolMode('move');
+    };
 }
 
 // 5. 웹캠이 없는 PC용 가상 캔버스 안내 도화지 빌더
@@ -123,7 +136,7 @@ function loadDummyCanvasForPC() {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🏹 우측 하단 [영상 파일 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
+    ctx.fillText('🏹 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
     ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 자유로운 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
@@ -139,7 +152,7 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
-            // 로컬 자동 다운로드 트리거
+            // 로컬 장치 원본 자동 보관 다운로더
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -155,7 +168,6 @@ async function startRecording() {
         mediaRecorder.start(1000); 
         isRecording = true;
         recordBtn.classList.add('recording');
-        recordBtn.innerText = "STOP";
     } catch (e) {
         console.error(e);
     }
@@ -167,7 +179,6 @@ async function stopRecording() {
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
-        recordBtn.innerText = "";
     }
 }
 
@@ -175,19 +186,19 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. 로컬 동영상 파일 인젝션 이벤트 (파일 업로드 파트)
+// 9. 로컬 동영상 파일 인젝션 이벤트
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
+        const file = e.target.files;
+        if (file && file[0]) {
             activeVideoRoll = 0; 
-            loadVideoForAnalysis(URL.createObjectURL(file));
+            loadVideoForAnalysis(URL.createObjectURL(file[0]));
         }
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈 (수평계/녹화단추 분석화면 전면 고립 차단)
+// 10. 상하단 레이아웃 분리 모듈 (패널 대통합 버그 패치 버전)
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -195,20 +206,23 @@ function switchMode(mode) {
     document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
     document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
 
-    // 촬영 화면 전용 컴포넌트 분리
-    const actionZone = document.querySelector('.action-zone');
+    // ⚡ [대통합 패치] 통합 제어 센터 내부의 분석 전용 컴포넌트 출력 전환 제어
+    const analysisComponents = document.getElementById('analysis-components');
     const headerElement = document.querySelector('.header');
+    const recordBtnContainer = document.querySelector('.action-zone');
     
     if (mode === 'analyze') {
-        if (actionZone) actionZone.classList.add('hidden');
-        if (headerElement) headerElement.classList.add('hidden'); 
+        if (analysisComponents) analysisComponents.classList.remove('hidden');
+        if (recordBtnContainer) recordBtnContainer.classList.add('hidden'); // 녹화 버튼 격리 숨김
+        if (headerElement) headerElement.classList.add('hidden'); // 수평계 메시지 숨김
     } else {
-        if (actionZone) actionZone.classList.remove('hidden');
-        if (headerElement) headerElement.classList.remove('hidden'); 
+        if (analysisComponents) analysisComponents.classList.add('hidden');
+        if (recordBtnContainer) recordBtnContainer.classList.remove('hidden'); // 녹화 버튼 복구
+        if (headerElement) headerElement.classList.remove('hidden'); // 수평계 메시지 복구
     }
 }
 
-// 11. 분석 화면 동적 데이터 마운트 로더 (비율 고정 및 비디오 컨텍스트 주입)
+// 11. 분석 화면 동적 데이터 마운트 로더
 function loadVideoForAnalysis(url) {
     const v = document.createElement('video');
     v.src = url; v.muted = true; v.playsInline = true;
@@ -220,12 +234,11 @@ function loadVideoForAnalysis(url) {
         const timeline = document.getElementById('video-timeline');
         const container = document.getElementById('manual-analysis-box');
         
-        // 캔버스를 눈에 보이는 레이아웃 크기 박스 해상도와 동기화
+        // 도화지 박스 정비례 크기로 캔버스 해상도 강제 맞춤 고정
         const rect = container.getBoundingClientRect();
         dc.width = oc.width = rect.width;
         dc.height = oc.height = rect.height;
         
-        // 타임라인 슬라이더 조작 범위 연동
         if (timeline) {
             timeline.min = 0;
             timeline.max = v.duration;
@@ -236,15 +249,13 @@ function loadVideoForAnalysis(url) {
         v.currentTime = 0.1; 
         switchMode('analyze');
         
-        // ⚡ 피치 투 줌 및 원본 비율 추적 연산 초기화
+        // 직선 그리드 피치 투 줌 마운트
         bowAnalyzer.init(); 
         
-        // 프레임 탐색 및 실시간 렌더링 동기화
         v.onseeked = () => {
             if (bowAnalyzer) bowAnalyzer.draw();
         };
         
-        // 비디오 재생 시 타임라인 연동 루프
         v.onplay = () => {
             const updateLoop = () => {
                 if (!v.paused && !v.ended) {
@@ -304,10 +315,8 @@ document.getElementById('btn-video-play').onclick = () => {
     }
 };
 
-// 13. 드로잉 캔버스 초기화 리스너
 document.getElementById('btn-clear-draw').onclick = () => { 
     if (bowAnalyzer) bowAnalyzer.clear(); 
 };
 
-// 최초 기동
 initApp();
