@@ -2,7 +2,7 @@
  * js/app_gesture.js
  * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (6단계)
  * - 두 손가락 피치 줌(최대 5배) 및 한 손가락 화면 드래그 이동 스크롤
- * - 비디오와 분석 캔버스의 Origin 축을 완전히 통일하여 선 분리 현상 영구 소거
+ * - 중복 CSS 변환을 소거하여 비디오와 조준선의 축 불일치 및 찢어짐 오류 완전 정밀 격파
  */
 
 class BowAppGesture {
@@ -86,7 +86,7 @@ class BowAppGesture {
         // 한 손가락 드래그 스크롤
         if (state.isDragging && this.activePointers.size === 1) {
             state.offsetX = e.clientX - state.startX;
-            state.offsetY = e.clientY - state.offsetY;
+            state.offsetY = e.clientY - state.startY;
             this.applyTransform();
         }
     }
@@ -126,7 +126,6 @@ class BowAppGesture {
         const mouseX = clientX - containerRect.left;
         const mouseY = clientY - containerRect.top;
         
-        // 💡 축 기준을 top left(0,0)와 부합하도록 정밀 역산식 교정
         state.offsetX = mouseX - (mouseX - state.offsetX) * (nextScale / state.scale);
         state.offsetY = mouseY - (mouseY - state.offsetY) * (nextScale / state.scale);
         state.scale = nextScale;
@@ -135,25 +134,24 @@ class BowAppGesture {
     }
 
     /**
-     * 💡 핵심 패치: 비디오와 캔버스 레이어를 물리적(CSS)으로 동시에 완벽 일치 변환 처리
-     * 이제 비디오 이미지 속 과녁이나 활의 픽셀 위에 그어진 선이 접착제처럼 결합하여 완벽하게 같이 움직입니다.
+     * 💡 교정: 비디오는 CSS로 확대하되, 캔버스는 전체 투명 유리창으로 고정(CSS 제거)하고 
+     * 오직 분석기 내부 행렬 엔진을 통해서만 선을 비디오 픽셀과 완전 일치하도록 동기화 렌더링합니다.
      */
     applyTransform() {
         const state = this.core.state;
-        const transformCSS = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         
-        // 1. 비디오 노드 변환
+        // 1. 비디오 엘리먼트만 물리 CSS 확대/이동 변환
         if (this.video) {
-            this.video.style.transform = transformCSS;
+            this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         }
         
-        // 2. 드로잉 캔버스 도화지 노드 완전 동시 변환 (동일 축, 동일 값 적용)
+        // 2. 캔버스의 이중 CSS 간섭 원천 소거 (유리창 고정)
         const canvasEl = document.getElementById('draw-canvas');
         if (canvasEl) {
-            canvasEl.style.transform = transformCSS;
+            canvasEl.style.transform = 'none';
         }
 
-        // 3. 기하학 렌더러 내부 변환 행렬 동기화
+        // 3. 분석기 내부 좌표계 시스템에만 실시간 동기화 명령 전송
         if (window.bowAnalyzer) {
             window.bowAnalyzer.updateTransform(state.scale, state.offsetX, state.offsetY);
         }
