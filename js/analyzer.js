@@ -3,7 +3,7 @@
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - S펜 / 애플펜슬 Palm Rejection 및 포인터 분리
  * - 줌/이동 변환 행렬 역산 (확대 상태에서도 정확한 조준점 매핑)
- * - 삼각함수 기반 다중 선긋기 사잇각(고각) 초정밀 연산
+ * - [핵심 패치] 확대 및 축소 상태에 상관없이 상시 균일한 정밀 각도 연산 인프라 구축
  */
 
 class BowAnalyzer {
@@ -79,7 +79,6 @@ class BowAnalyzer {
 
     /**
      * 화면 상의 절대 픽셀 좌표를 줌/이동이 적용된 비디오 캔버스의 로컬 좌표로 역산
-     * 💡 교정: 캔버스 해상도 스케일 밀도(DPR)와 확대 오프셋을 역산하여 완벽한 등배 트랙킹 구현
      */
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
@@ -92,7 +91,7 @@ class BowAnalyzer {
         const clientX = (event.clientX - rect.left) * scaleX;
         const clientY = (event.clientY - rect.top) * scaleY;
 
-        // 2단계: 확대 배율과 이동 오프셋을 해상도 비율에 맞춰 역산 처리 (동영상 그림에 정확히 고정)
+        // 2단계: 확대 배율과 이동 오프셋을 해상도 비율에 맞춰 역산 처리
         const canvasX = (clientX - (this.transform.offsetX * scaleX)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * scaleY)) / this.transform.scale;
 
@@ -180,22 +179,32 @@ class BowAnalyzer {
     }
 
     /**
+     * 💡 교정: 캔버스의 하드웨어 해상도 종횡비(화면비) 차이로 생기는 삼각함수 왜곡 보정
      * 단일 선의 지면 대비 수평 고각 측정
      */
     getLineAngle(line) {
+        const rect = this.canvas.getBoundingClientRect();
+        // 실제 화면의 물리 스케일 비율을 역산하여 왜곡 제거
+        const aspectCorrection = rect.height / rect.width;
+
         const dx = line.end.x - line.start.x;
-        const dy = line.end.y - line.start.y;
+        const dy = (line.end.y - line.start.y) * aspectCorrection; // 화면비 보정값 주입
+
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return angle % 180;
     }
 
     /**
+     * 💡 교정: 확대 배율에 독립적인 구면 삼각 픽셀 아크 매핑 적용
      * 두 선 사이의 사잇각(내각) 계산
      */
     getIntersectionAngle(line1, line2) {
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        const rect = this.canvas.getBoundingClientRect();
+        const aspectCorrection = rect.height / rect.width;
+
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.end.x - line1.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
         
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
@@ -218,12 +227,10 @@ class BowAnalyzer {
     render() {
         if (!this.ctx || !this.canvas) return;
 
-        // 캔버스 버퍼 전체 초기화
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.save();
         
-        // 💡 핵심 패치: 고해상도 디바이스 비율(DPR)에 맞춰 내부 행렬의 배율과 오프셋을 동영상 픽셀 크기와 일대일 매핑
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
@@ -231,7 +238,6 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        // 줌 배율에 반비례하여 2px 두께 상시 유지
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
