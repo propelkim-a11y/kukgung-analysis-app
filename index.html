@@ -4,32 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>국궁 자세 분석 시스템 (Archery Mechanics Analyzer)</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.0">
 </head>
 <body>
 
-    <!-- [SCENE 1] 촬영 모드 화면 -->
+    <!-- ================================================================= -->
+    <!-- [SCENE 1] 촬영 모드 화면 (기본 활성화) -->
+    <!-- ================================================================= -->
     <div id="scene-record" class="app-scene active">
+        <!-- 카메라 프리뷰 뷰포트 -->
         <div class="viewport-container">
-            <div id="gyro-horizon-line"></div>
-            <!-- 💡 추가 요건: 촬영 수평계 실시간 수치 각도 리포트창 -->
-            <div id="gyro-numeric-report" class="gyro-angle-report">0.0°</div>
+            <!-- 💡 실시간 자이로 연동 물리 수평 가이드선 및 각도 표기용 앵커 -->
+            <div id="gyro-horizon-line" data-angle="0.0°"></div>
+            <!-- 상시 중앙 가이드 십자선 -->
             <div class="center-crosshair-v"></div>
             <div class="center-crosshair-h"></div>
+            
+            <!-- 실시간 스마트폰 후면 카메라/웹캠 스트리밍 -->
             <video id="camera-preview" autoplay playsinline muted></video>
         </div>
 
+        <!-- 촬영 모드 전용 하단 대통합 패널 -->
         <div class="unified-panel-box">
-            <!-- 💡 터치 시 패널이 아래로 부드럽게 슥 내려가는 물리 핸들바 -->
-            <div class="panel-slider-handle record-handle">
-                <div class="handle-bar"></div>
-            </div>
             <div class="panel-content-wrapper">
+                <!-- 촬영 상태 표시 및 안내 -->
                 <div id="record-status" class="status-text">카메라 대기 중...</div>
+                
+                <!-- 촬영 제어 단추 레이아웃 -->
                 <div class="control-row-center">
-                    <!-- 💡 요건 반영: 괄호 [] 탈거 완료 -->
                     <button id="btn-record-toggle" class="action-btn-main">녹화시작</button>
                 </div>
+
+                <!-- 화면 전환 단추 (분석 화면으로 이동) -->
                 <nav class="scene-switch-bar">
                     <button id="btn-go-analyze" class="switch-btn">분석 화면으로 이동</button>
                 </nav>
@@ -37,26 +43,38 @@
         </div>
     </div>
 
+
+    <!-- ================================================================= -->
     <!-- [SCENE 2] 분석 모드 화면 -->
+    <!-- ================================================================= -->
     <div id="scene-analyze" class="app-scene">
+        <!-- 비디오 분석 및 드로잉 도화지 뷰포트 -->
         <div id="video-viewport" class="viewport-container">
+            <!-- 은은한 50px 바둑판 그리드 격자 배경 -->
             <div class="background-grid-layer">
                 <div class="center-crosshair-v"></div>
                 <div class="center-crosshair-h"></div>
             </div>
+
+            <!-- 분석 대상 비디오 재생 레이어 -->
             <video id="main-video" playsinline muted loop></video>
+
+            <!-- 스타일러스 수동 선긋기 조준선 캔버스 -->
             <canvas id="draw-canvas"></canvas>
+
+            <!-- 좌측 상단 플로팅 각도 리포트 수치창 -->
             <div id="angle-report" class="floating-report">📐 0.0°</div>
         </div>
 
+        <!-- 분석 모드 전용 하단 대통합 패널 (터치 시 아래로 부드럽게 완전 은닉 슬라이딩) -->
         <div id="unified-panel" class="unified-panel-box">
-            <!-- 💡 터치 시 패널이 아래로 부드럽게 슥 내려가는 물리 핸들바 -->
-            <div class="panel-slider-handle analyze-handle">
+            <!-- 슬라이딩 개폐 손잡이 바 핸들 (—) -->
+            <div id="panel-handle" class="panel-slider-handle">
                 <div class="handle-bar"></div>
             </div>
 
             <div class="panel-content-wrapper">
-                <!-- 💡 요건 반영: 괄호 [] 탈거 완료 -->
+                <!-- 💡 대괄호가 완전히 삭제된 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) -->
                 <nav class="text-menu-bar">
                     <button id="btn-open" class="menu-btn">열기</button>
                     <button id="btn-move" class="menu-btn">확대</button>
@@ -64,17 +82,19 @@
                     <button id="btn-reset" class="menu-btn">초기화</button>
                 </nav>
 
+                <!-- 비디오 타임라인 재생 슬라이더 바 -->
                 <div class="timeline-container">
                     <input type="range" id="video-slider" min="0" max="100" value="0" step="0.1">
                 </div>
 
-                <!-- 💡 요건 반영: 괄호 [] 탈거 완료 -->
+                <!-- 💡 대괄호가 완전히 삭제된 순정 서체 패밀리 룩 비디오 컨트롤러 -->
                 <div class="video-control-bar">
                     <button id="btn-frame-prev" class="control-btn">뒤로</button>
                     <button id="btn-play-pause" class="control-btn">재생</button>
                     <button id="btn-frame-next" class="control-btn">앞으로</button>
                 </div>
 
+                <!-- 화면 전환 단추 (촬영 화면으로 복귀) -->
                 <nav class="scene-switch-bar">
                     <button id="btn-go-record" class="switch-btn">촬영 화면으로 이동</button>
                 </nav>
@@ -82,12 +102,17 @@
         </div>
     </div>
 
+    <!-- 파일 시스템 연동 수동 비디오 업로드용 숨김 인풋 -->
     <input type="file" id="video-input" accept="video/*" style="display: none;">
 
-    <script src="js/sensor.js"></script>
-    <script src="js/analyzer.js"></script>
-    <script src="js/app_core.js"></script>
-    <script src="js/app_gesture.js"></script>
-    <script src="js/app.js"></script>
+
+    <!-- ================================================================= -->
+    <!-- 시스템 통합 백엔드 스크립트 이식 파이프라인 -->
+    <!-- ================================================================= -->
+    <script src="js/sensor.js?v=2.0"></script>
+    <script src="js/analyzer.js?v=2.0"></script>
+    <script src="js/app_core.js?v=2.0"></script>
+    <script src="js/app_gesture.js?v=2.0"></script>
+    <script src="js/app.js?v=2.0"></script>
 </body>
 </html>
