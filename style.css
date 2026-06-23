@@ -1,5 +1,5 @@
 /* style.css
- * PC/모바일 하이브리드 대응 및 폰 전체 화면 가득 채우기 버전
+ * 하단 패널 1/3 축소, 완전 투명화 및 비디오 원본 비율 유지 버전
  */
 
 * { 
@@ -40,15 +40,15 @@ body {
     z-index: 1; 
 }
 
-/* ⚡ [패치] contain에서 cover로 변경하여 영상을 화면 너비에 꽉 채움 */
-#video-preview, #output-canvas { 
+/* 촬영하기 탭 프리뷰 */
+#video-preview { 
     width: 100%; 
     height: 100%; 
     object-fit: cover; 
     background: #000000;
 }
 
-/* 상단 투명 헤더 영역 (촬영 모드용) */
+/* 촬영 모드 전용 투명 헤더 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -60,7 +60,7 @@ body {
     pointer-events: none; 
 }
 
-/* 하단 푸터 제어 영역 (반투명 글래스모피즘 가독성 팩) */
+/* 최하단 전환 탭 바 (반투명 글래스모피즘 유지) */
 .footer { 
     background: rgba(0, 0, 0, 0.4); 
     padding: 15px 15px calc(10px + env(safe-area-inset-bottom)); 
@@ -105,7 +105,9 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* 분석 전용 독립 섹션 (촬영 텍스트와 겹침 원천 제거) */
+/* ==========================================
+ * ⚡ 분석 화면 전용 고립 레이아웃 (완벽 리포지셔닝)
+ * ========================================== */
 #analysis-section { 
     z-index: 500; 
     background: #000000;
@@ -113,18 +115,26 @@ body {
     flex-direction: column;
     height: 100%;
     width: 100%;
-    padding-bottom: calc(180px + env(safe-area-inset-bottom)); 
 }
 
+/* ⚡ 상단 2/3 영역: 동영상 비율을 절대 왜곡하지 않고 표현하는 도화지 상자 */
 .canvas-container { 
     width: 100%; 
-    flex: 1; 
+    height: 66.66dvh; /* 화면의 정확히 2/3 배정 */
     position: relative; 
     overflow: hidden; 
     touch-action: none;
     display: flex;
     justify-content: center;
     align-items: center;
+    background-color: #050505;
+}
+
+/* ⚡ [패치] contain으로 고정하여 비디오 원본 가로세로 비율(9:16 등)을 완벽히 보존 */
+#output-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; 
 }
 
 #drawing-canvas {
@@ -141,117 +151,122 @@ body {
     image-rendering: crisp-edges;
 }
 
-/* 분석 모드용 우측 도구 바 */
-.tool-bar { 
-    position: absolute; 
-    top: 20px; 
-    right: 15px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-    z-index: 800; 
+/* ⚡ 하단 1/3 영역: 완전 투명 인터페이스 제어 패널 디자인 */
+.analysis-control-panel {
+    width: 100%;
+    height: 33.33dvh; /* 화면의 정확히 1/3 배정 */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 10px 15px calc(50px + env(safe-area-inset-bottom)) 15px; /* 모드 탭 바 공간 확보 */
+    background: transparent; /* 완전 투명화 처리 */
+    z-index: 600;
+}
+
+/* 초기화 및 서브 뱃지 라인 */
+.tool-bar-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
 }
 .tool-btn { 
-    padding: 10px 15px; 
-    background: rgba(0,0,0,0.6); 
+    padding: 8px 14px; 
+    background: rgba(255, 255, 255, 0.15); 
     border: 1px solid rgba(255,255,255,0.2); 
     color: #ffffff; 
-    border-radius: 10px; 
-    font-size: 0.9rem; 
-    backdrop-filter: blur(5px); 
+    border-radius: 8px; 
+    font-size: 0.85rem; 
     cursor: pointer;
 }
 .angle-badge {
-    padding: 10px; 
-    background: rgba(0,0,0,0.6); 
-    border-radius: 10px; 
-    font-size: 0.8rem; 
-    text-align: center; 
-    max-width: 240px;
+    padding: 8px 12px; 
+    background: rgba(0, 0, 0, 0.6); 
+    border-radius: 8px; 
+    font-size: 0.75rem; 
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* 비디오 재생 슬라이더 바 */
+/* 비디오 재생 타임라인 슬라이더 */
 .slider-container {
     width: 100%;
-    padding: 0 25px;
-    margin: 10px 0;
-    z-index: 800;
-    pointer-events: auto;
+    margin-bottom: 10px;
 }
 #video-timeline {
     width: 100%;
     -webkit-appearance: none;
     background: rgba(255, 255, 255, 0.2);
-    height: 6px;
+    height: 5px;
     border-radius: 3px;
     outline: none;
 }
 #video-timeline::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #007aff;
     cursor: pointer;
 }
 
-/* 비디오 탐색 컨트롤러 (-0.1s / ▶️ / +0.1s) */
+/* 비디오 탐색 컨트롤러 */
 .video-controls {
     display: flex; 
     justify-content: center; 
-    gap: 15px; 
-    margin-bottom: 10px; 
-    z-index: 800;
-    pointer-events: auto;
+    gap: 12px; 
+    margin-bottom: 10px;
 }
 .control-btn {
-    padding: 10px 18px; 
+    padding: 8px 16px; 
     background: rgba(255, 255, 255, 0.12); 
     border: 1px solid rgba(255, 255, 255, 0.15); 
     color: #ffffff; 
-    border-radius: 12px; 
-    backdrop-filter: blur(5px); 
-    font-size: 0.9rem; 
+    border-radius: 10px; 
+    font-size: 0.85rem; 
     cursor: pointer;
 }
 
-/* 정밀 각도 결과 리포트 및 업로드 박스 패널 */
+/* 정밀 각도 결과 리포트 및 업로드 통합 패널 */
 .report-box { 
-    padding: 15px; 
-    background: rgba(0, 0, 0, 0.5); 
-    border-radius: 15px; 
-    margin: 0 15px; 
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    z-index: 800;
-    pointer-events: auto;
+    padding: 10px 15px; 
+    background: rgba(255, 255, 255, 0.05); 
+    border-radius: 12px; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    flex: 1; /* 남은 하단 공간 채우기 */
+}
+.main-result { 
+    text-align: left;
     display: flex;
     flex-direction: column;
-    gap: 12px;
 }
-.main-result { text-align: center; }
-.main-result span:first-child { display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 2px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 2.3rem; display: block; }
+.main-result span:first-child { font-size: 0.75rem; opacity: 0.6; margin-bottom: 1px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 1.8rem; }
 
 .analysis-actions {
-    display: flex;
-    justify-content: center;
-    width: 100%;
+    flex: 1;
+    max-width: 180px;
 }
-
-/* 모드 전환 상단 토글 링크 버튼 */
-.mode-selector button { 
-    padding: 10px 20px; 
-    background: rgba(255,255,255,0.1); 
-    border: none; 
+.btn-secondary { 
+    padding: 10px 12px; 
+    background: rgba(0, 122, 255, 0.5); 
+    border-radius: 8px; 
     color: #ffffff; 
-    border-radius: 25px; 
-    margin: 0 5px; 
+    font-weight: bold; 
+    font-size: 0.8rem;
+    display: inline-block; 
     cursor: pointer; 
+    text-align: center; 
+    width: 100%; 
+    border: 1px solid rgba(255,255,255,0.15); 
 }
-.mode-selector button.active { background: #007aff; }
 
-/* 촬영 단추 */
+/* 촬영 셔터 단추 고정 */
 #record-btn { 
     width: 65px; 
     height: 65px; 
@@ -264,7 +279,7 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 #record-btn.recording { 
-    border-radius: 12px; 
+    border-radius: 15px; 
     background: #ff4d4d; 
     width: 55px;
     height: 55px;
@@ -278,9 +293,6 @@ body {
 }
 
 .hidden { display: none !important; }
-.btn-secondary { padding: 12px 25px; background: rgba(0, 122, 255, 0.6); border-radius: 10px; color: #ffffff; font-weight: bold; display: inline-block; cursor: pointer; text-align: center; width: 100%; border: 1px solid rgba(255,255,255,0.2); }
-
-/* 기기 최초 진입 권한 허용 팝업 */
 .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000000; z-index:5000; display:flex; justify-content:center; align-items:center; }
 .overlay-content { text-align: center; padding: 20px; background: #222222; border-radius: 20px; border: 1px solid #444444; max-width: 90%; width: 320px; }
 .overlay-content h2 { margin-bottom: 15px; }
