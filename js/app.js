@@ -102,7 +102,7 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // ⚡ [신설] 선 긋기 모드와 화면 이동/확대 제어 스위칭 리스너 결합
+    // 선 긋기 모드와 화면 이동/확대 제어 스위칭 리스너 결합
     document.getElementById('btn-tool-draw').onclick = () => {
         document.getElementById('btn-tool-draw').classList.add('active');
         document.getElementById('btn-tool-move').classList.remove('active');
@@ -136,7 +136,7 @@ function loadDummyCanvasForPC() {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🏹 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
+    ctx.fillText('🏹 우측 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
     ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 자유로운 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
@@ -206,19 +206,19 @@ function switchMode(mode) {
     document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
     document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
 
-    // ⚡ [대통합 패치] 통합 제어 센터 내부의 분석 전용 컴포넌트 출력 전환 제어
+    // ⚡ [대통합 패치] 통합 제어 센터 내부의 분석/촬영 컴포넌트 가시성 동적 전환
     const analysisComponents = document.getElementById('analysis-components');
+    const shootComponents = document.getElementById('shoot-components');
     const headerElement = document.querySelector('.header');
-    const recordBtnContainer = document.querySelector('.action-zone');
     
     if (mode === 'analyze') {
         if (analysisComponents) analysisComponents.classList.remove('hidden');
-        if (recordBtnContainer) recordBtnContainer.classList.add('hidden'); // 녹화 버튼 격리 숨김
-        if (headerElement) headerElement.classList.add('hidden'); // 수평계 메시지 숨김
+        if (shootComponents) shootComponents.classList.add('hidden'); // 녹화 버튼 세트 숨김
+        if (headerElement) headerElement.classList.add('hidden'); // 상단 촬영용 수평계 숨김
     } else {
         if (analysisComponents) analysisComponents.classList.add('hidden');
-        if (recordBtnContainer) recordBtnContainer.classList.remove('hidden'); // 녹화 버튼 복구
-        if (headerElement) headerElement.classList.remove('hidden'); // 수평계 메시지 복구
+        if (shootComponents) shootComponents.classList.remove('hidden'); // 녹화 버튼 세트 복구
+        if (headerElement) headerElement.classList.remove('hidden'); // 상단 촬영용 수평계 복구
     }
 }
 
@@ -315,6 +315,7 @@ document.getElementById('btn-video-play').onclick = () => {
     }
 };
 
+// 13. 드로잉 캔버스 초기화 리스너
 document.getElementById('btn-clear-draw').onclick = () => { 
     if (bowAnalyzer) bowAnalyzer.clear(); 
 };
