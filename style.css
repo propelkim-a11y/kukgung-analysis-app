@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 및 투명화 적용 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -331,4 +331,25 @@ body, html {
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
+}
+
+/* ================================================================= */
+/* 💡 [교정 파트] 촬영화면 패널 완벽 투명화 및 메뉴 버튼 위치 동기화 */
+/* ================================================================= */
+#scene-record .unified-panel-box {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-top: none !important;
+    box-shadow: none !important;
+}
+
+#scene-record .text-menu-bar {
+    background-color: transparent !important;
+}
+
+#scene-record .menu-btn.active-sync {
+    background: rgba(255, 255, 255, 0.12);
+    color: #34C759;
+    font-weight: 700;
 }
