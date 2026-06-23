@@ -1,20 +1,17 @@
 /**
  * js/app.js (Part 1 - 상단에 먼저 붙여넣기)
- * 국궁 자세 분석 시스템 - 통합 마스터 컨트롤러 (하나의 파일용 분할 1)
- * - 촬영 모드(수평계 녹화) 및 분석 모드 화면 전환 통제
- * - MediaRecorder 기반 비디오 세션 캡처 및 IndexedDB 이식
+ * 국궁 자세 분석 시스템 - 통합 마스터 컨트롤러
+ * - 💡 자이로 센서 물리 터치 기반 락 해제 처리 완료
+ * - 촬영 / 분석 모드 오토 스위칭 샌드박스
  */
 
-// 전역 공유를 위한 글로벌 네임스페이스 정의
 window.bowAppNodes = {};
 
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 코어 인프라 및 저장소 데이터베이스 인스턴스 활성화
+document.addEventListener('DOMContentLoaded', () => {
     const core = window.bowAppCore;
     const gesture = window.bowAppGesture;
-    await core.initDB();
 
-    // 2. 파트 1 & 2 공용 DOM 핵심 노드를 글로벌 객체에 일괄 바인딩
+    // 공용 DOM 핵심 노드 전역 인프라 적층
     const nodes = window.bowAppNodes;
     nodes.sceneRecord = document.getElementById('scene-record');
     nodes.sceneAnalyze = document.getElementById('scene-analyze');
@@ -44,26 +41,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 3. 외부 물리 제스처 및 드로잉 도화지 인터페이스 매핑
+    // 기하학 보정 캔버스 매핑 가동
     gesture.init(nodes.videoViewport, nodes.mainVideo);
     if (window.bowAnalyzer) {
         window.bowAnalyzer.init(nodes.drawCanvas);
     }
 
-    // 4. 지난 회차 캐시 복원
-    await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
-    gesture.applyTransform();
+    // 데이터 복원 루틴 가동 및 지연 렌더 동기화
+    core.initDB().then(async () => {
+        await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+        gesture.applyTransform();
+    });
 
-    /**
-     * =================================================================
-     *  실시간 스마트폰 후면 카메라 및 미디어 하드웨어 제어 루틴
-     * =================================================================
-     */
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
 
+    /**
+     * 💡 초정밀 후면 카메라 가동 인터페이스
+     */
     async function startCamera() {
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -71,9 +68,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = '카메라 정렬 완료. 수평계를 확인하세요.';
+            nodes.recordStatus.textContent = '카메라 정렬 완료. 수평계를 조준하세요.';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 접근 실패 (물리 권한 확인 필)';
+            nodes.recordStatus.textContent = '카메라 락을 해제할 수 없습니다.';
             console.error(err);
         }
     }
@@ -86,34 +83,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         nodes.cameraPreview.srcObject = null;
     }
 
-    // [촬영 화면] 양방향 수동 이탈 가동
+    // [촬영 모드 진입 트리거]
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '[재생]';
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         await startCamera();
+        
+        // 💡 중요: 사용자의 수동 버튼 클릭 내부에서 자이로 센서를 깨워야 최신 폰에서 작동함
+        if (window.bowGyroSensor) {
+            window.bowGyroSensor.start();
+        }
     });
 
-    // [분석 화면] 양방향 수동 진입 가동
+    // [분석 모드 진입 트리거]
     nodes.btnGoAnalyze.addEventListener('click', () => {
         stopCamera();
         nodes.sceneRecord.classList.remove('active');
         nodes.sceneAnalyze.classList.add('active');
-        
-        setActiveMenu(nodes.btnOpen);
+        setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
     });
 
-    // 최초 기동 시 카메라 화면 상시 대기화 규칙 이행
-    await startCamera();
+    // 화면 구동 점화식
+    startCamera();
 
     /**
-     * =================================================================
-     *  수평계 자이로 연동 고화질 녹화 및 분석 화면 토글 파이프라인
-     * =================================================================
+     * 💡 미디어 레코더 고해상도 수평 세션 녹화 가교
      */
     nodes.btnRecordToggle.addEventListener('click', () => {
+        // 💡 예비 안전장치: 첫 로드 시 터치 타깃 지점에서 자이로 하드웨어 개방 한 번 더 체크
+        if (window.bowGyroSensor) window.bowGyroSensor.start();
         if (!cameraStream) return;
 
         if (!isRecording) {
@@ -129,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             mediaRecorder.onstop = async () => {
-                nodes.recordStatus.textContent = '영상을 영구 저장소에 캐싱 중...';
+                nodes.recordStatus.textContent = '영상을 영구 캐시로 내보내는 중...';
                 
                 const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
                 await core.saveCache('lastVideoBlob', videoBlob);
@@ -142,9 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 nodes.sceneRecord.classList.remove('active');
                 nodes.sceneAnalyze.classList.add('active');
                 
-                // 분석 진입 시 초기 가동 룰 지정
                 setActiveMenu(nodes.btnOpen);
-                
                 if (window.bowAnalyzer) {
                     window.bowAnalyzer.clearLines();
                     window.bowAnalyzer.setMode('move');
@@ -158,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isRecording = true;
             nodes.btnRecordToggle.textContent = '[녹화종료/분석]';
             nodes.btnRecordToggle.classList.add('recording');
-            nodes.recordStatus.textContent = '● 수평 유지 중 - 자세 촬영 중...';
+            nodes.recordStatus.textContent = '● 고각 수평 동기화 - 자세 촬영 중...';
         } else {
             mediaRecorder.stop();
             isRecording = false;
@@ -170,15 +169,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeBtn.classList.add('active');
     }
     /**
-     * js/app.js (Part 2 - 첫 번째 박스 바로 아래에 붙여넣기)
-     * 국궁 자세 분석 시스템 - 통합 마스터 컨트롤러 (하나의 파일용 분할 2)
-     * - 분석 화면 비디오 타임라인 슬라이더 바 동기화 및 1프레임 초정밀 스킵
-     * - Glassmorphism 통합 패널 슬라이딩 개폐 및 수식 리포트 중계
+     * js/app.js (Part 2 - 첫 번째 박스 바로 아래에 빈 칸 없이 이어 붙이세요)
+     * - 초당 30프레임 표준 비디오 제어 루틴
+     * - 핀치 줌 행렬 및 자이로 수평선 회전 보정 중계부
      */
 
-    const FRAME_TIME = 1 / 30; // 30fps 표준 규격 프레임 타임
+    const FRAME_TIME = 1 / 30; // 1프레임당 스킵 밀리초 (약 0.033초)
 
-    // 동영상 데이터 확보 완료 시 슬라이더 최댓값 연계 조율
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         nodes.drawCanvas.width = nodes.mainVideo.videoWidth;
         nodes.drawCanvas.height = nodes.mainVideo.videoHeight;
@@ -187,9 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
-     * =================================================================
-     *  비디오 재생 타임라인 슬라이더 바 실시간 동기화
-     * =================================================================
+     * 비디오 타임라인 동기화 모니터링
      */
     nodes.mainVideo.addEventListener('timeupdate', () => {
         if (!isNaN(nodes.mainVideo.currentTime)) {
@@ -204,9 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
-     * =================================================================
-     *  명세 규격 코어 5: 1프레임 초정밀 텍스트 비디오 컨트롤러
-     * =================================================================
+     * 1프레임 초정밀 스킵 타임라인 액션
      */
     nodes.btnPlayPause.addEventListener('click', () => {
         if (nodes.mainVideo.paused) {
@@ -231,18 +224,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
-     * =================================================================
-     *  명세 규격 코어 3 & 4: 4대 텍스트 메뉴바 제어 액션
-     * =================================================================
+     * 4대 분석 텍스트 메뉴 조율 핸들러
      */
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
     nodes.videoInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files;
         if (!file) return;
 
         await core.saveCache('lastVideoBlob', file);
-
         const url = URL.createObjectURL(file);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
@@ -269,9 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
-     * =================================================================
-     *  명세 규격 코어 10: 슬라이딩 패널 부드러운 개폐 루틴
-     * =================================================================
+     * 패널 슬라이딩 부드러운 개폐 가속
      */
     nodes.panelHandle.addEventListener('click', () => {
         core.state.isPanelOpen = !core.state.isPanelOpen;
@@ -283,9 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     /**
-     * =================================================================
-     *  자이로 센서 및 삼각함수 연산 이벤트 중계 파이프라인 수신
-     * =================================================================
+     * 글로벌 리포트 동기화 파이프라인 수신 루프
      */
     window.addEventListener('bowAngleUpdate', (e) => {
         nodes.angleReport.textContent = `📐 ${e.detail.angle}°`;
@@ -297,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         
-        // 오직 촬영 모드 스크린이 열려있을 때만 수평선 동적 추적 연산 가동
+        // 오직 촬영 모드 스크린이 active 상태일 때만 수평선 기하 변환 추적
         if (nodes.gyroHorizonLine && nodes.sceneRecord.classList.contains('active')) {
             nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
             
@@ -308,9 +294,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     });
-
-    // 자이로 하드웨어 초기화 최종 구동 개시
-    if (window.bowGyroSensor) {
-        window.bowGyroSensor.start();
-    }
 });
