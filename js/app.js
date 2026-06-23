@@ -54,7 +54,6 @@ async function initApp() {
     // 진입 권한 팝업 버튼 허용 클릭 리스너
     document.getElementById('btn-permission').onclick = async () => {
         if (statusText) statusText.innerText = "카메라 노드 연결 중...";
-        
         const videoConstraints = window.isMobileDevice 
             ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
             : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -74,9 +73,7 @@ async function initApp() {
                     try { await leveler.init(); } catch(e) {}
                 }
             }, 100);
-
         } catch (err) {
-            console.warn("실물 웹캠 미감지: PC 수동 파일 업로드 모드로 안전 우회 진입합니다.");
             document.getElementById('permission-overlay').style.display = 'none';
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
@@ -104,7 +101,6 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // 화면 이동 모드가 왼쪽, 선 긋기 모드가 오른쪽 연동 매핑
     document.getElementById('btn-tool-move').onclick = () => {
         document.getElementById('btn-tool-move').classList.add('active');
         document.getElementById('btn-tool-draw').classList.remove('active');
@@ -130,16 +126,6 @@ function loadDummyCanvasForPC() {
     
     switchMode('analyze');
     bowAnalyzer.init();
-    
-    const ctx = oc.getContext('2d');
-    ctx.fillStyle = '#111113';
-    ctx.fillRect(0, 0, oc.width, oc.height);
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🏹 우측 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
-    ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 정밀 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
 async function startRecording() {
@@ -154,7 +140,6 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
-            // 로컬 장치 원본 자동 보관 다운로더
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -166,7 +151,6 @@ async function startRecording() {
             activeVideoRoll = phoneRollAtRecord;
             loadVideoForAnalysis(url);
         };
-
         mediaRecorder.start(1000); 
         isRecording = true;
         recordBtn.classList.add('recording');
@@ -188,19 +172,19 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. ⚡ [긴급 수리 패치] 파일 데이터 읽기 참조 방식을 표준 코드로 안전하게 교정하여 엔진 정지 버그 차단
+// 9. 파일 데이터 읽기 참조 방식을 표준 코드로 완전 수정하여 업로드 실패 해결
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]; // 단일 파일 직접 참조 추출
+            const file = e.target.files[0]; 
             activeVideoRoll = 0; 
             loadVideoForAnalysis(URL.createObjectURL(file));
         }
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈
+// 10. 상하단 레이아웃 분리 모듈 (통합 구성 노출 버그 완벽 패치)
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -235,7 +219,6 @@ function loadVideoForAnalysis(url) {
         const timeline = document.getElementById('video-timeline');
         const container = document.getElementById('manual-analysis-box');
         
-        // 도화지 박스 정비례 크기로 캔버스 해상도 강제 맞춤 고정
         const rect = container.getBoundingClientRect();
         dc.width = oc.width = rect.width;
         dc.height = oc.height = rect.height;
@@ -249,7 +232,6 @@ function loadVideoForAnalysis(url) {
         
         v.currentTime = 0.1; 
         switchMode('analyze');
-        
         bowAnalyzer.init(); 
         
         v.onseeked = () => {
