@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (폰 전체 화면 꽉 채움 패치 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (분석 십자선 제거 완결본)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -38,19 +38,18 @@ body, html {
     display: block !important;
 }
 
-/* 3. 💡 [핵심 교정] 상단 비디오/카메라 영역 화면 전체 100% 독점 */
+/* 3. 상단 비디오/카메라 영역 화면 전체 100% 독점 */
 .viewport-container {
     position: absolute;
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh; /* 스마트폰 물리적 화면 전체 크기 강제 점유 */
+    height: 100vh; 
     overflow: hidden;
     background-color: #050507;
     z-index: 1;
 }
 
-/* 💡 [핵심 교정] object-fit을 cover로 전격 변경하여 레터박스 여백을 박멸하고 전체 화면을 꽉 채움 */
 #camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
@@ -74,8 +73,8 @@ body, html {
     display: none !important;
 }
 
-/* 시인성 높은 십자 가이드 (중앙 상시 고정) */
-.center-crosshair-v {
+/* 💡 교정: 시인성 높은 십자 가이드라인이 오직 촬영 화면(#scene-record) 내부에서만 작동하도록 범위 가두기 */
+#scene-record .center-crosshair-v {
     left: 50%;
     top: 0;
     width: 1px;
@@ -86,7 +85,7 @@ body, html {
     z-index: 5;
 }
 
-.center-crosshair-h {
+#scene-record .center-crosshair-h {
     top: 50%;
     left: 0;
     height: 1px;
