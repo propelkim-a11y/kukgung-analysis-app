@@ -45,7 +45,7 @@ async function initApp() {
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
-        if (statusText) statusText.innerText = "PC 에뮬레이션 분석 모드";
+        if (statusText) statusText.innerText = "PC 에뮬레전 분석 모드";
         document.getElementById('angle-text').innerText = "고정";
         recordBtn.style.border = '5px solid #007aff';
         recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
@@ -101,7 +101,6 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // ⚡ [텍스트 연동 패치] 4대 버튼에 따른 동적 인터랙션 및 클래스 활성화 조율 리스너
     document.getElementById('btn-tool-move').onclick = () => {
         setActiveToolButton('btn-tool-move');
         bowAnalyzer.setToolMode('move');
@@ -111,9 +110,19 @@ async function initApp() {
         setActiveToolButton('btn-tool-draw');
         bowAnalyzer.setToolMode('draw');
     };
+
+    // ⚡ [신설 패치] 하단 컨트롤 패널 터치 개폐 인터랙션 스위치 장착
+    const panel = document.getElementById('unified-control-center');
+    const handle = document.getElementById('panel-handle');
+    if (handle && panel) {
+        handle.onclick = (e) => {
+            e.preventDefault();
+            panel.classList.toggle('collapsed'); // collapsed 클래스를 넣고 빼며 상하 슬라이딩
+        };
+    }
 }
 
-// ⚡ [신설] 하단 4대 텍스트 메뉴의 불빛(Active) 상태를 강제로 통제하는 토글 도구
+// 하단 4대 텍스트 메뉴의 불빛(Active) 상태 통제 도구
 function setActiveToolButton(activeId) {
     const txtButtons = [document.getElementById('upload-label'), document.getElementById('btn-tool-move'), document.getElementById('btn-tool-draw')];
     txtButtons.forEach(btn => {
@@ -188,9 +197,8 @@ if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
         if (e.target.files && e.target.files[0]) {
             activeVideoRoll = 0; 
-            // ⚡ 파일 선택 시 자동으로 '열기' 버튼 하이라이트 활성화 연동
             setActiveToolButton('upload-label');
-            bowAnalyzer.setToolMode('move'); // 업로드 직후엔 안전하게 이동/확대 기본화
+            bowAnalyzer.setToolMode('move'); 
             loadVideoForAnalysis(URL.createObjectURL(e.target.files[0]));
         }
     };
@@ -208,16 +216,19 @@ function switchMode(mode) {
     const shootComponents = document.getElementById('shoot-components');
     const headerElement = document.querySelector('.header');
     
+    // ⚡ [슬라이딩 초기화] 촬영창으로 넘어갈 때는 강제로 슬라이딩 다운 클래스 해제 보정
+    const panel = document.getElementById('unified-control-center');
+    if (panel) panel.classList.remove('collapsed');
+
     if (mode === 'analyze') {
         if (analysisComponents) analysisComponents.classList.remove('hidden'); 
         if (shootComponents) shootComponents.classList.add('hidden'); 
         if (headerElement) headerElement.classList.add('hidden'); 
         
-        // ⚡ [핵심 요구사항 반영] 분석하기 클릭 시 최초 세팅은 언제나 '열기' 단추가 활성화(Active) 상태가 되도록 제어
         setActiveToolButton('upload-label');
-        bowAnalyzer.setToolMode('move'); // 열기 상태에 어울리는 안전한 기본 툴 세팅
+        bowAnalyzer.setToolMode('move'); 
     } else {
-        if (analysisComponents) analysisComponents.add('hidden'); 
+        if (analysisComponents) analysisComponents.classList.add('hidden'); 
         if (shootComponents) shootComponents.classList.remove('hidden'); 
         if (headerElement) headerElement.classList.remove('hidden'); 
     }
@@ -314,6 +325,11 @@ document.getElementById('btn-video-play').onclick = () => {
             document.getElementById('btn-video-play').innerText = "▶️ 재생";
         }
     }
+};
+
+// ⚡ [버그 정밀 패치] 누락되었던 텍스트 버튼 초기화 클릭 이벤트를 바인딩하여 드로잉 리셋 활성화
+document.getElementById('btn-clear-draw').onclick = () => { 
+    if (bowAnalyzer) bowAnalyzer.clear(); 
 };
 
 initApp();
