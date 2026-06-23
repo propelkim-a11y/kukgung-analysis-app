@@ -1,7 +1,6 @@
-/* style.css
- * 뒤로/재생/앞으로 텍스트 단추 정밀 정렬 및 슬라이딩 글래스모피즘 완성 버전
- */
-
+/* ==========================================
+   [Core Reset & Mobile Anti-Bounce]
+   ========================================== */
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -14,6 +13,8 @@ body {
     color: #ffffff;
     height: 100dvh;
     overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .container { 
@@ -24,6 +25,9 @@ body {
     position: relative;
 }
 
+/* ==========================================
+   [Main Contents & Preview/Canvas Grid Setup]
+   ========================================== */
 .main-content { 
     flex: 1; 
     position: relative; 
@@ -40,48 +44,20 @@ body {
     z-index: 1; 
 }
 
+.video-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #000000;
+}
+
 #video-preview { 
     width: 100%; 
     height: 100%; 
     object-fit: cover; 
-    background: #000000;
 }
 
-/* 촬영 모드 전용 수평계 투명 헤더 */
-.header { 
-    text-align: center; 
-    padding: 20px; 
-    background: transparent; 
-    z-index: 100; 
-    position: absolute;
-    top: 0;
-    width: 100%;
-    pointer-events: none; 
-}
-
-#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
-#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
-
-/* 촬영용 기기 실시간 수평계 */
-.level-container { 
-    position: absolute; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); 
-    pointer-events: none; 
-    z-index: 2; 
-}
-.center-target { width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
-.level-line { 
-    width: 220px; height: 2px; 
-    background-color: #ff4d4d; 
-    position: absolute; left: -110px; 
-    transition: transform 0.05s linear, background-color 0.3s; 
-}
-
-/* ==========================================
- * 비디오 원본 도화지 영역
- * ========================================== */
+/* 비디오 원본 도화지 영역 (전체화면 확보 바닥까지 매핑) */
 .canvas-container { 
     width: 100%; 
     height: 100dvh; 
@@ -118,7 +94,65 @@ body {
     image-rendering: crisp-edges;
 }
 
-/* 동영상 화면 내부 좌측 상단 투명 각도 표시기 디자인 */
+/* ==========================================
+   [Header & Gyro Sensor Level UI]
+   ========================================== */
+.header { 
+    text-align: center; 
+    padding: 20px; 
+    background: transparent; 
+    z-index: 100; 
+    position: absolute;
+    top: 0;
+    width: 100%;
+    pointer-events: none; 
+}
+
+#status-text { 
+    font-size: 1.1rem; 
+    font-weight: bold; 
+    color: #ff4d4d; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+#angle-text { 
+    font-size: 1.2rem; 
+    font-weight: bold; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6); 
+    pointer-events: auto; 
+    margin-top: 4px;
+}
+
+.level-container { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    pointer-events: none; 
+    z-index: 2; 
+}
+
+.center-target { 
+    width: 16px; 
+    height: 16px; 
+    border: 2px solid #ffffff; 
+    border-radius: 50%; 
+    position: absolute; 
+    top: -8px; 
+    left: -8px; 
+}
+
+.level-line { 
+    width: 220px; 
+    height: 2px; 
+    background-color: #ff4d4d; 
+    position: absolute; 
+    left: -110px; 
+    transition: transform 0.05s linear, background-color 0.3s; 
+}
+/* ==========================================
+   [Floating Report Screen HUD]
+   ========================================== */
 .top-left-floating-report {
     position: absolute;
     top: 25px;
@@ -135,9 +169,11 @@ body {
     -webkit-backdrop-filter: blur(5px);
     pointer-events: none; 
 }
+
 .report-icon {
     font-size: 1.1rem;
 }
+
 .top-left-floating-report .highlight {
     font-weight: bold; 
     color: #00e676; 
@@ -146,8 +182,8 @@ body {
 }
 
 /* ==========================================
- * 공용 반투명 하단 컨트롤 패널 상자
- * ========================================== */
+   [Unified Glassmorphic Lower Panel]
+   ========================================== */
 .unified-panel {
     position: absolute;
     bottom: 0;
@@ -174,11 +210,12 @@ body {
     will-change: transform;
 }
 
+/* 슬라이딩 폐쇄 상태 클래스 */
 .unified-panel.collapsed {
     transform: translateY(calc(100% - 55px - env(safe-area-inset-bottom))); 
 }
 
-/* 슬라이딩 제어용 드래그 상단 바 핸들 */
+/* 핸들 바 */
 .panel-drag-handle {
     width: 100%;
     height: 24px;
@@ -188,6 +225,7 @@ body {
     cursor: pointer;
     pointer-events: auto;
 }
+
 .handle-bar {
     width: 40px;
     height: 4px;
@@ -195,7 +233,6 @@ body {
     border-radius: 2px;
 }
 
-/* 내부 동적 컴포넌트 묶음 블록 (분석용) */
 .panel-inner-block {
     display: flex;
     flex-direction: column;
@@ -205,20 +242,26 @@ body {
     pointer-events: auto;
 }
 
-/* 슬라이더 트랙 */
+/* ==========================================
+   [Video Seek Timeline & Controls]
+   ========================================== */
 .slider-container {
     width: 100%;
 }
+
 #video-timeline {
     width: 100%;
     -webkit-appearance: none;
+    appearance: none;
     background: rgba(255, 255, 255, 0.15);
     height: 4px;
     border-radius: 2px;
     outline: none;
 }
+
 #video-timeline::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 12px;
     height: 12px;
     border-radius: 50%;
@@ -226,7 +269,6 @@ body {
     cursor: pointer;
 }
 
-/* ⚡ [피드백 적용] 뒤로/재생/앞으로 세련된 텍스트 기반 비디오 미세 탐색 패널 디자인 */
 .video-controls {
     display: flex; 
     justify-content: center; 
@@ -234,7 +276,6 @@ body {
     width: 100%;
 }
 
-/* 세 단추를 가로 비율 1:1:1로 자로 잰 듯 똑바르게 균등 3분할 연출 */
 .control-btn-txt {
     flex: 1;
     width: 33.33%;
@@ -253,12 +294,15 @@ body {
     white-space: nowrap;
     transition: all 0.2s;
 }
+
 .control-btn-txt:active {
     background: rgba(255, 255, 255, 0.16);
     transform: scale(0.97);
 }
 
-/* 4대 텍스트 버튼 캡슐 트랙 디자인 */
+/* ==========================================
+   [Analysis Menu Tab: Equidistant 4 Buttons]
+   ========================================== */
 .menu-tab-bar {
     display: flex;
     align-items: center;
@@ -271,7 +315,14 @@ body {
     gap: 4px; 
 }
 
-/* 4개의 텍스트 단추 너비 1/4 균등 할당 */
+.analysis-actions {
+    flex: 1;
+    width: 25%; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .menu-tab-btn-txt, .menu-tab-btn-txt-reset {
     flex: 1;
     width: 25%; 
@@ -291,6 +342,12 @@ body {
     white-space: nowrap;
 }
 
+#upload-label {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
 .menu-tab-btn-txt.active {
     background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
@@ -300,23 +357,15 @@ body {
 .menu-tab-btn-txt-reset {
     color: rgba(255, 255, 255, 0.75); 
 }
+
 .menu-tab-btn-txt-reset:active {
     background: rgba(255, 255, 255, 0.12);
     transform: scale(0.96);
 }
 
-.analysis-actions {
-    flex: 1;
-    width: 25%; 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-.menu-tab-btn-txt {
-    width: 100%;
-}
-
-/* 촬영 모드의 녹화 버튼 구역 */
+/* ==========================================
+   [Shutter Shunt Area & Global Footer Switch]
+   ========================================== */
 .action-zone {
     display: flex;
     justify-content: center;
@@ -336,6 +385,7 @@ body {
     box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     transition: all 0.2s;
 }
+
 #record-btn.recording { 
     border-radius: 12px; 
     background: #ff4d4d; 
@@ -343,7 +393,6 @@ body {
     height: 45px;
 }
 
-/* 공통 하단 전환 탭 스위치 구역 */
 .panel-global-footer {
     display: flex;
     justify-content: center;
@@ -360,6 +409,7 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.06);
     width: fit-content;
 }
+
 .mode-selector button { 
     padding: 5px 14px; 
     background: transparent; 
@@ -371,13 +421,70 @@ body {
     cursor: pointer; 
     transition: all 0.2s;
 }
+
 .mode-selector button.active { 
     background: #007aff; 
     color: #ffffff;
     box-shadow: 0 1px 5px rgba(0, 122, 255, 0.3);
 }
 
+/* ==========================================
+   [Overlay Permissions Screen Popup]
+   ========================================== */
+.overlay { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 5000; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+
+.overlay-content {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 30px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    max-width: 85%;
+}
+
+.overlay-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+    color: #ffffff;
+}
+
+.overlay-content p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 24px;
+}
+
+#btn-permission {
+    background: #007aff;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+}
+
+#btn-permission:active {
+    background: #0056b3;
+    transform: scale(0.98);
+}
+
 .hidden { display: none !important; }
-.overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000000; z-index:5000; display:flex; justify-content:center; align-items:center; }
-.overlay-content { text-align: center; padding: 20px; background: #222222; border-radius: 20px; border: 1px solid #444444; max-width: 90%; width: 320px; }
-#btn-permission { padding: 15px 30px; background: #007aff; color:#ffffff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
