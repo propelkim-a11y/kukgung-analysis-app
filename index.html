@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>국궁 자세 분석 시스템 (Archery Mechanics Analyzer)</title>
-    <link rel="stylesheet" href="style.css?v=7.0">
+    <link rel="stylesheet" href="style.css?v=8.0">
 </head>
 <body>
 
@@ -24,18 +24,24 @@
             <video id="camera-preview" autoplay playsinline muted></video>
         </div>
 
-        <!-- 촬영 모드 전용 하단 대통합 패널 (애플 미니멀리즘 명세 반영) -->
+        <!-- 촬영 모드 전용 하단 대통합 패널 -->
         <div class="unified-panel-box">
-            <div class="panel-content-wrapper apple-record-layout">
+            <!-- 분석 화면의 슬라이더 핸들과 완벽한 공간 일치감을 주는 더미 상단 바 공간 -->
+            <div class="panel-slider-handle-placeholder"></div>
+
+            <div class="panel-content-wrapper">
+                <!-- 💡 [핵심 교정] 분석 화면의 4대 버튼 바 높이를 정확히 상쇄하여 수직 레이아웃을 고정하는 숨김 스페이서 -->
+                <div class="apple-layout-sync-spacer"></div>
+
                 <!-- 촬영 상태 표시 및 안내 -->
                 <div id="record-status" class="status-text">화면을 가볍게 터치하면 카메라와 수평계가 가동됩니다.</div>
                 
-                <!-- 촬영 제어 단추 레이아웃 (오직 녹화시작 버튼만 배치) -->
+                <!-- 촬영 제어 단추 레이아웃 -->
                 <div class="control-row-center">
                     <button id="btn-record-toggle" class="action-btn-main">녹화시작</button>
                 </div>
 
-                <!-- 화면 전환 단추 (오직 분석 화면으로 이동 버튼만 배치) -->
+                <!-- 화면 전환 단추 (분석 화면으로 이동) -->
                 <nav class="scene-switch-bar">
                     <button id="btn-go-analyze" class="switch-btn">분석 화면으로 이동</button>
                 </nav>
@@ -72,7 +78,7 @@
             </div>
 
             <div class="panel-content-wrapper">
-                <!-- 4대 텍스트 메뉴 정렬 (열기, 확대, 선긋기, 초기화 실제 가동) -->
+                <!-- 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) -->
                 <nav class="text-menu-bar">
                     <button id="btn-open" class="menu-btn">열기</button>
                     <button id="btn-move" class="menu-btn">확대</button>
@@ -85,14 +91,14 @@
                     <input type="range" id="video-slider" min="0" max="100" value="0" step="0.1">
                 </div>
 
-                <!-- 순정 서체 패밀리 룩 비디오 컨트롤러 (뒤로, 재생, 앞으로 실제 가동) -->
+                <!-- 순정 서체 패밀리 룩 비디오 컨트롤러 -->
                 <div class="video-control-bar">
                     <button id="btn-frame-prev" class="control-btn">뒤로</button>
                     <button id="btn-play-pause" class="control-btn">재생</button>
                     <button id="btn-frame-next" class="control-btn">앞으로</button>
                 </div>
 
-                <!-- 화면 전환 단추 (촬영 화면으로 복귀 실제 가동) -->
+                <!-- 화면 전환 단추 (촬영 화면으로 복귀) -->
                 <nav class="scene-switch-bar">
                     <button id="btn-go-record" class="switch-btn">촬영 화면으로 이동</button>
                 </nav>
