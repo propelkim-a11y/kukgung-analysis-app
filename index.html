@@ -44,11 +44,6 @@
                     <canvas id="output-canvas"></canvas>
                     <canvas id="drawing-canvas"></canvas>
                 </div>
-
-                <!-- ⚡ [피드백 적용] 화면 오른쪽 상단에 조그만 미니멀 초기화 아이콘 버튼 배치 -->
-                <div class="top-floating-toolbar">
-                    <button id="btn-clear-draw" class="mini-icon-btn" aria-label="초기화">🔄</button>
-                </div>
             </div>
         </main>
 
@@ -57,9 +52,11 @@
             
             <!-- [분석 모드 전용 내부 컴포넌트 라인] -->
             <div id="analysis-components" class="panel-inner-block hidden">
-                <!-- ⚡ [피드백 적용] 좌우 위치 스위칭: 화면 이동/확대가 왼쪽, 선 긋기가 오른쪽 배치 -->
+                
+                <!-- ⚡ [피드백 적용] 화면 이동과 선 긋기 메뉴 사이에 정중앙 초기화 분리 탭 바 구축 -->
                 <div class="menu-tab-bar">
                     <button id="btn-tool-move" class="menu-tab-btn">🔍 화면 이동/확대</button>
+                    <button id="btn-clear-draw" class="center-reset-btn" aria-label="초기화">🔄 초기화</button>
                     <button id="btn-tool-draw" class="menu-tab-btn active">✏️ 선 긋기 모드</button>
                 </div>
 
@@ -75,7 +72,7 @@
                     <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
                 </div>
 
-                <!-- 정밀 각도 결과 리포트 창 및 업로드 팩 ("두 선을 선택하세요" 뱃지 라인 영구 삭제) -->
+                <!-- 정밀 각도 결과 리포트 창 및 업로드 팩 -->
                 <div class="report-box">
                     <div class="report-item main-result">
                         <span>📐 선택한 두 선의 각도</span>
@@ -97,7 +94,6 @@
             <div class="panel-global-footer">
                 <div class="mode-selector">
                     <button id="btn-mode-shoot" class="active">촬영하기</button>
-                    <!-- ⚡ [피드백 적용] 결과보기 ➡️ 분석하기 텍스트 전면 교체 -->
                     <button id="btn-mode-analyze">분석하기</button>
                 </div>
             </div>
