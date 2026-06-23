@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>국궁 자세 분석 시스템 (Archery Mechanics Analyzer)</title>
-    <link rel="stylesheet" href="style.css?v=2.0">
+    <link rel="stylesheet" href="style.css?v=5.0">
 </head>
 <body>
 
@@ -14,7 +14,7 @@
     <div id="scene-record" class="app-scene active">
         <!-- 카메라 프리뷰 뷰포트 -->
         <div class="viewport-container">
-            <!-- 💡 실시간 자이로 연동 물리 수평 가이드선 및 각도 표기용 앵커 -->
+            <!-- 실시간 자이로 연동 물리 수평 가이드선 및 각도 표기용 앵커 -->
             <div id="gyro-horizon-line" data-angle="0.0°"></div>
             <!-- 상시 중앙 가이드 십자선 -->
             <div class="center-crosshair-v"></div>
@@ -28,7 +28,7 @@
         <div class="unified-panel-box">
             <div class="panel-content-wrapper">
                 <!-- 촬영 상태 표시 및 안내 -->
-                <div id="record-status" class="status-text">카메라 대기 중...</div>
+                <div id="record-status" class="status-text">화면을 가볍게 터치하면 수평계가 가동됩니다.</div>
                 
                 <!-- 촬영 제어 단추 레이아웃 -->
                 <div class="control-row-center">
@@ -74,7 +74,7 @@
             </div>
 
             <div class="panel-content-wrapper">
-                <!-- 💡 대괄호가 완전히 삭제된 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) -->
+                <!-- 대괄호가 완전히 삭제된 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) -->
                 <nav class="text-menu-bar">
                     <button id="btn-open" class="menu-btn">열기</button>
                     <button id="btn-move" class="menu-btn">확대</button>
@@ -87,7 +87,7 @@
                     <input type="range" id="video-slider" min="0" max="100" value="0" step="0.1">
                 </div>
 
-                <!-- 💡 대괄호가 완전히 삭제된 순정 서체 패밀리 룩 비디오 컨트롤러 -->
+                <!-- 대괄호가 완전히 삭제된 순정 서체 패밀리 룩 비디오 컨트롤러 -->
                 <div class="video-control-bar">
                     <button id="btn-frame-prev" class="control-btn">뒤로</button>
                     <button id="btn-play-pause" class="control-btn">재생</button>
@@ -109,10 +109,10 @@
     <!-- ================================================================= -->
     <!-- 시스템 통합 백엔드 스크립트 이식 파이프라인 -->
     <!-- ================================================================= -->
-    <script src="js/sensor.js?v=2.0"></script>
-    <script src="js/analyzer.js?v=2.0"></script>
-    <script src="js/app_core.js?v=2.0"></script>
-    <script src="js/app_gesture.js?v=2.0"></script>
-    <script src="js/app.js?v=2.0"></script>
+    <script src="js/sensor.js?v=5.0"></script>
+    <script src="js/analyzer.js?v=5.0"></script>
+    <script src="js/app_core.js?v=5.0"></script>
+    <script src="js/app_gesture.js?v=5.0"></script>
+    <script src="js/app.js?v=5.0"></script>
 </body>
 </html>
