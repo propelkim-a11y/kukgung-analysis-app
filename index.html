@@ -18,65 +18,83 @@
     </div>
 
     <div class="container">
-        <!-- 상단 헤더: 수평계 실시간 데이터 -->
-        <header class="header">
+        <!-- 상단 헤더: 촬영 모드에서만 z-index 상위 노출 -->
+        <header id="camera-header" class="header">
             <div id="status-text">장치 준비 중</div>
             <div id="angle-text">0.0°</div>
         </header>
 
         <!-- 메인 콘텐츠 화면 -->
         <main class="main-content">
-            <!-- 촬영 모드 -->
+            <!-- [1] 촬영 모드 -->
             <div id="camera-section" class="view-section">
-                <div class="video-wrapper" style="width: 100%; height: 100%; position: relative;">
+                <div class="video-wrapper">
                     <video id="video-preview" autoplay playsinline muted></video>
                     <div id="level-container" class="level-container">
                         <div class="center-target"></div>
                         <div id="level-line" class="level-line"></div>
                     </div>
                 </div>
+                <!-- 촬영 모드 전용 푸터 -->
+                <footer class="footer transparent-footer">
+                    <div class="mode-selector">
+                        <button class="btn-mode-shoot active"><span>촬영하기</span></button>
+                        <button class="btn-mode-analyze"><span>결과보기</span></button>
+                    </div>
+                    <div class="action-zone">
+                        <button id="record-btn" aria-label="녹화"></button>
+                    </div>
+                </footer>
             </div>
 
-            <!-- 분석 모드 (결과 리포트 및 프레임 탐색) -->
+            <!-- [2] 분석 모드 (완전 투명 풀스크린 인터페이스) -->
             <div id="analysis-section" class="view-section hidden">
                 <div class="canvas-container" id="manual-analysis-box">
                     <canvas id="output-canvas"></canvas>
+                    <!-- 영구 지속 고정 수직/수평 가이드선 레이어 -->
+                    <div class="crosshair-guide">
+                        <div class="guide-v"></div>
+                        <div class="guide-h"></div>
+                    </div>
                     <canvas id="drawing-canvas"></canvas>
                 </div>
-                <div class="tool-bar">
-                    <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
-                    <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
-                </div>
-                <!-- 비디오 탐색 컨트롤러 -->
-                <div class="video-controls">
-                    <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
-                    <button id="btn-video-play" class="control-btn">▶️ 재생/정지</button>
-                    <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
-                </div>
+                
+                <!-- 분석 전용 플로팅 컨트롤 시스템 -->
+                <div class="analysis-ui-wrapper">
+                    <!-- 타임라인 슬라이더 바 -->
+                    <div class="timeline-container">
+                        <input type="range" id="video-slider" min="0" max="100" value="0" step="0.1">
+                    </div>
 
-                <div class="report-box">
-                    <div class="report-item main-result">
-                        <span>📐 선택한 두 선의 각도</span>
-                        <span id="res-manual-angle" class="highlight">0°</span>
+                    <!-- 비디오 재생 및 미세 이동 컨트롤러 -->
+                    <div class="video-controls">
+                        <button id="btn-video-prev" class="control-btn">⏪ -0.1s</button>
+                        <button id="btn-video-play" class="control-btn">▶ 재생</button>
+                        <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
+                    </div>
+
+                    <!-- 최하단 리포트 및 액션 존 (초기화 및 파일 업로드 통합) -->
+                    <div class="analysis-footer-box">
+                        <div class="report-main">
+                            <span class="report-title">📐 최근 두 선의 사잇각</span>
+                            <span id="res-manual-angle" class="highlight">0°</span>
+                            <div id="angle-display" class="angle-badge">화면을 터치해 선을 그리세요</div>
+                        </div>
+                        <div class="analysis-action-buttons">
+                            <button id="btn-clear-draw" class="action-sub-btn">🔄 초기화</button>
+                            <input type="file" id="file-upload" accept="video/*" class="hidden">
+                            <label for="file-upload" id="upload-label" class="action-sub-btn upload-theme">📁 영상 업로드</label>
+                        </div>
+                    </div>
+
+                    <!-- 모드 전환 탭 (최하단 고정 배치) -->
+                    <div class="mode-selector text-center" style="margin-top: 10px;">
+                        <button class="btn-mode-shoot"><span>촬영하기</span></button>
+                        <button class="btn-mode-analyze active"><span>결과보기</span></button>
                     </div>
                 </div>
             </div>
         </main>
-
-        <!-- 하단 컨트롤바 -->
-        <footer class="footer">
-            <div class="mode-selector">
-                <button id="btn-mode-shoot" class="active">촬영하기</button>
-                <button id="btn-mode-analyze">결과보기</button>
-            </div>
-            <div class="action-zone">
-                <!-- 촬영 버튼 -->
-                <button id="record-btn" aria-label="녹화"></button>
-                <!-- 로컬 영상 업로드 버튼 -->
-                <input type="file" id="file-upload" accept="video/*" class="hidden">
-                <label for="file-upload" id="upload-label" class="btn-secondary">영상 파일 업로드 분석</label>
-            </div>
-        </footer>
     </div>
 
     <!-- 핵심 스크립트 모듈 로드 -->
