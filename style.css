@@ -1,5 +1,5 @@
 /* style.css
- * 하단 패널 3분할 레이아웃, 초투명 글래스모피즘 및 메뉴 일체화 완성 버전
+ * 좌측 상단 투명 각도 표시, 재생 탭 아래 4대 아이콘 메뉴 배치 완성 버전
  */
 
 * { 
@@ -80,7 +80,7 @@ body {
 }
 
 /* ==========================================
- * 비디오 원본 도화지 영역 (화면 전체 100% 매핑 확장)
+ * 비디오 원본 도화지 영역
  * ========================================== */
 .canvas-container { 
     width: 100%; 
@@ -118,6 +118,33 @@ body {
     image-rendering: crisp-edges;
 }
 
+/* ⚡ [신설] 동영상 화면 내부 좌측 상단 투명 각도 표시기 디자인 */
+.top-left-floating-report {
+    position: absolute;
+    top: 25px;
+    left: 20px;
+    z-index: 2000; /* 동영상 및 캔버스 바로 위에 투명하게 노출 */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.3); /* 은은하고 투명한 배경 */
+    padding: 6px 14px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    pointer-events: none; /* 선 긋기 터치를 방해하지 않음 */
+}
+.report-icon {
+    font-size: 1.1rem;
+}
+.top-left-floating-report .highlight {
+    font-weight: bold; 
+    color: #00e676; 
+    font-size: 1.5rem; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4); 
+}
+
 /* ==========================================
  * [대통합 패치] 단 하나의 공용 반투명 하단 컨트롤 패널 상자
  * ========================================== */
@@ -148,63 +175,10 @@ body {
 .panel-inner-block {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px; /* 재생 바와 아이콘 바의 간격 확보 */
     width: 100%;
     margin-bottom: 12px; 
     pointer-events: auto;
-}
-
-/* ⚡ [피드백 적용] 이동, 리셋, 그리기 메뉴가 정렬되도록 가로 배분 처리 */
-.menu-tab-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 3px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    width: 100%;
-    gap: 6px;
-}
-
-/* ⚡ 좌측(이동), 우측(선긋기) 탭 버튼 크기 균등 분할 */
-.menu-tab-btn {
-    flex: 1;
-    padding: 8px 4px;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 0.75rem;
-    font-weight: 600;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-    white-space: nowrap;
-}
-.menu-tab-btn.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-/* ⚡ [피드백 적용] 메뉴 한가운데 안착한 프리미엄 스몰 초기화 버튼 디자인 */
-.center-reset-btn {
-    padding: 8px 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-    font-size: 0.75rem;
-    font-weight: bold;
-    border-radius: 8px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-}
-.center-reset-btn:active {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(0.95);
 }
 
 /* 슬라이더 트랙 */
@@ -244,35 +218,74 @@ body {
     cursor: pointer;
 }
 
-/* 정밀 각도 결과 리포트 창 및 업로드 통합 패널 */
-.report-box { 
-    padding: 8px 12px; 
-    background: rgba(255, 255, 255, 0.03); 
-    border-radius: 10px; 
-    border: 1px solid rgba(255, 255, 255, 0.06);
+/* ⚡ [피드백 적용] 재생 탭 '아래'로 전면 이동한 4대 아이콘 메뉴 캡슐 트랙 */
+.menu-tab-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
 }
-.main-result { display: flex; flex-direction: column; }
-.main-result span:first-child { font-size: 0.65rem; opacity: 0.5; margin-bottom: 1px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 1.5rem; }
 
-.analysis-actions { flex: 1; max-width: 150px; }
-.btn-secondary { 
-    padding: 8px 10px; 
-    background: rgba(0, 122, 255, 0.35); 
-    border-radius: 8px; 
-    color: #ffffff; 
-    font-weight: 600; 
-    font-size: 0.75rem;
-    display: inline-block; 
-    cursor: pointer; 
-    text-align: center; 
-    width: 100%; 
-    border: 1px solid rgba(0, 122, 255, 0.2); 
+/* ⚡ 순수 아이콘 단추 4분할 균등 분리 공식 */
+.menu-tab-btn, .menu-tab-btn-label {
+    flex: 1;
+    padding: 8px 0;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 1.1rem; /* 이모지 아이콘 크기 선명화 */
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.menu-tab-btn.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* ⚡ 정중앙 스몰 초기화 아이콘 버튼 디자인 유지 통합 */
+.center-reset-btn {
+    flex: 1;
+    padding: 8px 0;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.center-reset-btn:active {
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(0.95);
+}
+
+/* 파일 업로드 캡슐 내부 고립 박스화 */
+.analysis-actions {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.menu-tab-btn-label {
+    width: 100%;
+    color: #007aff; /* 업로드 아이콘 고유 포인트 색상 배정 */
+}
+.menu-tab-btn-label:active {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 /* 촬영 모드의 녹화 버튼 구역 */
