@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (변환 기준축 보정 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (통합 패널 테마 완결)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -49,7 +49,6 @@ body, html {
     overflow: hidden;
 }
 
-/* 💡 교정: 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단(top left)으로 완벽하게 일치시킵니다. */
 #camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
@@ -152,7 +151,9 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 대통합 개폐 패널 스타일 (녹화/분석 화면 통합 패치) */
+/* ================================================================= */
+/* 7. 대통합 단일 개폐 패널 스타일 (인프라 통합 완료) */
+/* ================================================================= */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -161,23 +162,25 @@ body, html {
     height: 33.333vh;
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-    background: rgba(15, 15, 20, 0.45) !important;
-    backdrop-filter: blur(35px) saturate(210%) !important;
-    -webkit-backdrop-filter: blur(35px) saturate(210%) !important;
-    border-top: 0.5px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 28px 28px 0 0 !important;
-    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4) !important;
+    
+    /* 공통 프리미엄 글래스모피즘 디자인 고정 */
+    background: rgba(15, 15, 20, 0.45);
+    backdrop-filter: blur(35px) saturate(210%);
+    -webkit-backdrop-filter: blur(35px) saturate(210%);
+    border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4);
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s, backdrop-filter 0.3s;
 }
 
-/* 분석 화면 전용 슬라이딩 축소 제어 */
-#scene-analyze .unified-panel-box.collapsed {
+/* 패널 축소(collapsed) 애니메이션 스타일 */
+.unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
     background: rgba(0, 0, 0, 0.0) !important;
     backdrop-filter: blur(0px) saturate(100%) !important;
     -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
-    border-top-color: transparent !important;
-    box-shadow: none !important;
+    border-top-color: transparent;
+    box-shadow: none;
 }
 
 .panel-slider-handle {
@@ -198,10 +201,28 @@ body, html {
 
 .panel-content-wrapper {
     height: calc(100% - 34px);
-    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 💡 화면 변환 시 내부 컨텐츠만 페이드 스위칭되도록 연동하는 분기 클래스 */
+.panel-inner-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
     flex-direction: column;
     justify-content: space-between;
     padding: 8px 24px 16px 24px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.panel-inner-content.active {
+    display: flex;
+    opacity: 1;
 }
 
 /* 8. 4대 텍스트 메뉴 정렬 */
@@ -335,11 +356,4 @@ body, html {
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
-}
-
-/* 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
-.text-menu-bar-sync, #btn-record-move-sync {
-    display: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
 }
