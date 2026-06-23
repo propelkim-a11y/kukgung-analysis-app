@@ -2,7 +2,7 @@
  * js/app_gesture.js
  * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (6단계)
  * - 두 손가락 피치 줌(최대 5배) 및 한 손가락 화면 드래그 이동 스크롤
- * - 비디오, 선긋기 캔버스, 격자 그리드를 삼위일체로 묶어 이탈 및 격차 오류 영구 소거
+ * - 캔버스 간섭을 완전히 걷어내어 축 뒤틀림 현상 원천 차단
  */
 
 class BowAppGesture {
@@ -127,32 +127,18 @@ class BowAppGesture {
         this.applyTransform();
     }
 
-    /**
-     * 💡 핵심 교정: 비디오뿐만 아니라 격자 그리드 레이어(.background-grid-layer)까지 
-     * 동일한 CSS 변환 연산을 적용하여, 동영상을 키우면 격자선도 영상 픽셀에 고정된 채 함께 정밀 확대되도록 유기적 삼위일체 결합 수행
-     */
     applyTransform() {
         const state = this.core.state;
-        const transformCSS = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         
-        // 1. 비디오 노드 변환
         if (this.video) {
-            this.video.style.transform = transformCSS;
+            this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         }
         
-        // 2. 격자 그리드 배경 레이어 동시 변환 (동영상 위의 바둑판 픽셀 일치화)
-        const gridEl = this.container.querySelector('.background-grid-layer');
-        if (gridEl) {
-            gridEl.style.transform = transformCSS;
-        }
-        
-        // 3. 드로잉 캔버스 도화지 축소 노정 고정 유지
         const canvasEl = document.getElementById('draw-canvas');
         if (canvasEl) {
             canvasEl.style.transform = 'none';
         }
 
-        // 4. 분석기 기하학 좌표 엔진 동기화
         if (window.bowAnalyzer) {
             window.bowAnalyzer.updateTransform(state.scale, state.offsetX, state.offsetY);
         }
