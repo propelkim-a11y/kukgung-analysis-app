@@ -1,5 +1,5 @@
 /* style.css
- * 좌측 상단 투명 각도 표시, 재생 탭 아래 4대 아이콘 메뉴 배치 완성 버전
+ * 4대 텍스트 버튼 동일 크기 균등 4분할 및 프리미엄 글래스모피즘 완성 버전
  */
 
 * { 
@@ -118,22 +118,22 @@ body {
     image-rendering: crisp-edges;
 }
 
-/* ⚡ [신설] 동영상 화면 내부 좌측 상단 투명 각도 표시기 디자인 */
+/* 동영상 화면 내부 좌측 상단 투명 각도 표시기 디자인 */
 .top-left-floating-report {
     position: absolute;
     top: 25px;
     left: 20px;
-    z-index: 2000; /* 동영상 및 캔버스 바로 위에 투명하게 노출 */
+    z-index: 2000; 
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(0, 0, 0, 0.3); /* 은은하고 투명한 배경 */
+    background: rgba(0, 0, 0, 0.3); 
     padding: 6px 14px;
     border-radius: 30px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
-    pointer-events: none; /* 선 긋기 터치를 방해하지 않음 */
+    pointer-events: none; 
 }
 .report-icon {
     font-size: 1.1rem;
@@ -146,7 +146,7 @@ body {
 }
 
 /* ==========================================
- * [대통합 패치] 단 하나의 공용 반투명 하단 컨트롤 패널 상자
+ * 공용 반투명 하단 컨트롤 패널 상자
  * ========================================== */
 .unified-panel {
     position: absolute;
@@ -175,7 +175,7 @@ body {
 .panel-inner-block {
     display: flex;
     flex-direction: column;
-    gap: 12px; /* 재생 바와 아이콘 바의 간격 확보 */
+    gap: 12px; 
     width: 100%;
     margin-bottom: 12px; 
     pointer-events: auto;
@@ -218,7 +218,7 @@ body {
     cursor: pointer;
 }
 
-/* ⚡ [피드백 적용] 재생 탭 '아래'로 전면 이동한 4대 아이콘 메뉴 캡슐 트랙 */
+/* ⚡ [피드백 적용] 이모지 대신 명확한 고품격 텍스트 버튼 캡슐 트랙 디자인 */
 .menu-tab-bar {
     display: flex;
     align-items: center;
@@ -228,64 +228,55 @@ body {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
+    gap: 4px; /* 단추 간의 정밀한 틈새 여백 고정 */
 }
 
-/* ⚡ 순수 아이콘 단추 4분할 균등 분리 공식 */
-.menu-tab-btn, .menu-tab-btn-label {
+/* ⚡ [핵심 요구사항 반영] 4개의 텍스트 단추가 완전히 동일한 픽셀 크기를 갖도록 균등 4분할 배분 정렬 */
+.menu-tab-btn-txt, .menu-tab-btn-txt-reset {
     flex: 1;
-    padding: 8px 0;
+    width: 25%; /* 정확히 너비의 1/4 균등 할당 */
+    padding: 9px 0;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 1.1rem; /* 이모지 아이콘 크기 선명화 */
+    color: rgba(255, 255, 255, 0.45); /* 비활성화 텍스트 색상 */
+    font-size: 0.8rem; 
+    font-weight: 600;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease-in-out;
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap;
 }
-.menu-tab-btn.active {
+
+/* 현재 켜진 활성화 상태 텍스트 버튼 하이라이트 스타일 (열기, 확대, 선긋기 공용) */
+.menu-tab-btn-txt.active {
     background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
-/* ⚡ 정중앙 스몰 초기화 아이콘 버튼 디자인 유지 통합 */
-.center-reset-btn {
-    flex: 1;
-    padding: 8px 0;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 1.1rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+/* 초기화 단추용 리셋 액티브 상호작용 */
+.menu-tab-btn-txt-reset {
+    color: rgba(255, 255, 255, 0.75); /* 초기화는 리셋 기능성이므로 평소 글씨를 약간 밝게 지원 */
 }
-.center-reset-btn:active {
+.menu-tab-btn-txt-reset:active {
     background: rgba(255, 255, 255, 0.12);
-    transform: scale(0.95);
+    transform: scale(0.96);
 }
 
-/* 파일 업로드 캡슐 내부 고립 박스화 */
+/* 파일 업로드 구역 캡슐 내부 고립 배분화 */
 .analysis-actions {
     flex: 1;
+    width: 25%; /* 정확히 너비의 1/4 할당 */
     display: flex;
     justify-content: center;
     align-items: center;
 }
-.menu-tab-btn-label {
+.menu-tab-btn-txt {
     width: 100%;
-    color: #007aff; /* 업로드 아이콘 고유 포인트 색상 배정 */
-}
-.menu-tab-btn-label:active {
-    background: rgba(255, 255, 255, 0.12);
 }
 
 /* 촬영 모드의 녹화 버튼 구역 */
