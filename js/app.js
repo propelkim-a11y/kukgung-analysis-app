@@ -121,9 +121,9 @@ function loadDummyCanvasForPC() {
     ctx.fillRect(0, 0, oc.width, oc.height);
     
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px sans-serif';
+    ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🏹 하단 [영상 파일 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
+    ctx.fillText('🏹 우측 하단 [영상 파일 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
     ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 자유로운 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
@@ -139,6 +139,7 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
+            // 로컬 자동 다운로드 트리거
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -174,19 +175,19 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. 로컬 동영상 파일 인젝션 이벤트
+// 9. 로컬 동영상 파일 인젝션 이벤트 (파일 업로드 파트)
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
-        const file = e.target.files;
-        if (file && file[0]) {
+        const file = e.target.files[0];
+        if (file) {
             activeVideoRoll = 0; 
-            loadVideoForAnalysis(URL.createObjectURL(file[0]));
+            loadVideoForAnalysis(URL.createObjectURL(file));
         }
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈
+// 10. 상하단 레이아웃 분리 모듈 (수평계/녹화단추 분석화면 전면 고립 차단)
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -194,6 +195,7 @@ function switchMode(mode) {
     document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
     document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
 
+    // 촬영 화면 전용 컴포넌트 분리
     const actionZone = document.querySelector('.action-zone');
     const headerElement = document.querySelector('.header');
     
@@ -206,7 +208,7 @@ function switchMode(mode) {
     }
 }
 
-// 11. 분석 화면 동적 데이터 마운트 로더 (전체화면 비율 패치 반영)
+// 11. 분석 화면 동적 데이터 마운트 로더 (비율 고정 및 비디오 컨텍스트 주입)
 function loadVideoForAnalysis(url) {
     const v = document.createElement('video');
     v.src = url; v.muted = true; v.playsInline = true;
@@ -218,11 +220,12 @@ function loadVideoForAnalysis(url) {
         const timeline = document.getElementById('video-timeline');
         const container = document.getElementById('manual-analysis-box');
         
-        // ⚡ [전체화면 패치] 물리 컨테이너 화면을 꽉 채우도록 캔버스 크기 강제 동기화
+        // 캔버스를 눈에 보이는 레이아웃 크기 박스 해상도와 동기화
         const rect = container.getBoundingClientRect();
         dc.width = oc.width = rect.width;
         dc.height = oc.height = rect.height;
         
+        // 타임라인 슬라이더 조작 범위 연동
         if (timeline) {
             timeline.min = 0;
             timeline.max = v.duration;
@@ -233,16 +236,19 @@ function loadVideoForAnalysis(url) {
         v.currentTime = 0.1; 
         switchMode('analyze');
         
+        // ⚡ 피치 투 줌 및 원본 비율 추적 연산 초기화
         bowAnalyzer.init(); 
         
+        // 프레임 탐색 및 실시간 렌더링 동기화
         v.onseeked = () => {
-            renderFrame();
+            if (bowAnalyzer) bowAnalyzer.draw();
         };
         
+        // 비디오 재생 시 타임라인 연동 루프
         v.onplay = () => {
             const updateLoop = () => {
                 if (!v.paused && !v.ended) {
-                    renderFrame();
+                    if (bowAnalyzer) bowAnalyzer.draw();
                     if (timeline) timeline.value = v.currentTime;
                     requestAnimationFrame(updateLoop);
                 }
@@ -252,44 +258,35 @@ function loadVideoForAnalysis(url) {
     };
 }
 
-// 12. 현재 비디오 프레임을 전체 크기에 고르게 투사하는 렌더링 함수
-function renderFrame() {
-    const v = window.analysisVideo;
-    const oc = document.getElementById('output-canvas');
-    if (!v || !oc) return;
-    const ctx = oc.getContext('2d');
-    ctx.clearRect(0, 0, oc.width, oc.height);
-    
-    // ⚡ [전체화면 패치] cover 스타일 연출을 위해 가로세로를 캔버스 규격에 완전히 맞춰서 드로잉
-    ctx.drawImage(v, 0, 0, oc.width, oc.height);
-}
-
-// 13. 슬라이더 및 재생 제어 바인딩
+// 12. 슬라이더 및 재생 제어 바인딩
 const timelineSlider = document.getElementById('video-timeline');
 if (timelineSlider) {
     timelineSlider.addEventListener('input', (e) => {
-        if (window.analysisVideo) {
-            window.analysisVideo.pause(); 
-            window.analysisVideo.currentTime = parseFloat(e.target.value);
+        const v = window.analysisVideo;
+        if (v) {
+            v.pause(); 
+            v.currentTime = parseFloat(e.target.value);
             document.getElementById('btn-video-play').innerText = "▶️ 재생";
         }
     });
 }
 
 document.getElementById('btn-video-prev').onclick = () => { 
-    if(window.analysisVideo) {
-        window.analysisVideo.pause();
-        window.analysisVideo.currentTime = Math.max(0, window.analysisVideo.currentTime - 0.1);
-        if (timelineSlider) timelineSlider.value = window.analysisVideo.currentTime;
+    const v = window.analysisVideo;
+    if(v) {
+        v.pause();
+        v.currentTime = Math.max(0, v.currentTime - 0.1);
+        if (timelineSlider) timelineSlider.value = v.currentTime;
         document.getElementById('btn-video-play').innerText = "▶️ 재생";
     }
 };
 
 document.getElementById('btn-video-next').onclick = () => { 
-    if(window.analysisVideo) {
-        window.analysisVideo.pause();
-        window.analysisVideo.currentTime = Math.min(window.analysisVideo.duration, window.analysisVideo.currentTime + 0.1);
-        if (timelineSlider) timelineSlider.value = window.analysisVideo.currentTime;
+    const v = window.analysisVideo;
+    if(v) {
+        v.pause();
+        v.currentTime = Math.min(v.duration, v.currentTime + 0.1);
+        if (timelineSlider) timelineSlider.value = v.currentTime;
         document.getElementById('btn-video-play').innerText = "▶️ 재생";
     }
 };
@@ -307,9 +304,10 @@ document.getElementById('btn-video-play').onclick = () => {
     }
 };
 
-// 14. 드로잉 캔버스 초기화 리스너
+// 13. 드로잉 캔버스 초기화 리스너
 document.getElementById('btn-clear-draw').onclick = () => { 
     if (bowAnalyzer) bowAnalyzer.clear(); 
 };
 
+// 최초 기동
 initApp();
