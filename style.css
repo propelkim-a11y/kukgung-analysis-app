@@ -1,377 +1,218 @@
-* { 
-    box-sizing: border-box; 
-    margin: 0; 
-    padding: 0; 
+/**
+ * style.css
+ * 국궁 자세 분석 시스템 통합 스타일시트
+ * - 풀스크린 비디오 및 도화지 적층 레이아웃
+ * - 하단 1/3 통합 패널 Glassmorphism 및 슬라이딩 애니메이션
+ * - 4대 메뉴 가로폭 25% 정밀 균등 배분 정렬
+ * - 50px 간격 은은한 바둑판 그리드 및 상시 점선 십자가
+ */
+
+/* 1. 하드웨어 리셋 및 풀뷰포트 환경 격리 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none; /* 드로잉 시 텍스트 블록 지정 노이즈 차단 */
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #000000; 
-    color: #ffffff;
-    height: 100dvh;
-    overflow: hidden;
-}
-
-.container { 
-    display: flex; 
-    flex-direction: column; 
-    height: 100dvh;
-    background-color: #000000;
-    position: relative;
-}
-
-.main-content { 
-    flex: 1; 
-    position: relative; 
-    background-color: #000000;
-    overflow: hidden;
-}
-
-.view-section { 
-    width: 100%; 
-    height: 100%; 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    z-index: 1; 
-}
-
-#video-preview { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; 
-    background: #000000;
-}
-
-/* 촬영 모드 전용 수평계 투명 헤더 */
-.header { 
-    text-align: center; 
-    padding: 20px; 
-    background: transparent; 
-    z-index: 100; 
-    position: absolute;
-    top: 0;
+body, html {
     width: 100%;
-    pointer-events: none; 
+    height: 100%;
+    overflow: hidden;
+    background-color: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
-#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
-
-/* 촬영용 기기 실시간 수평계 */
-.level-container { 
-    position: absolute; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); 
-    pointer-events: none; 
-    z-index: 2; 
-}
-.center-target { width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
-.level-line { 
-    width: 220px; height: 2px; 
-    background-color: #ff4d4d; 
-    position: absolute; left: -110px; 
-    transition: transform 0.05s linear, background-color 0.3s; 
-}
-
-/* 비디오 원본 도화지 영역 (전체화면 확보 바닥까지 매핑) */
-.canvas-container { 
-    width: 100%; 
-    height: 100dvh; 
+/* 2. 풀스크린 비디오 투사 도화지 컨테이너 */
+.viewport-container {
     position: absolute;
     top: 0;
     left: 0;
-    overflow: hidden; 
-    touch-action: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #000000;
-    z-index: 10;
+    width: 100%;
+    height: 100%; /* 하단 패널 뒷공간 맨 바닥 끝까지 유기적으로 확장 */
+    z-index: 1;
+    overflow: hidden;
 }
 
-#output-canvas {
+#main-video {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; 
+    object-fit: contain; /* 동영상 고유 비율 왜곡 없이 칼같이 보존 */
+    transform-origin: top left; /* 줌 행렬 연산 기준점 고정 */
+    z-index: 2;
 }
 
-#drawing-canvas {
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
-    pointer-events: auto;
-    z-index: 20;
-}
-
-#manual-analysis-box canvas {
-    image-rendering: -webkit-optimize-contrast; 
-    image-rendering: crisp-edges;
-}
-
-/* 동영상 화면 내부 좌측 상단 투명 각도 표시기 디자인 */
-.top-left-floating-report {
+#draw-canvas {
     position: absolute;
-    top: 25px;
-    left: 20px;
-    z-index: 2000; 
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(0, 0, 0, 0.3); 
-    padding: 6px 14px;
-    border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    pointer-events: none; 
-}
-.report-icon {
-    font-size: 1.1rem;
-}
-.top-left-floating-report .highlight {
-    font-weight: bold; 
-    color: #00e676; 
-    font-size: 1.5rem; 
-    text-shadow: 0 2px 4px rgba(0,0,0,0.4); 
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto; /* 스타일러스 터치 이벤트를 받아내기 위해 개방 */
+    z-index: 3;
 }
 
-/* 공용 반투명 하단 컨트롤 패널 상자 (슬라이딩 모션 내장) */
-.unified-panel {
+/* 3. 명세 8번: 50픽셀 간격 바둑판 그리드 격자 및 상시 점선 십자가 */
+.background-grid-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 50px 50px; /* 은은한 50픽셀 간격 모눈종이 */
+    z-index: 1;
+    pointer-events: none;
+}
+
+.center-crosshair-v, .center-crosshair-h {
+    position: absolute;
+    background: none;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.center-crosshair-v {
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    border-left: 1px dashed rgba(255, 255, 255, 0.25); /* 상시 세로 점선 십자가 */
+}
+
+.center-crosshair-h {
+    top: 50%;
+    left: 0;
+    height: 1px;
+    width: 100%;
+    border-top: 1px dashed rgba(255, 255, 255, 0.25); /* 상시 가로 점선 십자가 */
+}
+
+/* 4. 명세 9번: 좌측 상단 플로팅 각도 리포트 결과창 */
+.floating-report {
+    position: absolute;
+    top: calc(20px + env(safe-area-inset-top)); /* 노치 방어 */
+    left: 20px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #00FF66; /* 고시인성 형광 연두 */
+    text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.8);
+    z-index: 4;
+    font-variant-numeric: tabular-nums; /* 각도 변경 시 자출 흔들림 방지 */
+}
+
+/* 5. 명세 1번 & 10번: 하단 대통합 1/3 Glassmorphism 패널 상자 */
+.unified-panel-box {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: auto; 
-    min-height: 160px;
-    max-height: 38dvh; 
-    
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 6px 16px calc(15px + env(safe-area-inset-bottom)) 16px; 
-    
-    background: rgba(0, 0, 0, 0.12) !important; 
-    backdrop-filter: blur(16px) !important; 
-    -webkit-backdrop-filter: blur(16px) !important;
-    
-    border-top: 1px solid rgba(255, 255, 255, 0.06); 
-    z-index: 1000; 
-    
-    transition: transform 0.4s cubic-bezier(0.1, 0.76, 0.55, 0.94);
-    will-change: transform;
+    height: 33.333vh; /* 정확히 화면 세로 크기의 1/3 고정 */
+    background: rgba(25, 25, 25, 0.55); /* 반투명 유리 기재 */
+    backdrop-filter: blur(20px); /* 상용급 고급 Glassmorphism 핵심 블러 */
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1); /* 부드러운 슬라이딩 슥 개폐 */
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 패널이 터치로 접혔을 때 작동할 슬라이딩 상태 클래스 */
-.unified-panel.collapsed {
-    transform: translateY(calc(100% - 55px - env(safe-area-inset-bottom))); 
+/* 슬라이딩 패널 접힘 접지 상태 클래스 */
+.unified-panel-box.collapsed {
+    transform: translateY(calc(100% - 30px)); /* 물리 손잡이 핸들바만 남기고 슥 내려감 */
 }
 
-/* 슬라이딩 제어용 상단 바 핸들 */
-.panel-drag-handle {
+/* 패널 손잡이 바 핸들 (—) */
+.panel-slider-handle {
     width: 100%;
-    height: 24px;
+    height: 30px;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    pointer-events: auto;
-}
-.handle-bar {
-    width: 40px;
-    height: 4px;
-    background-color: rgba(255, 255, 255, 0.25);
-    border-radius: 2px;
-}
-
-/* 내부 동적 컴포넌트 묶음 블록 (분석용) */
-.panel-inner-block {
-    display: flex;
-    flex-direction: column;
-    gap: 12px; 
-    width: 100%;
-    margin-bottom: 12px; 
-    pointer-events: auto;
-}
-
-/* 슬라이더 트랙 */
-.slider-container {
-    width: 100%;
-}
-#video-timeline {
-    width: 100%;
-    -webkit-appearance: none;
-    background: rgba(255, 255, 255, 0.15);
-    height: 4px;
-    border-radius: 2px;
-    outline: none;
-}
-#video-timeline::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #007aff;
-    cursor: pointer;
-}
-
-/* 뒤로/재생/앞으로 세련된 텍스트 비디오 미세 탐색 버튼 정렬 */
-.video-controls {
-    display: flex; 
-    justify-content: center; 
-    gap: 10px;
-    width: 100%;
-}
-.control-btn-txt {
-    flex: 1;
-    width: 33.33%;
-    padding: 8px 0; 
-    background: rgba(255, 255, 255, 0.06); 
-    border: 1px solid rgba(255, 255, 255, 0.12); 
-    color: #ffffff; 
-    border-radius: 8px; 
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    transition: all 0.2s;
-}
-.control-btn-txt:active {
-    background: rgba(255, 255, 255, 0.16);
-    transform: scale(0.97);
-}
-
-/* 4대 텍스트 버튼 캡슐 트랙 디자인 */
-.menu-tab-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 4px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    width: 100%;
-    gap: 4px; 
-}
-
-/* 4개의 텍스트 단추 너비 25% 가로 폭 균등 4분할 고정 */
-.menu-tab-btn-txt, .menu-tab-btn-txt-reset {
-    flex: 1;
-    width: 25%; 
-    padding: 9px 0;
     background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.45); 
-    font-size: 0.8rem; 
-    font-weight: 600;
+}
+
+.handle-bar {
+    width: 44px;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.35);
+    border-radius: 2px;
+}
+
+/* 패널 내부 정밀 제어 그리드 배치 wrapper */
+.panel-content-wrapper {
+    height: calc(100% - 30px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 0 16px 12px 16px;
+}
+
+/* 6. 명세 3번: 4대 텍스트 메뉴 정렬 (가로폭 25% 균등 분할) */
+.text-menu-bar {
+    display: flex;
+    width: 100%;
+    gap: 1px; /* 격자 분할선 효과 */
+    background-color: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    overflow: hidden;
+}
+
+.menu-btn {
+    flex: 1; /* 단 하나의 선언으로 가로폭 정확히 25%씩 칼같이 균등 배분 */
+    height: 48px;
+    background: rgba(40, 40, 40, 0.6);
+    border: none;
+    color: #A0A0A0;
+    font-size: 15px;
+    font-weight: 500;
     text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-}
-
-/* 활성화 단추 하이라이트 스타일 (열기, 확대, 선긋기 공용) */
-.menu-tab-btn-txt.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-.menu-tab-btn-txt-reset {
-    color: rgba(255, 255, 255, 0.75); 
-}
-.menu-tab-btn-txt-reset:active {
-    background: rgba(255, 255, 255, 0.12);
-    transform: scale(0.96);
-}
-
-/* 파일 업로드 캡슐 내부 분할 매핑 */
-.analysis-actions {
-    flex: 1;
-    width: 25%; 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-.menu-tab-btn-txt {
-    width: 100%;
-}
-
-/* 촬영 모드의 녹화 버튼 구역 */
-.action-zone {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin-bottom: 15px; 
-    pointer-events: auto;
-}
-
-/* 촬영 셔터 원형 버튼 */
-#record-btn { 
-    width: 55px; 
-    height: 55px; 
-    flex-shrink: 0; 
-    border-radius: 50%; 
-    border: 4px solid #ffffff; 
-    background: rgba(255, 255, 255, 0.2); 
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-    transition: all 0.2s;
-}
-#record-btn.recording { 
-    border-radius: 12px; 
-    background: #ff4d4d; 
-    width: 45px;
-    height: 45px;
+    transition: all 0.2s ease;
 }
 
-/* 공통 하단 전환 탭 스위치 구역 (촬영/분석 전환 스위치 단 1픽셀 오차도 없이 위치 고정) */
-.panel-global-footer {
+/* 명세 4번: 활성화(Active) 불빛 시인성 조율 */
+.menu-btn.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #00FF66; /* 안전 모드 불빛 피드백 */
+    font-weight: 700;
+    box-shadow: inset 0 -3px 0 #00FF66; /* 하단 엣지 바 형태 불빛 고정 */
+}
+
+.menu-btn:active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* 7. 명세 5번: 텍스트 비디오 컨트롤러 패밀리 룩 디자인 */
+.video-control-bar {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    pointer-events: auto;
+    gap: 32px; /* 버튼 간 세련된 이격 간격 */
 }
 
-.mode-selector {
-    display: flex;
-    background: rgba(255, 255, 255, 0.06); 
-    padding: 3px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    width: fit-content;
-}
-.mode-selector button { 
-    padding: 5px 14px; 
-    background: transparent; 
-    border: none; 
-    color: rgba(255, 255, 255, 0.5); 
-    border-radius: 16px; 
-    font-size: 0.75rem; 
+.control-btn {
+    background: none;
+    border: none;
+    color: #E0E0E0;
+    font-size: 16px;
     font-weight: 600;
-    cursor: pointer; 
-    transition: all 0.2s;
-}
-.mode-selector button.active { 
-    background: #007aff; 
-    color: #ffffff;
-    box-shadow: 0 1px 5px rgba(0, 122, 255, 0.3);
+    letter-spacing: -0.5px;
+    cursor: pointer;
+    padding: 10px 16px;
+    transition: color 0.15s ease;
 }
 
-.hidden { display: none !important; }
-.overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000000; z-index:5000; display:flex; justify-content:center; align-items:center; }
-.overlay-content { text-align: center; padding: 20px; background: #222222; border-radius: 20px; border: 1px solid #444444; max-width: 90%; width: 320px; }
-#btn-permission { padding: 15px 30px; background: #007aff; color:#ffffff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
+.control-btn:active {
+    color: #00FF66; /* 터치 시 미세 피드백 광원 */
+}
