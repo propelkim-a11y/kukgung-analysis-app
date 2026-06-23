@@ -18,7 +18,7 @@ body, html {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #050507; /* 아이폰 특유의 깊은 심해 블랙 */
+    background-color: #050507;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     letter-spacing: -0.5px;
 }
@@ -114,7 +114,7 @@ body, html {
     left: 5%;
     width: 90%;
     height: 1px;
-    background-color: rgba(255, 59, 48, 0.8); /* iOS 오렌지-레드 경고색 */
+    background-color: rgba(255, 59, 48, 0.8);
     transform-origin: center;
     z-index: 4;
     pointer-events: none;
@@ -123,13 +123,12 @@ body, html {
 
 #gyro-horizon-line.perfect-level {
     height: 2px;
-    background-color: #34C759; /* iOS 세련된 그린 */
+    background-color: #34C759;
     box-shadow: 0 0 14px rgba(52, 199, 89, 0.8);
 }
 
-/* 수평선 중앙 위에 실시간 수치 각도를 띄우는 가상 선택자 설계 */
 #gyro-horizon-line::after {
-    content: attr(data-angle); /* js에서 업데이트하는 각도 텍스트를 실시간 투사 */
+    content: attr(data-angle);
     position: absolute;
     top: -24px;
     left: 50%;
@@ -138,23 +137,23 @@ body, html {
     font-weight: 700;
     color: #FFFFFF;
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-    font-family: -apple-system, sans-serif;
 }
 
-/* 6. 좌측 상단 플로팅 각도 리포트 */
+/* 6. 좌측 상단 플로팅 각도 리포트 (SF 모던 서체 적용) */
 .floating-report {
     position: absolute;
     top: calc(24px + env(safe-area-inset-top));
     left: 24px;
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 700;
     color: #34C759;
     text-shadow: 0px 4px 12px rgba(0, 0, 0, 0.9);
     z-index: 10;
     font-variant-numeric: tabular-nums;
+    font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 터치 시 완전 투명해지며 아래로 부드럽게 완전 은닉 슬라이딩 개폐 패널 */
+/* 7. 터치 시 아래로 부드럽게 완전 은닉 슬라이딩 개폐 패널 */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -172,7 +171,6 @@ body, html {
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 물리 핸들바 터치 접지 상태(collapsed) 시 패널 내부 기재 및 블러/배경을 완전 투명 은닉 */
 .unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
     background: rgba(0, 0, 0, 0.0) !important;
