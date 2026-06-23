@@ -21,7 +21,9 @@ export class DynamicLeveler {
                     return true;
                 }
                 return false;
-            } catch (err) { return false; }
+            } catch (err) {
+                return false;
+            }
         } else {
             window.addEventListener('deviceorientation', (e) => this.handleOrientation(e));
             return true;
@@ -42,9 +44,13 @@ export class DynamicLeveler {
             screenAngle = window.orientation;
         }
 
-        if (screenAngle === 90) { displayAngle = -pitch; } 
-        else if (screenAngle === 270 || screenAngle === -90) { displayAngle = pitch; } 
-        else if (screenAngle === 180) { displayAngle = -roll; }
+        if (screenAngle === 90) {
+            displayAngle = -pitch;
+        } else if (screenAngle === 270 || screenAngle === -90) {
+            displayAngle = pitch;
+        } else if (screenAngle === 180) {
+            displayAngle = -roll;
+        }
 
         if (Math.abs(pitch) > 85 && (screenAngle === 0 || screenAngle === 180)) return; 
 
