@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (화면 겹침 격리 오류 완전 해결)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 규격 완전 패치)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -23,7 +23,7 @@ body, html {
     letter-spacing: -0.5px;
 }
 
-/* 2. 💡 [핵심 교정] 스크린 완전 격리 및 겹침 방어 시스템 */
+/* 2. 💡 [핵심 교정] 두 화면 간의 레이아웃 상호 간섭 원천 차단 */
 .app-scene {
     position: absolute;
     top: 0;
@@ -32,27 +32,21 @@ body, html {
     height: 100%;
     overflow: hidden;
     
-    /* 비활성화 상태일 때는 투명도, 터치, 레이아웃을 원천 봉쇄하여 절대 겹치지 않게 격리 */
+    /* 비활성화 상태일 때는 절대 레이아웃 공간을 차지하지 못하도록 완벽 격리 */
     display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    z-index: 1;
 }
 
-/* 활성화 상태일 때만 최상단 위로 레이아웃을 독점 전개 */
+/* 활성화 상태일 때만 위아래 분할형 플렉스 상자로 독점 전개 */
 .app-scene.active {
     display: flex !important;
     flex-direction: column !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    z-index: 5 !important;
 }
 
-/* 3. 풀스크린 프리뷰 도화지 */
+/* 3. 💡 [핵심 교정] 상단 비디오/카메라 영역 (하단 패널과 절대 겹치지 않는 공간 독점) */
 .viewport-container {
-    position: relative; /* absolute에서 relative로 변경하여 내부 유연성 확보 */
+    position: relative;
     width: 100%;
-    flex: 1; /* 패널을 제외한 나머지 상단 공간 전체를 완벽 독점 */
+    flex: 1; /* 하단 패널을 제외한 위쪽 공간 전체를 정밀하게 채움 */
     overflow: hidden;
     background-color: #050507;
 }
@@ -151,11 +145,11 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 대통합 개폐 패널 공통 레이아웃 구조 */
+/* 7. 💡 [핵심 교정] 하단 패널 영역 (상단 비디오 영역 밑에 완벽히 격리 배치) */
 .unified-panel-box {
-    position: relative; /* absolute에서 relative 구조로 변경하여 겹침 공간 왜곡 차단 */
+    position: relative;
     width: 100%;
-    height: 33.333vh;
+    height: 33.333vh; /* 화면의 정확히 1/3을 독점 보유 */
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
     background: rgba(15, 15, 20, 0.45) !important;
@@ -164,17 +158,15 @@ body, html {
     border-top: 0.5px solid rgba(255, 255, 255, 0.12) !important;
     border-radius: 28px 28px 0 0 !important;
     box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4) !important;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s, backdrop-filter 0.3s;
 }
 
-/* 분석 화면 전용 접힘 애니메이션 */
+/* 분석 화면 패널 전용: 접혔을 때 아래로 슬라이딩 무빙 제어 */
+#scene-analyze .unified-panel-box {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 #scene-analyze .unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
-    background: rgba(0, 0, 0, 0.0) !important;
-    backdrop-filter: blur(0px) saturate(100%) !important;
-    -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
-    border-top-color: transparent !important;
-    box-shadow: none !important;
 }
 
 .panel-slider-handle, .panel-slider-handle-dummy {
@@ -204,7 +196,7 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 8. 4대 텍스트 메뉴 */
+/* 8. 4대 텍스트 메뉴 및 촬영 화면 동기화 프레임 바 */
 .text-menu-bar, .text-menu-bar-placeholder {
     display: flex;
     width: 100%;
@@ -217,6 +209,7 @@ body, html {
     border-radius: 13px;
 }
 
+/* 촬영 화면용 투명 플레이스홀더 (수직 구조 정렬 완벽 일치용) */
 .text-menu-bar-placeholder {
     background-color: transparent;
 }
