@@ -101,17 +101,27 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
+    // ⚡ [텍스트 연동 패치] 4대 버튼에 따른 동적 인터랙션 및 클래스 활성화 조율 리스너
     document.getElementById('btn-tool-move').onclick = () => {
-        document.getElementById('btn-tool-move').classList.add('active');
-        document.getElementById('btn-tool-draw').classList.remove('active');
+        setActiveToolButton('btn-tool-move');
         bowAnalyzer.setToolMode('move');
     };
 
     document.getElementById('btn-tool-draw').onclick = () => {
-        document.getElementById('btn-tool-draw').classList.add('active');
-        document.getElementById('btn-tool-move').classList.remove('active');
+        setActiveToolButton('btn-tool-draw');
         bowAnalyzer.setToolMode('draw');
     };
+}
+
+// ⚡ [신설] 하단 4대 텍스트 메뉴의 불빛(Active) 상태를 강제로 통제하는 토글 도구
+function setActiveToolButton(activeId) {
+    const txtButtons = [document.getElementById('upload-label'), document.getElementById('btn-tool-move'), document.getElementById('btn-tool-draw')];
+    txtButtons.forEach(btn => {
+        if (btn) {
+            if (btn.id === activeId) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+    });
 }
 
 // 5. 웹캠이 없는 PC용 가상 캔버스 안내 도화지 빌더
@@ -172,19 +182,21 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. 파일 데이터 읽기 참조 방식을 표준 코드로 완전 수정하여 업로드 실패 해결
+// 9. 파일 데이터 읽기 참조 연동
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]; 
             activeVideoRoll = 0; 
-            loadVideoForAnalysis(URL.createObjectURL(file));
+            // ⚡ 파일 선택 시 자동으로 '열기' 버튼 하이라이트 활성화 연동
+            setActiveToolButton('upload-label');
+            bowAnalyzer.setToolMode('move'); // 업로드 직후엔 안전하게 이동/확대 기본화
+            loadVideoForAnalysis(URL.createObjectURL(e.target.files[0]));
         }
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈 (통합 구성 노출 버그 완벽 패치)
+// 10. 상하단 레이아웃 분리 모듈
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -200,8 +212,12 @@ function switchMode(mode) {
         if (analysisComponents) analysisComponents.classList.remove('hidden'); 
         if (shootComponents) shootComponents.classList.add('hidden'); 
         if (headerElement) headerElement.classList.add('hidden'); 
+        
+        // ⚡ [핵심 요구사항 반영] 분석하기 클릭 시 최초 세팅은 언제나 '열기' 단추가 활성화(Active) 상태가 되도록 제어
+        setActiveToolButton('upload-label');
+        bowAnalyzer.setToolMode('move'); // 열기 상태에 어울리는 안전한 기본 툴 세팅
     } else {
-        if (analysisComponents) analysisComponents.classList.add('hidden'); 
+        if (analysisComponents) analysisComponents.add('hidden'); 
         if (shootComponents) shootComponents.classList.remove('hidden'); 
         if (headerElement) headerElement.classList.remove('hidden'); 
     }
@@ -264,7 +280,7 @@ if (timelineSlider) {
     });
 }
 
-// 초당 30프레임 표준 규격을 대입해 1프레임 단위(0.033초) 미세 정밀 조작
+// 초당 30프레임 표준 1프레임 단위(0.033초) 미세 정밀 조작
 const FRAME_TIME = 1 / 30; 
 
 document.getElementById('btn-video-prev').onclick = () => { 
@@ -298,11 +314,6 @@ document.getElementById('btn-video-play').onclick = () => {
             document.getElementById('btn-video-play').innerText = "▶️ 재생";
         }
     }
-};
-
-// 13. 우측 상단 플로팅 미니 아이콘 연동 초기화 리스너
-document.getElementById('btn-clear-draw').onclick = () => { 
-    if (bowAnalyzer) bowAnalyzer.clear(); 
 };
 
 initApp();
