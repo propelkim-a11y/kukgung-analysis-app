@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (동영상 위 실시간 연동 그리드 완비)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (순정 복구 완결본)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -49,8 +49,8 @@ body, html {
     overflow: hidden;
 }
 
-/* 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단으로 일치 */
-#camera-preview, #main-video, #draw-canvas, .background-grid-layer {
+/* 비디오와 캔버스의 하드웨어 변환 시작점을 좌측 상단으로 수평 일치 */
+#camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
     left: 0;
@@ -64,22 +64,17 @@ body, html {
     z-index: 2;
 }
 
-/* 💡 교정: 바둑판 그리드가 동영상 위, 선긋기 캔버스 아래에 정밀하게 얹어지도록 레이어 순서(z-index)와 스케일 기준 보정 */
-.background-grid-layer {
-    z-index: 3;
-    pointer-events: none;
-    background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 50px 50px;
-}
-
 #draw-canvas {
-    z-index: 4;
+    z-index: 3;
     pointer-events: auto;
 }
 
-/* 시인성 높은 십자 가이드 (비디오 변환과 독립적으로 중앙 상시 고정) */
+/* 💡 교정: 복잡한 외부 CSS 그리드 레이어를 완전 폐기하고 빈 레이어로 대기 (꼬임 소거) */
+.background-grid-layer {
+    display: none !important;
+}
+
+/* 시인성 높은 십자 가이드 (중앙 상시 고정) */
 .center-crosshair-v {
     left: 50%;
     top: 0;
