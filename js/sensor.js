@@ -1,3 +1,8 @@
+/**
+ * sensor.js
+ * PC 및 안드로이드/iOS 크로스 플랫폼 규격 대응 자이로 수평 필터
+ */
+
 export class DynamicLeveler {
     constructor(onLevelChange) {
         this.onLevelChange = onLevelChange;
