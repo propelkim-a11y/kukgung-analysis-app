@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (디자인 일체감 통합 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -153,7 +153,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 대통합 개폐 패널 공통 구조 */
+/* 7. 대통합 개폐 패널 스타일 (녹화/분석 화면 통합 패치) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -162,34 +162,24 @@ body, html {
     height: 33.333vh;
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* [분석 화면 패널 스타일] */
-#scene-analyze .unified-panel-box {
-    background: rgba(15, 15, 20, 0.45);
-    backdrop-filter: blur(35px) saturate(210%);
-    -webkit-backdrop-filter: blur(35px) saturate(210%);
-    border-top: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 28px 28px 0 0;
-    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4);
+    
+    /* 💡 패치: 두 패널 모두 프리미엄 매트 블랙 반투명과 블러 필터로 통일 */
+    background: rgba(15, 15, 20, 0.45) !important;
+    backdrop-filter: blur(35px) saturate(210%) !important;
+    -webkit-backdrop-filter: blur(35px) saturate(210%) !important;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 28px 28px 0 0 !important;
+    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4) !important;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s, backdrop-filter 0.3s;
 }
 
+/* 분석 화면 전용 슬라이딩 축소 제어 */
 #scene-analyze .unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
     background: rgba(0, 0, 0, 0.0) !important;
     backdrop-filter: blur(0px) saturate(100%) !important;
     -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
-    border-top-color: transparent;
-    box-shadow: none;
-}
-
-/* [요구사항 2] 촬영 화면 패널을 완벽하게 투명화 처리 */
-#scene-record .unified-panel-box {
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: none !important;
+    border-top-color: transparent !important;
     box-shadow: none !important;
 }
 
@@ -335,17 +325,24 @@ body, html {
 .switch-btn {
     width: 100%;
     height: 40px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 0.5px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
+}
+
+/* 💡 촬영용 상단 바 레이아웃 강제 소거 상태 유지 */
+.text-menu-bar-sync, #btn-record-move-sync {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
