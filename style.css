@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (투명 스타일 및 레이아웃 통합 완결본)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (폰 전체 화면 꽉 채움 패치 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -35,26 +35,29 @@ body, html {
 }
 
 .app-scene.active {
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;
 }
 
-/* 3. 상단 비디오/카메라 영역 */
+/* 3. 💡 [핵심 교정] 상단 비디오/카메라 영역 화면 전체 100% 독점 */
 .viewport-container {
-    position: relative;
-    width: 100%;
-    flex: 1; 
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh; /* 스마트폰 물리적 화면 전체 크기 강제 점유 */
     overflow: hidden;
     background-color: #050507;
+    z-index: 1;
 }
 
+/* 💡 [핵심 교정] object-fit을 cover로 전격 변경하여 레터박스 여백을 박멸하고 전체 화면을 꽉 채움 */
 #camera-preview, #main-video, #draw-canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover !important;
     transform-origin: top left !important;
 }
 
@@ -140,16 +143,17 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 💡 [핵심 교정] 하단 패널 영역 (애플 감성의 고투명 반투명 스타일 및 높이 규격 통일) */
+/* 7. 하단 패널 영역 (애플 감성의 고투명 반투명 스타일 및 높이 규격 통일) */
 .unified-panel-box {
-    position: relative;
+    position: absolute;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    height: 33.333vh; /* 화면의 1/3 높이를 오차 없이 엄격 독점 고정 */
+    height: 33.333vh; 
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
     
-    /* 투명하고 우아한 블러 스타일 선언 */
-    background: rgba(10, 10, 15, 0.3) !important; /* 배경 투명도를 더 높여 투명한 스타일 완성 */
+    background: rgba(10, 10, 15, 0.3) !important; 
     backdrop-filter: blur(40px) saturate(220%) !important;
     -webkit-backdrop-filter: blur(40px) saturate(220%) !important;
     border-top: 0.5px solid rgba(255, 255, 255, 0.1) !important;
@@ -157,7 +161,7 @@ body, html {
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* 분석 화면 전용 슬라이딩 무빙 효과 연동 */
+/* 분석 화면 전용 슬라이딩 무빙 제어 */
 #scene-analyze .unified-panel-box {
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -195,7 +199,7 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 💡 교정: 분석 화면의 4대 버튼 메뉴 바 높이(44px)를 완벽하게 대칭 상쇄하는 투명 스페이서 */
+/* 분석 화면의 4대 버튼 메뉴 바 높이를 정렬하는 스페이서 */
 .apple-layout-sync-spacer {
     width: 100%;
     height: 44px;
@@ -298,7 +302,7 @@ body, html {
 }
 
 .action-btn-main {
-    background: rgba(0, 0, 0, 0.4); /* 투명한 패널에 맞춰 버튼 불투명도 조절 */
+    background: rgba(0, 0, 0, 0.4); 
     border: 3px solid #FFFFFF;
     color: #FFFFFF;
     font-size: 15px;
