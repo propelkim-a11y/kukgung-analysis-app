@@ -1,5 +1,5 @@
 /* style.css
- * 하단 패널 1/3 축소, 완전 투명화 및 비디오 원본 비율 유지 버전
+ * 하단 패널 1/3 초투명화, 하이테크 글래스모피즘 및 버튼 프리미엄 연출 버전
  */
 
 * { 
@@ -48,7 +48,7 @@ body {
     background: #000000;
 }
 
-/* 촬영 모드 전용 투명 헤더 */
+/* 촬영 모드 전용 상단 수평계 투명 헤더 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -60,7 +60,7 @@ body {
     pointer-events: none; 
 }
 
-/* 최하단 전환 탭 바 (반투명 글래스모피즘 유지) */
+/* 촬영 전용 최하단 탭 바 */
 .footer { 
     background: rgba(0, 0, 0, 0.4); 
     padding: 15px 15px calc(10px + env(safe-area-inset-bottom)); 
@@ -106,31 +106,32 @@ body {
 }
 
 /* ==========================================
- * ⚡ 분석 화면 전용 고립 레이아웃 (완벽 리포지셔닝)
+ * ⚡ 분석 화면 레이아웃 (영상이 배경으로 비치는 구조)
  * ========================================== */
 #analysis-section { 
     z-index: 500; 
     background: #000000;
-    display: flex;
-    flex-direction: column;
+    position: relative;
     height: 100%;
     width: 100%;
 }
 
-/* ⚡ 상단 2/3 영역: 동영상 비율을 절대 왜곡하지 않고 표현하는 도화지 상자 */
+/* ⚡ 상단 2/3 영역: 동영상이 나오는 도화지 공간 */
 .canvas-container { 
     width: 100%; 
-    height: 66.66dvh; /* 화면의 정확히 2/3 배정 */
-    position: relative; 
+    height: 66.66dvh; /* 화면의 2/3 배정 */
+    position: absolute;
+    top: 0;
+    left: 0;
     overflow: hidden; 
     touch-action: none;
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #050505;
+    background-color: #000000;
+    z-index: 10;
 }
 
-/* ⚡ [패치] contain으로 고정하여 비디오 원본 가로세로 비율(9:16 등)을 완벽히 보존 */
 #output-canvas {
     width: 100%;
     height: 100%;
@@ -144,6 +145,7 @@ body {
     width: 100%; 
     height: 100%; 
     pointer-events: auto;
+    z-index: 20;
 }
 
 #manual-analysis-box canvas {
@@ -151,16 +153,27 @@ body {
     image-rendering: crisp-edges;
 }
 
-/* ⚡ 하단 1/3 영역: 완전 투명 인터페이스 제어 패널 디자인 */
+/* ⚡ 하단 1/3 영역: 완전 반투명 하이테크 제어 패널 디자인 */
 .analysis-control-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     width: 100%;
     height: 33.33dvh; /* 화면의 정확히 1/3 배정 */
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    padding: 10px 15px calc(50px + env(safe-area-inset-bottom)) 15px; /* 모드 탭 바 공간 확보 */
-    background: transparent; /* 완전 투명화 처리 */
-    z-index: 600;
+    justify-content: space-between;
+    /* 패널 내부 컴포넌트 여백 밸런스 조정 */
+    padding: 12px 16px calc(15px + env(safe-area-inset-bottom)) 16px; 
+    
+    /* 🔥 [핵심 요구사항] 패널 뒤의 영상이 은은하게 비치는 글래스모피즘 초투명 처리 */
+    background: rgba(0, 0, 0, 0.15) !important; 
+    backdrop-filter: blur(15px) !important; 
+    -webkit-backdrop-filter: blur(15px) !important;
+    
+    /* 은은하게 경계를 나누는 투명 상단 테두리 선 */
+    border-top: 1px solid rgba(255, 255, 255, 0.08); 
+    z-index: 100;
 }
 
 /* 초기화 및 서브 뱃지 라인 */
@@ -169,104 +182,161 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    margin-bottom: 8px;
 }
+
+/* 🔥 [UI 업그레이드] 초기화 버튼 프리미엄 스타일 입히기 */
 .tool-btn { 
-    padding: 8px 14px; 
-    background: rgba(255, 255, 255, 0.15); 
-    border: 1px solid rgba(255,255,255,0.2); 
+    padding: 6px 12px; 
+    background: rgba(255, 255, 255, 0.12); 
+    border: 1px solid rgba(255, 255, 255, 0.18); 
     color: #ffffff; 
     border-radius: 8px; 
-    font-size: 0.85rem; 
+    font-size: 0.8rem; 
+    font-weight: 500;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: background 0.2s;
 }
+.tool-btn:active {
+    background: rgba(255, 255, 255, 0.25);
+}
+
 .angle-badge {
-    padding: 8px 12px; 
-    background: rgba(0, 0, 0, 0.6); 
+    padding: 6px 10px; 
+    background: rgba(0, 0, 0, 0.4); 
     border-radius: 8px; 
     font-size: 0.75rem; 
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    opacity: 0.8;
 }
 
 /* 비디오 재생 타임라인 슬라이더 */
 .slider-container {
     width: 100%;
-    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
 }
 #video-timeline {
     width: 100%;
     -webkit-appearance: none;
-    background: rgba(255, 255, 255, 0.2);
-    height: 5px;
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    height: 4px;
+    border-radius: 2px;
     outline: none;
 }
 #video-timeline::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: #007aff;
     cursor: pointer;
+    box-shadow: 0 0 6px rgba(0,122,255,0.5);
 }
 
-/* 비디오 탐색 컨트롤러 */
+/* 🔥 [UI 업그레이드] 프레임 이동 조작 버튼 스타일 정돈 */
 .video-controls {
     display: flex; 
     justify-content: center; 
-    gap: 12px; 
-    margin-bottom: 10px;
+    gap: 10px;
+    width: 100%;
 }
 .control-btn {
-    padding: 8px 16px; 
-    background: rgba(255, 255, 255, 0.12); 
-    border: 1px solid rgba(255, 255, 255, 0.15); 
+    padding: 8px 14px; 
+    background: rgba(255, 255, 255, 0.08); 
+    border: 1px solid rgba(255, 255, 255, 0.12); 
     color: #ffffff; 
-    border-radius: 10px; 
-    font-size: 0.85rem; 
+    border-radius: 8px; 
+    font-size: 0.8rem; 
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.2s;
+}
+.control-btn:active {
+    background: rgba(255, 255, 255, 0.18);
 }
 
-/* 정밀 각도 결과 리포트 및 업로드 통합 패널 */
+/* ⚡ 정밀 각도 결과 리포트 및 업로드 통합 패널 (가독성 보장 구조) */
 .report-box { 
-    padding: 10px 15px; 
-    background: rgba(255, 255, 255, 0.05); 
-    border-radius: 12px; 
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 12px; 
+    background: rgba(255, 255, 255, 0.03); 
+    border-radius: 10px; 
+    border: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 15px;
-    flex: 1; /* 남은 하단 공간 채우기 */
+    gap: 12px;
+    width: 100%;
 }
 .main-result { 
     text-align: left;
     display: flex;
     flex-direction: column;
 }
-.main-result span:first-child { font-size: 0.75rem; opacity: 0.6; margin-bottom: 1px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 1.8rem; }
+.main-result span:first-child { font-size: 0.7rem; opacity: 0.5; margin-bottom: 1px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 1.6rem; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 
 .analysis-actions {
     flex: 1;
-    max-width: 180px;
+    max-width: 160px;
 }
+
+/* 🔥 [UI 업그레이드] 영상 파일 업로드 버튼 세련된 컬러 맵 배정 */
 .btn-secondary { 
-    padding: 10px 12px; 
-    background: rgba(0, 122, 255, 0.5); 
+    padding: 8px 10px; 
+    background: rgba(0, 122, 255, 0.4); 
     border-radius: 8px; 
     color: #ffffff; 
-    font-weight: bold; 
-    font-size: 0.8rem;
+    font-weight: 600; 
+    font-size: 0.75rem;
     display: inline-block; 
     cursor: pointer; 
     text-align: center; 
     width: 100%; 
-    border: 1px solid rgba(255,255,255,0.15); 
+    border: 1px solid rgba(0, 122, 255, 0.3); 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    transition: background 0.2s;
+}
+.btn-secondary:active {
+    background: rgba(0, 122, 255, 0.6);
 }
 
-/* 촬영 셔터 단추 고정 */
+/* ==========================================
+ * ⚡ [UI 업그레이드] 촬영하기/결과보기 모드 전환 버튼 디자인 패치
+ * ========================================== */
+.mode-selector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08); /* 버튼 전체를 아우르는 트렌디한 캡슐형 배경 추가 */
+    padding: 4px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: fit-content;
+    margin: 0 auto;
+}
+
+.mode-selector button { 
+    padding: 6px 16px; 
+    background: transparent; /* 평소엔 배경 없음 */
+    border: none; 
+    color: rgba(255, 255, 255, 0.6); /* 선택 안 된 글자는 살짝 흐리게 */
+    border-radius: 16px; 
+    font-size: 0.8rem; 
+    font-weight: 600;
+    cursor: pointer; 
+    transition: all 0.2s ease-in-out;
+}
+
+/* 현재 켜져 있는 활성화 탭만 선명한 하이라이트 배경 배정 */
+.mode-selector button.active { 
+    background: #007aff; 
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 122, 255, 0.4);
+}
+
+/* 촬영 모드 셔터 원형 버튼 */
 #record-btn { 
     width: 65px; 
     height: 65px; 
