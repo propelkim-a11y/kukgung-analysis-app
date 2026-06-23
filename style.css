@@ -1,5 +1,5 @@
 /* style.css
- * 슬라이딩 패널 인터랙션, 4대 텍스트 버튼 균등 분할 완성 버전
+ * 뒤로/재생/앞으로 텍스트 단추 정밀 정렬 및 슬라이딩 글래스모피즘 완성 버전
  */
 
 * { 
@@ -146,7 +146,7 @@ body {
 }
 
 /* ==========================================
- * 공용 반투명 하단 컨트롤 패널 상자 (슬라이딩 내장)
+ * 공용 반투명 하단 컨트롤 패널 상자
  * ========================================== */
 .unified-panel {
     position: absolute;
@@ -170,17 +170,15 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.06); 
     z-index: 1000; 
     
-    /* ⚡ [신설] 패널 개폐를 위한 트랜지션 효과 고정 */
     transition: transform 0.4s cubic-bezier(0.1, 0.76, 0.55, 0.94);
     will-change: transform;
 }
 
-/* ⚡ [신설] 패널이 아래로 내려가 접혔을 때 작동할 상태 클래스 정의 */
 .unified-panel.collapsed {
-    transform: translateY(calc(100% - 55px - env(safe-area-inset-bottom))); /* 공통 푸터 탭 바 영역만 남기고 완전 은폐 */
+    transform: translateY(calc(100% - 55px - env(safe-area-inset-bottom))); 
 }
 
-/* ⚡ [신설] 슬라이딩 제어용 드래그 상단 바 핸들 스펙 */
+/* 슬라이딩 제어용 드래그 상단 바 핸들 */
 .panel-drag-handle {
     width: 100%;
     height: 24px;
@@ -228,20 +226,36 @@ body {
     cursor: pointer;
 }
 
-/* 탐색 화살표 미세 단추 라인 */
+/* ⚡ [피드백 적용] 뒤로/재생/앞으로 세련된 텍스트 기반 비디오 미세 탐색 패널 디자인 */
 .video-controls {
     display: flex; 
     justify-content: center; 
     gap: 10px;
+    width: 100%;
 }
-.control-btn {
-    padding: 6px 14px; 
+
+/* 세 단추를 가로 비율 1:1:1로 자로 잰 듯 똑바르게 균등 3분할 연출 */
+.control-btn-txt {
+    flex: 1;
+    width: 33.33%;
+    padding: 8px 0; 
     background: rgba(255, 255, 255, 0.06); 
-    border: 1px solid rgba(255, 255, 255, 0.1); 
+    border: 1px solid rgba(255, 255, 255, 0.12); 
     color: #ffffff; 
     border-radius: 8px; 
-    font-size: 0.75rem; 
+    font-size: 0.8rem;
+    font-weight: 600;
     cursor: pointer;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.control-btn-txt:active {
+    background: rgba(255, 255, 255, 0.16);
+    transform: scale(0.97);
 }
 
 /* 4대 텍스트 버튼 캡슐 트랙 디자인 */
@@ -257,7 +271,7 @@ body {
     gap: 4px; 
 }
 
-/* 4개의 텍스트 단추가 완전히 동일한 픽셀 크기를 갖도록 균등 4분할 배분 정렬 */
+/* 4개의 텍스트 단추 너비 1/4 균등 할당 */
 .menu-tab-btn-txt, .menu-tab-btn-txt-reset {
     flex: 1;
     width: 25%; 
@@ -277,14 +291,12 @@ body {
     white-space: nowrap;
 }
 
-/* 현재 켜진 활성화 상태 텍스트 버튼 하이라이트 스타일 */
 .menu-tab-btn-txt.active {
     background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
-/* 초기화 단추용 리셋 액티브 상호작용 */
 .menu-tab-btn-txt-reset {
     color: rgba(255, 255, 255, 0.75); 
 }
@@ -293,7 +305,6 @@ body {
     transform: scale(0.96);
 }
 
-/* 파일 업로드 구역 캡슐 내부 고립 배분화 */
 .analysis-actions {
     flex: 1;
     width: 25%; 
@@ -302,19 +313,6 @@ body {
     align-items: center;
 }
 .menu-tab-btn-txt {
-    width: 100%;
-}
-
-/* 정밀 각도 결과 리포트 창 및 업로드 통합 패널 */
-.report-box { 
-    padding: 8px 12px; 
-    background: rgba(255, 255, 255, 0.03); 
-    border-radius: 10px; 
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     width: 100%;
 }
 
@@ -327,7 +325,6 @@ body {
     pointer-events: auto;
 }
 
-/* 촬영 모드 셔터 원형 버튼 */
 #record-btn { 
     width: 55px; 
     height: 55px; 
