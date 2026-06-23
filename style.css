@@ -1,9 +1,9 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Minimal Edition
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (덮어쓰기용 전체 파일)
  */
 
-/* 1. iOS 네이티브 브라우저 제스처 원천 차단 */
+/* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
 * {
     margin: 0;
     padding: 0;
@@ -18,12 +18,12 @@ body, html {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #000000;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    background-color: #050507; /* 아이폰 특유의 깊은 심해 블랙 */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", sans-serif;
     letter-spacing: -0.5px;
 }
 
-/* 2. 스크린 격리 및 줌/드로잉 오차 근본 원인 차단 */
+/* 2. 스크린 격리 및 제스처 빗나감 방어 (확대/선 오차 근본적 해결책) */
 .app-scene {
     position: absolute;
     top: 0;
@@ -32,15 +32,14 @@ body, html {
     height: 100%;
     display: none;
     overflow: hidden;
-    /* 💡 중요: 폰 자체의 브라우저 확대/이동 개입을 물리적으로 완전히 제로화 */
-    touch-action: none !important; 
+    touch-action: none; /* 브라우저 고유 줌 개입 차단하여 제스처 연산 완벽 격리 */
 }
 
 .app-scene.active {
     display: block;
 }
 
-/* 3. 풀스크린 컨테이너 */
+/* 3. 풀스크린 프리뷰 도화지 */
 .viewport-container {
     position: absolute;
     top: 0;
@@ -49,7 +48,7 @@ body, html {
     height: 100%;
     z-index: 1;
     overflow: hidden;
-    touch-action: none !important;
+    touch-action: none;
 }
 
 #camera-preview, #main-video {
@@ -58,10 +57,10 @@ body, html {
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* 왜곡 보존 */
+    object-fit: contain;
     transform-origin: top left;
     z-index: 2;
-    touch-action: none !important;
+    touch-action: none;
 }
 
 #draw-canvas {
@@ -72,10 +71,10 @@ body, html {
     height: 100%;
     z-index: 3;
     pointer-events: auto;
-    touch-action: none !important;
+    touch-action: none;
 }
 
-/* 4. 은은한 바둑판 그리드 및 가이드선 */
+/* 4. 은은한 바둑판 그리드 및 시인성 높은 십자 가이드 */
 .background-grid-layer {
     position: absolute;
     top: 0;
@@ -97,6 +96,7 @@ body, html {
     height: 100%;
     border-left: 1px dashed rgba(255, 255, 255, 0.15);
     position: absolute;
+    pointer-events: none;
     z-index: 1;
 }
 
@@ -107,45 +107,45 @@ body, html {
     width: 100%;
     border-top: 1px dashed rgba(255, 255, 255, 0.15);
     position: absolute;
+    pointer-events: none;
     z-index: 1;
 }
 
-/* 5. 실시간 수평계 자이로 가이드 UI 및 텍스트 뱃지 */
+/* 5. 💡 초정밀 실물 수평기 자이로 UI 및 실시간 각도 숫자 매핑 */
 #gyro-horizon-line {
     position: absolute;
     top: 50%;
     left: 5%;
     width: 90%;
     height: 1px;
-    background-color: rgba(255, 59, 48, 0.8);
+    background-color: rgba(255, 59, 48, 0.8); /* iOS 오렌지-레드 경고색 */
     transform-origin: center;
     z-index: 4;
     pointer-events: none;
+    transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
 }
 
 #gyro-horizon-line.perfect-level {
     height: 2px;
-    background-color: #34C759;
+    background-color: #34C759; /* iOS 세련된 그린 */
     box-shadow: 0 0 14px rgba(52, 199, 89, 0.8);
 }
 
-.gyro-angle-report {
+/* 수평선 중앙 위에 실시간 수치 각도를 띄우는 가상 선택자 설계 */
+#gyro-horizon-line::after {
+    content: attr(data-angle); /* js에서 업데이트하는 각도 텍스트를 실시간 투사 */
     position: absolute;
-    top: 24px;
-    right: 24px;
-    font-size: 20px;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
     font-weight: 700;
-    color: #FF3B30;
-    text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.8);
-    z-index: 10;
-    font-variant-numeric: tabular-nums;
+    color: #FFFFFF;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    font-family: -apple-system, sans-serif;
 }
 
-.gyro-angle-report.perfect-level {
-    color: #34C759;
-}
-
-/* 6. 좌측 상단 분석 각도 리포트 */
+/* 6. 좌측 상단 초미니멀 플로팅 각도 리포트 */
 .floating-report {
     position: absolute;
     top: calc(24px + env(safe-area-inset-top));
@@ -156,25 +156,36 @@ body, html {
     text-shadow: 0px 4px 12px rgba(0, 0, 0, 0.9);
     z-index: 10;
     font-variant-numeric: tabular-nums;
+    font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 💡 요구사항 반영: 완전 투명(無백그라운드) 하단 컨트롤러 탭박스 */
+/* 7. 💡 터치 시 완전 투명해지며 아래로 부드럽게 완전 은닉 슬라이딩 개폐 패널 */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 33.333vh;
-    background: transparent; /* 덮어씌우는 면적 완전 투명 처리 */
-    border-top: none;
-    box-shadow: none;
+    background: rgba(15, 15, 20, 0.4); /* 완전 투명화 지향 베이스 아키텍처 */
+    backdrop-filter: blur(35px) saturate(210%);
+    -webkit-backdrop-filter: blur(35px) saturate(210%);
+    border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4);
     z-index: 20;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    /* iOS 순정 애니메이션 가속 속도 정렬 */
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s, backdrop-filter 0.4s;
     padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* 물리 핸들바 터치 접지 상태(collapsed) 시 패널 내부 기재 및 블러/배경을 완전 투명 은닉 */
 .unified-panel-box.collapsed {
-    transform: translateY(calc(100% - 34px)); /* 터치 시 아래로 슥 접힘 */
+    transform: translateY(calc(100% - 34px));
+    background: rgba(0, 0, 0, 0.0) !important;
+    backdrop-filter: blur(0px) saturate(100%) !important;
+    -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
+    border-top-color: transparent;
+    box-shadow: none;
 }
 
 .panel-slider-handle {
@@ -189,9 +200,8 @@ body, html {
 .handle-bar {
     width: 38px;
     height: 5px;
-    background-color: rgba(255, 255, 255, 0.45);
+    background-color: rgba(255, 255, 255, 0.25);
     border-radius: 3px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 
 .panel-content-wrapper {
@@ -202,13 +212,11 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 8. 메뉴 바 (완전 투명 환경 안착 룩) */
+/* 8. 4대 텍스트 메뉴 균등 배분 (iOS 세그먼트 컨트롤 룩) */
 .text-menu-bar {
     display: flex;
     width: 100%;
-    background-color: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.06);
     padding: 3px;
     border-radius: 13px;
 }
@@ -218,16 +226,16 @@ body, html {
     height: 38px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.5);
     font-size: 14px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .menu-btn.active {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
 }
@@ -243,7 +251,7 @@ body, html {
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 2px;
     outline: none;
 }
@@ -255,11 +263,11 @@ body, html {
     height: 14px;
     border-radius: 50%;
     background: #FFFFFF;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     cursor: pointer;
 }
 
-/* 10. 💡 요구사항 반영: 괄호 [] 가 전면 거세된 텍스트 컨트롤 버튼 */
+/* 10. 고급스러운 순정 서체 패밀리 룩 컨트롤러 */
 .video-control-bar {
     display: flex;
     justify-content: center;
@@ -268,30 +276,27 @@ body, html {
 }
 
 .control-btn {
-    background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    background: none;
     border: none;
-    color: #FFFFFF;
+    color: rgba(255, 255, 255, 0.85);
     font-size: 14px;
     font-weight: 600;
-    border-radius: 8px;
+    letter-spacing: -0.2px;
     cursor: pointer;
-    padding: 8px 18px;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    padding: 8px 16px;
+    transition: color 0.2s;
 }
 
 .control-btn:active {
     color: #34C759;
 }
 
-/* 11. 촬영 셔터 단추 단원화 */
+/* 11. 촬영 전용 UI 및 하이엔드 아이폰 녹화 셔터 단추 */
 .status-text {
-    color: #FFFFFF;
+    color: rgba(255, 255, 255, 0.6);
     font-size: 13px;
     text-align: center;
-    font-weight: 600;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    font-weight: 500;
 }
 
 .control-row-center {
@@ -302,35 +307,45 @@ body, html {
 }
 
 .action-btn-main {
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border: 2px solid #FFFFFF;
+    background: transparent;
+    border: 3px solid #FFFFFF;
     color: #FFFFFF;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
-    padding: 10px 32px;
+    padding: 10px 28px;
     border-radius: 22px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .action-btn-main.recording {
-    background: #FF3B30;
+    background: #FF3B30; /* iOS 완전 강렬한 레드 오버레이 */
     border-color: #FF3B30;
-    box-shadow: 0 0 15px rgba(255, 59, 48, 0.6);
+    color: #FFFFFF;
+    box-shadow: 0 0 20px rgba(255, 59, 48, 0.5);
+    animation: pulseGlow 1.5s infinite alternate;
 }
 
+/* 모던 에어드롭 스타일 스위칭 단추 */
 .switch-btn {
     width: 100%;
     height: 40px;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border: 0.5px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s;
+}
+
+.switch-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes pulseGlow {
+    from { transform: scale(1); }
+    to { transform: scale(1.04); }
 }
