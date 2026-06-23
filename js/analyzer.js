@@ -1,6 +1,6 @@
 /**
  * analyzer.js
- * 스타일러스 펜(S펜, 애플펜슬) 최적화, 정밀 격자 그리드 및 렉 제거 다중 분석 엔진
+ * 스타일러스 펜(S펜, 애플펜슬) 최적화, 피치 줌 고정 수리, 정밀 격자 그리드 및 렉 제거 다중 분석 엔진
  */
 
 export class BowAnalyzer {
@@ -20,13 +20,14 @@ export class BowAnalyzer {
         this.lastTouchDist = 0; 
         this.toolMode = 'draw'; 
         
-        // 스타일러스 펜 인식을 위한 포인터 상태 추적 맵
+        // 스타일러스 펜 및 멀티 터치 인식을 위한 포인터 상태 추적 맵
         this.activePointers = new Map();
     }
 
     init() {
         if (!this.canvas || !this.ctx) return;
 
+        // 중복 등록 방지를 위해 기존 이벤트 완벽 제거 후 단 1회 재등록
         this.canvas.removeEventListener('pointerdown', this.boundHandlePointerDown);
         this.canvas.removeEventListener('pointermove', this.boundHandlePointerMove);
         this.canvas.removeEventListener('pointerup', this.boundHandlePointerUp);
@@ -72,9 +73,11 @@ export class BowAnalyzer {
 
         const pointerType = e.pointerType; 
         
+        // ⚡ [피치 줌 버그 수리] 손가락 2개가 화면에 닿았을 때, 캔버스 내부 해상도가 아닌 물리 화면 픽셀 거리로 직접 타겟팅
         if (this.activePointers.size === 2) {
+            this.isDragging = false; // 줌 동작 중 화면 밀림 드래그 강제 중단
             const pointers = Array.from(this.activePointers.values());
-            this.lastTouchDist = this.getPointerDistance(pointers, pointers);
+            this.lastTouchDist = this.getPointerDistance(pointers[0], pointers[1]);
             return;
         }
 
@@ -105,16 +108,20 @@ export class BowAnalyzer {
         if (!this.activePointers.has(e.pointerId)) return;
         this.activePointers.set(e.pointerId, e); 
 
+        // ⚡ [피치 줌 버그 수리] 실시간으로 움직이는 두 포인터의 화면 기준 물리 거리를 계산하여 동적 스케일 조절
         if (this.activePointers.size === 2 && this.lastTouchDist > 0) {
             const pointers = Array.from(this.activePointers.values());
-            const dist = this.getPointerDistance(pointers, pointers);
+            const dist = this.getPointerDistance(pointers[0], pointers[1]);
             const factor = dist / this.lastTouchDist;
+            
+            // 배율이 부드럽게 연속적으로 변하도록 보정하면서 최소 1배 ~ 최대 5배율 락킹
             this.scale = Math.min(5.0, Math.max(1.0, this.scale * factor)); 
             this.lastTouchDist = dist;
             this.draw();
             return;
         }
 
+        // 화면 이동 제어 (확대 상태에서 밀어서 이동)
         if (this.isDragging) {
             this.offsetX = e.clientX - this.startX;
             this.offsetY = e.clientY - this.startY;
@@ -134,13 +141,14 @@ export class BowAnalyzer {
         e.preventDefault();
         const zoomFactor = 1.1;
         if (e.deltaY < 0) {
-            this.scale = Math.min(5.0, Math.scale * zoomFactor || this.scale * zoomFactor);
+            this.scale = Math.min(5.0, this.scale * zoomFactor);
         } else {
             this.scale = Math.max(1.0, this.scale / zoomFactor);
         }
         this.draw();
     }
 
+    // ⚡ 물리 화면 픽셀 좌표(clientX, clientY)를 다이렉트로 대입해 두 점 사이의 거리를 계산하는 정밀 공식
     getPointerDistance(p1, p2) {
         return Math.sqrt(Math.pow(p2.clientX - p1.clientX, 2) + Math.pow(p2.clientY - p1.clientY, 2));
     }
@@ -173,25 +181,23 @@ export class BowAnalyzer {
             this.ctx.drawImage(v, drawX, drawY, drawW, drawH);
         }
 
-        // ⚡ 2. [신설] 척추선 및 화살 수평 상태 계측용 '바둑판 정밀 격자 그리드(Grid)' 엔진 기동
+        // 2. 바둑판 정밀 격자 그리드(Grid) 제도
         this.ctx.lineWidth = 1.0 / this.scale;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // 방해되지 않는 은은한 그리드선
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; 
         
-        // 가로선 촘촘하게 제도 (50픽셀 간격 바둑판)
         const gridSize = 50;
         this.ctx.beginPath();
         for (let y = 0; y < this.canvas.height; y += gridSize) {
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(this.canvas.width, y);
         }
-        // 세로선 촘촘하게 제도
         for (let x = 0; x < this.canvas.width; x += gridSize) {
             this.ctx.moveTo(x, 0);
             this.ctx.lineTo(x, this.canvas.height);
         }
         this.ctx.stroke();
 
-        // 3. 상시 고정 센터 십자 기준선 투사 (그리드보다 조금 더 진하게 연출)
+        // 3. 상시 고정 센터 십자 기준선 투사
         this.ctx.lineWidth = 1.5 / this.scale;
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; 
         this.ctx.setLineDash([8 / this.scale, 8 / this.scale]); 
