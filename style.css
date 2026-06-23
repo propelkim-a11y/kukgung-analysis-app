@@ -1,5 +1,5 @@
 /* style.css
- * 컨트롤 패널 구조 대통합 및 하이엔드 투명 캡슐 모드 디자인 버전
+ * 컨트롤 패널 완전 일체화, 녹화 버튼 상단 이동 및 하단 탭 위치 완벽 동기화 버전
  */
 
 * { 
@@ -80,11 +80,11 @@ body {
 }
 
 /* ==========================================
- * ⚡ 비디오 원본 도화지 영역 (화면 전체 100% 매핑 확장)
+ * 비디오 원본 도화지 영역 (화면 전체 100% 매핑 확장)
  * ========================================== */
 .canvas-container { 
     width: 100%; 
-    height: 100dvh; /* ⚡ [핵심 패치] 여백이나 단절 현상 없애기 위해 화면 전체 바닥까지 채움 */
+    height: 100dvh; 
     position: absolute;
     top: 0;
     left: 0;
@@ -100,7 +100,7 @@ body {
 #output-canvas {
     width: 100%;
     height: 100%;
-    object-fit: contain; /* 동영상 고유 비율 손상 없이 유지 보존 */
+    object-fit: contain; 
 }
 
 #drawing-canvas {
@@ -119,44 +119,44 @@ body {
 }
 
 /* ==========================================
- * ⚡ [대통합 패치] 완전 투명 기동 통합 제어 센터 패널
+ * ⚡ [대통합 패치] 단 하나의 공용 반투명 하단 컨트롤 패널 상자
  * ========================================== */
 .unified-panel {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
-    /* 화면 하단 높이를 1/3 수준으로 스마트하게 락킹 조정 */
+    /* 촬영과 결과보기의 고정된 크기 일체화를 위해 높이를 동적 가변형식으로 일치 */
     height: auto; 
-    min-height: 150px;
+    min-height: 160px;
     max-height: 35dvh; 
     
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    /* 스마트폰 노치 및 시스템 홈 바 여백 통합 반영 */
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) 16px; 
+    align-items: center;
+    /* 패널 내부 간격 및 모바일 네비게이션 여백 완전 동기화 */
+    padding: 12px 16px calc(15px + env(safe-area-inset-bottom)) 16px; 
     
-    /* 🔥 [초투명 처리] 불투명 수치를 rgba 0.12로 최소 극대화하여 투명하게 변경 */
     background: rgba(0, 0, 0, 0.12) !important; 
     backdrop-filter: blur(16px) !important; 
     -webkit-backdrop-filter: blur(16px) !important;
     
     border-top: 1px solid rgba(255, 255, 255, 0.06); 
-    z-index: 1000; /* 캔버스들보다 가장 높은 무조건 위 우선순위 배정 */
+    z-index: 1000; 
 }
 
-/* 내부 동적 컴포넌트 묶음 블록 */
+/* 내부 동적 컴포넌트 묶음 블록 (분석용) */
 .panel-inner-block {
     display: flex;
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    margin-bottom: 8px;
+    margin-bottom: 10px; /* 공통 푸터 탭 바와의 정밀 여백 확보 */
     pointer-events: auto;
 }
 
-/* 🛠️ [신설] 선 긋기 모드 스위칭 탭 바 메뉴 인터페이스 */
+/* 선 긋기 모드 스위칭 탭 바 */
 .menu-tab-bar {
     display: flex;
     background: rgba(0, 0, 0, 0.3);
@@ -275,14 +275,41 @@ body {
     border: 1px solid rgba(0, 122, 255, 0.2); 
 }
 
+/* ⚡ [위치 패치] 촬영 모드의 녹화 버튼 구역을 하단 탭 버튼 상단으로 수직 정렬 유도 */
+.action-zone {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 15px; /* 하단 전환 탭 바 위쪽에 자연스럽게 안착하도록 여백 부여 */
+    pointer-events: auto;
+}
+
+/* 촬영 모드 셔터 원형 버튼 */
+#record-btn { 
+    width: 58px; 
+    height: 58px; 
+    flex-shrink: 0; 
+    border-radius: 50%; 
+    border: 4px solid #ffffff; 
+    background: rgba(255, 255, 255, 0.2); 
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    transition: all 0.2s;
+}
+#record-btn.recording { 
+    border-radius: 12px; 
+    background: #ff4d4d; 
+    width: 48px;
+    height: 48px;
+}
+
 /* ==========================================
- * ⚡ 공통 및 촬영 전용 컨트롤 플로어 영역 (대통합 정비)
+ * ⚡ 공통 하단 전환 탭 스위치 구역 (크기 및 위치 단 1픽셀도 무조건 고정 일치)
  * ========================================== */
 .panel-global-footer {
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    gap: 10px;
     width: 100%;
     pointer-events: auto;
 }
@@ -310,28 +337,6 @@ body {
     background: #007aff; 
     color: #ffffff;
     box-shadow: 0 1px 5px rgba(0, 122, 255, 0.3);
-}
-
-.action-zone {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-}
-#record-btn { 
-    width: 55px; 
-    height: 55px; 
-    flex-shrink: 0; 
-    border-radius: 50%; 
-    border: 4px solid #ffffff; 
-    background: rgba(255, 255, 255, 0.2); 
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-}
-#record-btn.recording { 
-    border-radius: 12px; 
-    background: #ff4d4d; 
-    width: 45px;
-    height: 45px;
 }
 
 .hidden { display: none !important; }
