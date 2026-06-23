@@ -1,7 +1,3 @@
-/* style.css
- * PC/모바일 하이브리드 대응 및 겹침 버그 차단 완벽 고정 버전
- */
-
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -40,14 +36,20 @@ body {
     z-index: 1; 
 }
 
+.video-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
 #video-preview, #output-canvas { 
     width: 100%; 
     height: 100%; 
-    object-fit: contain; 
+    object-fit: cover; /* ⚡ 폰 전체 화면을 빈틈없이 꽉 채우도록 설정 */
     background: #000000;
 }
 
-/* 상단 투명 헤더 영역 (촬영 모드용) */
+/* 촬영 모드 전용 상단 헤더 */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -58,10 +60,12 @@ body {
     width: 100%;
     pointer-events: none; 
 }
+#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
+#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* ⚡ 하단 푸터 제어 영역 (반투명 글래스모피즘 가독성 팩) */
+/* 촬영 모드 전용 하단 푸터 */
 .footer { 
-    background: rgba(0, 0, 0, 0.4); 
+    background: rgba(0, 0, 0, 0.3); 
     padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
     display: flex; 
     flex-direction: column; 
@@ -71,165 +75,195 @@ body {
     position: absolute;
     bottom: 0;
     width: 100%;
-    pointer-events: none; 
-    backdrop-filter: blur(10px); 
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(8px); 
+    -webkit-backdrop-filter: blur(8px);
 }
-
-.mode-selector, .action-zone {
-    pointer-events: auto;
+.mode-selector {
     display: flex;
     justify-content: center;
-    align-items: center;
+    gap: 10px;
     width: 100%;
 }
-
-#status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
-#angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
-
-/* 촬영용 기기 실시간 수평계 */
-.level-container { 
-    position: absolute; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); 
-    pointer-events: none; 
-    z-index: 2; 
+.mode-selector button { 
+    padding: 8px 18px; 
+    background: rgba(255, 255, 255, 0.15); 
+    border: 1px solid rgba(255, 255, 255, 0.1); 
+    color: #ffffff; 
+    border-radius: 20px; 
+    cursor: pointer; 
+    font-size: 0.9rem;
+    backdrop-filter: blur(5px);
 }
+.mode-selector button.active { 
+    background: #007aff; 
+    font-weight: bold;
+    border-color: #007aff;
+}
+
+#record-btn { 
+    width: 65px; height: 65px; flex-shrink: 0; border-radius: 50%; border: 4px solid #ffffff; 
+    background: rgba(255, 255, 255, 0.2); transition: all 0.2s ease-in-out; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+#record-btn.recording { border-radius: 12px; background: #ff4d4d; width: 55px; height: 55px; animation: pulse 1.5s infinite; }
+
+/* 촬영 수평계 */
+.level-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; }
 .center-target { width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
-.level-line { 
-    width: 220px; height: 2px; 
-    background-color: #ff4d4d; 
-    position: absolute; left: -110px; 
-    transition: transform 0.05s linear, background-color 0.3s; 
-}
+.level-line { width: 220px; height: 2px; background-color: #ff4d4d; position: absolute; left: -110px; transition: transform 0.05s linear, background-color 0.3s; }
 
-/* ⚡ 분석 전용 독립 섹션 (촬영 텍스트와 겹침 원천 제거) */
+/* ----------------------------------------------------
+ * 🏹 [개편] 분석 모드 전용 완전 투명 풀스크린 UI 스펙
+ * ---------------------------------------------------- */
 #analysis-section { 
-    z-index: 500; 
+    z-index: 200; /* 촬영 수평 바가 가려지도록 격상 */
     background: #000000;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: calc(85px + env(safe-area-inset-bottom)); 
 }
 
 .canvas-container { 
     width: 100%; 
-    flex: 1; 
-    position: relative; 
-    overflow: hidden; 
-    touch-action: none;
+    height: 100%; 
+    position: absolute; 
+    top: 0; 
+    left: 0;
 }
 
 #drawing-canvas {
     position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    z-index: 10;
     pointer-events: auto;
 }
 
-#manual-analysis-box canvas {
-    image-rendering: -webkit-optimize-contrast; 
-    image-rendering: crisp-edges;
+/* ⚡ 지워지지 않는 기본 탑재형 십자 수직/수평 기준선 */
+.crosshair-guide {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+.guide-v {
+    position: absolute; left: 50%; top: 0;
+    width: 1px; height: 100%;
+    background: rgba(255, 255, 255, 0.25); /* 은은한 백색 점선 스타일 유도 */
+    border-left: 1px dashed rgba(255, 255, 255, 0.3);
+}
+.guide-h {
+    position: absolute; top: 50%; left: 0;
+    width: 100%; height: 1px;
+    background: rgba(255, 255, 255, 0.25);
+    border-top: 1px dashed rgba(255, 255, 255, 0.3);
 }
 
-/* 분석 모드용 우측 도구 바 */
-.tool-bar { 
-    position: absolute; 
-    top: 20px; 
-    right: 15px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-    z-index: 600; 
+/* ⚡ 분석 인터페이스 통합 제어 오버레이 박스 */
+.analysis-ui-wrapper {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    z-index: 30;
+    padding: 10px 15px calc(15px + env(safe-area-inset-bottom)) 15px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.4) 80%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
 }
-.tool-btn { 
-    padding: 10px 15px; 
-    background: rgba(0,0,0,0.6); 
-    border: 1px solid rgba(255,255,255,0.2); 
-    color: #ffffff; 
-    border-radius: 10px; 
-    font-size: 0.9rem; 
-    backdrop-filter: blur(5px); 
+.analysis-ui-wrapper * { pointer-events: auto; }
+
+/* 타임라인 슬라이더 */
+.timeline-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+}
+#video-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
     cursor: pointer;
 }
-.angle-badge {
-    padding: 10px; 
-    background: rgba(0,0,0,0.6); 
-    border-radius: 10px; 
-    font-size: 0.8rem; 
-    text-align: center; 
-    max-width: 200px;
+#video-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #007aff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    cursor: pointer;
 }
 
-/* 비디오 탐색 컨트롤러 (-0.1s / ▶️ / +0.1s) */
+/* 재생 및 탐색 버튼 바 */
 .video-controls {
-    display: flex; 
-    justify-content: center; 
-    gap: 15px; 
-    margin: 15px 0 5px 0; 
-    z-index: 600;
-    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
 }
 .control-btn {
-    padding: 10px 15px; 
-    background: rgba(255, 255, 255, 0.15); 
-    border: 1px solid rgba(255, 255, 255, 0.2); 
-    color: #ffffff; 
-    border-radius: 10px; 
-    backdrop-filter: blur(10px); 
-    font-size: 0.9rem; 
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-radius: 10px;
+    font-size: 0.85rem;
     cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: background 0.2s;
 }
+.control-btn:active { background: rgba(255, 255, 255, 0.3); }
 
-/* 정밀 각도 결과 리포트 박스 */
-.report-box { 
-    padding: 15px; 
-    background: rgba(255, 255, 255, 0.08); 
-    border-radius: 15px; 
-    margin: 0 15px; 
-    backdrop-filter: blur(15px);
+/* 하단 결과 및 기능 통합 카드 박스 */
+.analysis-footer-box {
+    background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 600;
-    pointer-events: auto;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 12px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
 }
-.main-result { text-align: center; }
-.main-result span:first-child { display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 2px; }
-.highlight { font-weight: bold; color: #00e676; font-size: 2.2rem; display: block; }
+.report-main { text-align: center; }
+.report-title { display: block; font-size: 0.8rem; opacity: 0.6; margin-bottom: 2px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 2rem; display: block; line-height: 1.2; }
+.angle-badge { font-size: 0.75rem; opacity: 0.5; margin-top: 2px; }
 
-/* 모드 전환 상단 토글 링크 버튼 */
-.mode-selector button { 
-    padding: 10px 20px; 
-    background: rgba(255,255,255,0.1); 
-    border: none; 
-    color: #ffffff; 
-    border-radius: 25px; 
-    margin: 0 5px; 
-    cursor: pointer; 
+/* 하단 내부에 배치한 기능 액션 버튼 존 (초기화 & 업로드) */
+.analysis-action-buttons {
+    display: flex;
+    gap: 10px;
+    width: 100%;
 }
-.mode-selector button.active { background: #007aff; }
-
-/* ⚡ 촬영 단추 (기기가 눌러도 모양 찌그러짐 차단 패치) */
-#record-btn { 
-    width: 65px; 
-    height: 65px; 
-    flex-shrink: 0; 
-    border-radius: 50%; 
-    border: 4px solid #ffffff; 
-    background: rgba(255, 255, 255, 0.2); 
-    transition: all 0.2s ease-in-out; 
+.action-sub-btn {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-align: center;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
-#record-btn.recording { 
-    border-radius: 12px; 
-    background: #ff4d4d; 
-    width: 55px;
-    height: 55px;
-    animation: pulse 1.5s infinite; 
+.action-sub-btn:active { background: rgba(255, 255, 255, 0.25); }
+.upload-theme {
+    background: rgba(0, 122, 255, 0.25);
+    border-color: rgba(0, 122, 255, 0.4);
 }
+.upload-theme:active { background: rgba(0, 122, 255, 0.4); }
+
+.hidden { display: none !important; }
+.text-center { text-align: center; }
 
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
@@ -237,15 +271,7 @@ body {
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
 }
 
-.hidden { display: none !important; }
-.btn-secondary { padding: 12px 25px; background: rgba(255,255,255,0.2); border-radius: 10px; color: #ffffff; font-weight: bold; display: inline-block; cursor: pointer; }
-
-/* 기기 최초 진입 권한 허용 팝업 */
-.overlay { 
-    position: fixed; top:0; left:0; width:100%; height:100%; 
-    background:#000000; z-index:1000; display:flex; justify-content:center; align-items:center; 
-}
+.overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000000; z-index:1000; display:flex; justify-content:center; align-items:center; }
 .overlay-content { text-align: center; padding: 20px; background: #222222; border-radius: 20px; border: 1px solid #444444; max-width: 90%; width: 320px; }
 .overlay-content h2 { margin-bottom: 15px; }
 .overlay-content p { font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px; }
-#btn-permission { padding: 15px 30px; background: #007aff; color:#ffffff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
