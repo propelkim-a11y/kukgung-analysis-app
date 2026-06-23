@@ -16,7 +16,7 @@
         <div class="viewport-container">
             <!-- 실시간 자이로 연동 물리 수평 가이드선 및 각도 표기용 앵커 -->
             <div id="gyro-horizon-line" data-angle="0.0°"></div>
-            <!-- 상시 중앙 가이드 십자선 -->
+            <!-- 상시 중앙 가이드 십자선 (촬영 정렬용 유지) -->
             <div class="center-crosshair-v"></div>
             <div class="center-crosshair-h"></div>
             
@@ -30,7 +30,7 @@
             <div class="panel-slider-handle-placeholder"></div>
 
             <div class="panel-content-wrapper">
-                <!-- 💡 [핵심 교정] 분석 화면의 4대 버튼 바 높이를 정확히 상쇄하여 수직 레이아웃을 고정하는 숨김 스페이서 -->
+                <!-- 분석 화면의 4대 버튼 메뉴 바 높이를 정확히 상쇄하여 수직 레이아웃을 고정하는 숨김 스페이서 -->
                 <div class="apple-layout-sync-spacer"></div>
 
                 <!-- 촬영 상태 표시 및 안내 -->
@@ -62,9 +62,7 @@
             <!-- 스타일러스 수동 선긋기 조준선 캔버스 -->
             <canvas id="draw-canvas"></canvas>
 
-            <!-- 상시 중앙 가이드 십자선 -->
-            <div class="center-crosshair-v"></div>
-            <div class="center-crosshair-h"></div>
+            <!-- 💡 교정: 분석 화면 내부에 고정되어 시야를 방해하던 수평·수직 중앙 점선 레이어 완전 삭제 -->
 
             <!-- 애플 스타일 순정 타이포그래피 리포트 배치 -->
             <div id="angle-report" class="floating-report">ANGLE 0.0°</div>
