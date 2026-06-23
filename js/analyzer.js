@@ -3,7 +3,7 @@
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - S펜 / 애플펜슬 Palm Rejection 및 포인터 분리
  * - 줌/이동 변환 행렬 역산 (확대 상태에서도 정확한 조준점 매핑)
- * - [디자인 시스템 패치] 선의 두께는 얇게 유지하되, 다크 모드 시인성을 확보한 투명 블루 그리드 사출
+ * - [디자인 시스템 패치] 애플 순정 인디고 블루(Indigo Blue) 정밀 그리드 이식 완료
  */
 
 class BowAnalyzer {
@@ -174,17 +174,17 @@ class BowAnalyzer {
 
     /**
      * 💡 [디자인 시스템 피드백 보정] 
-     * 선의 굵기(0.75px)는 얇게 유지하여 화면 왜곡을 방지하되,
-     * 다크 블랙 배경 위에서 은은하고 세련되게 검출되는 애플 시그니처 딤 화이트 컬러 매핑
+     * 미니멀한 두께(0.75px)를 고수하여 정밀 분석 시야를 완전히 확보하되,
+     * 영상 뒤편에서 이질감 없이 스포티하게 조화를 이루는 애플 고유의 인디고 블루 가이드 매핑
      */
     drawBackgroundGrid(scaleX, scaleY) {
         this.ctx.save();
         
-        // 굵기는 아주 얇게 유지 (0.75px)
+        // 정갈한 나노 단위 굵기 유지
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         
-        // 💡 기존의 너무 낮았던 투명도(0.04)를 선명한 딤 화이트(0.14)로 조정하여 시인성 원천 확보
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'; 
+        // 💡 애플 시그니처 테크니컬 인디고 블루 색상 및 최적화 투명도 주입
+        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.25)'; 
 
         const gridSize = 50; // 50px 물리 규격 고정
         
@@ -223,7 +223,7 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        // 1단계: 동영상 위에 연동되는 50px 정밀 격자선 직접 렌더링
+        // 1단계: 동영상 위에 연동되는 50px 인디고 블루 격자선 렌더링
         this.drawBackgroundGrid(scaleX, scaleY);
 
         // 2단계: 기 확정된 조준선 그리기
