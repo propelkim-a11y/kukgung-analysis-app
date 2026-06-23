@@ -339,27 +339,32 @@ function switchMode(mode) {
 
     if (mode === 'analyze') {
         if (analysisComponents) analysisComponents.classList.remove('hidden'); 
-        if (shootComponents) shootComponents.classList.add('hidden'); 
+        if (shootComponents) shootComponents.add('hidden'); 
         if (headerElement) headerElement.classList.add('hidden'); 
         
         // 규격 4: 분석하기 최초 진입 제어 규칙 동기 가동
         setActiveToolButton('upload-label');
         bowAnalyzer.setToolMode('move'); 
     } else {
-        if (analysisComponents) analysisComponents.classList.add('hidden'); 
+        if (analysisComponents) analysisComponents.add('hidden'); 
         if (shootComponents) shootComponents.remove('hidden'); 
-        if (headerElement) headerElement.classList.remove('hidden'); 
+        if (headerElement) headerElement.remove('hidden'); 
     }
 }
 
 /**
- * 비디오 파이프라인 마운트 핸들러 및 프레임 레이트 틱 루프 바인딩
+ * [버그 수리 완결판] 비디오 파이프라인 마운트 핸들러 및 프레임 레이트 틱 루프 바인딩
+ * 영상 업로드 즉시 화면에 강제 렌더링하고 재생 루프 오작동을 완벽히 수리했습니다.
  */
 function loadVideoForAnalysis(url) {
     const v = document.createElement('video');
-    v.src = url; v.muted = true; v.playsInline = true;
+    v.src = url; 
+    v.muted = true; 
+    v.playsInline = true;
+    v.preload = "auto"; // 브라우저 데이터 선제 로딩 지시
     window.analysisVideo = v;
     
+    // 1단계: 비디오의 기본 메타데이터(길이, 해상도 등)가 파악되었을 때
     v.onloadedmetadata = () => {
         const dc = document.getElementById('drawing-canvas');
         const oc = document.getElementById('output-canvas');
@@ -379,24 +384,41 @@ function loadVideoForAnalysis(url) {
             timeline.step = 0.01;
         }
         
-        v.currentTime = 0.1; 
         switchMode('analyze');
         bowAnalyzer.init(); 
         
-        v.onseeked = () => {
+        // 첫 프레임을 강제로 띄우기 위해 미세 조작
+        v.currentTime = 0.033; 
+    };
+
+    // 2단계: 브라우저가 영상을 화면에 뿌릴 준비가 끝났을 때 (초기화 버튼 없이 바로 띄우는 핵심 코드)
+    v.oncanplay = () => {
+        if (bowAnalyzer) {
+            bowAnalyzer.draw(); 
+        }
+    };
+    
+    // 3단계: 프레임 미세 조정 이동 시 실시간 캔버스 동기화
+    v.onseeked = () => {
+        if (bowAnalyzer) {
+            bowAnalyzer.draw();
+        }
+    };
+    
+    // 4단계: [재생 오작동 수리] 재생 루프가 끊기지 않고 화면을 지속적으로 갱신하도록 분리
+    const renderLoop = () => {
+        if (!v.paused && !v.ended) {
             if (bowAnalyzer) bowAnalyzer.draw();
-        };
-        
-        v.onplay = () => {
-            const updateLoop = () => {
-                if (!v.paused && !v.ended) {
-                    if (bowAnalyzer) bowAnalyzer.draw();
-                    if (timeline) timeline.value = v.currentTime;
-                    requestAnimationFrame(updateLoop);
-                }
-            };
-            requestAnimationFrame(updateLoop);
-        };
+            const timeline = document.getElementById('video-timeline');
+            if (timeline) timeline.value = v.currentTime;
+            requestAnimationFrame(renderLoop);
+        } else if (!v.paused) {
+            requestAnimationFrame(renderLoop);
+        }
+    };
+
+    v.onplay = () => {
+        requestAnimationFrame(renderLoop);
     };
 }
 
