@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 및 투명화 적용 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 패치 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -56,7 +56,7 @@ body, html {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    transform-origin: top left;
+    transform-origin: center center;
     z-index: 2;
 }
 
@@ -139,11 +139,11 @@ body, html {
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
 
-/* 6. 좌측 상단 플로팅 각도 리포트 (SF 모던 서체 적용) */
+/* 6. 우측 상단 플로팅 각도 리포트 (SF 모던 서체 적용) */
 .floating-report {
     position: absolute;
     top: calc(24px + env(safe-area-inset-top));
-    left: 24px;
+    right: 24px;
     font-size: 20px;
     font-weight: 700;
     color: #34C759;
@@ -153,31 +153,50 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 터치 시 아래로 부드럽게 완전 은닉 슬라이딩 개폐 패널 */
+/* 7. 대통합 개폐 패널 공통 구조 */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 33.333vh;
+    z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* [분석 화면 패널 스타일] */
+#scene-analyze .unified-panel-box {
     background: rgba(15, 15, 20, 0.45);
     backdrop-filter: blur(35px) saturate(210%);
     -webkit-backdrop-filter: blur(35px) saturate(210%);
     border-top: 0.5px solid rgba(255, 255, 255, 0.12);
     border-radius: 28px 28px 0 0;
     box-shadow: 0 -15px 45px rgba(0, 0, 0, 0.4);
-    z-index: 20;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s, backdrop-filter 0.3s;
-    padding-bottom: env(safe-area-inset-bottom);
 }
 
-.unified-panel-box.collapsed {
+#scene-analyze .unified-panel-box.collapsed {
     transform: translateY(calc(100% - 34px));
     background: rgba(0, 0, 0, 0.0) !important;
     backdrop-filter: blur(0px) saturate(100%) !important;
     -webkit-backdrop-filter: blur(0px) saturate(100%) !important;
     border-top-color: transparent;
     box-shadow: none;
+}
+
+/* [교정 2] 촬영 화면 패널 투명화 처리 */
+#scene-record .unified-panel-box {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* 촬영용 더미 패널 핸들 공간 확보 (레이아웃 싱크용) */
+#scene-record .panel-slider-handle {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .panel-slider-handle {
@@ -204,25 +223,36 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 8. 4대 텍스트 메뉴 균등 배분 */
-.text-menu-bar {
+/* 8. 4대 텍스트 메뉴 정렬 및 [교정 1] 촬영 화면용 싱크 바 */
+.text-menu-bar, .text-menu-bar-sync {
     display: flex;
     width: 100%;
-    background-color: rgba(255, 255, 255, 0.06);
     padding: 3px;
     border-radius: 13px;
 }
 
-.menu-btn {
+.text-menu-bar {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.text-menu-bar-sync {
+    background-color: transparent; /* 촬영 패널 투명화 연동 */
+}
+
+.menu-btn, .menu-btn-sync {
     flex: 1;
     height: 38px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
     font-size: 14px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
+    text-align: center;
+}
+
+.menu-btn {
+    color: rgba(255, 255, 255, 0.5);
     transition: all 0.2s ease;
 }
 
@@ -230,6 +260,19 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
+}
+
+/* [교정 1] 분석 모드의 '확대(두번째)' 위치와 완벽히 격자를 일치시키는 촬영용 버튼 */
+.menu-btn-sync {
+    background: rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    border: 0.5px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.menu-btn-dummy {
+    flex: 1;
+    height: 38px;
 }
 
 /* 9. 비디오 슬라이더 타임라인 */
@@ -283,10 +326,11 @@ body, html {
 
 /* 11. 촬영 컨트롤 */
 .status-text {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 13px;
     text-align: center;
     font-weight: 500;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .control-row-center {
@@ -297,7 +341,7 @@ body, html {
 }
 
 .action-btn-main {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.6);
     border: 3px solid #FFFFFF;
     color: #FFFFFF;
     font-size: 15px;
@@ -305,6 +349,7 @@ body, html {
     padding: 10px 28px;
     border-radius: 22px;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     transition: all 0.2s ease;
 }
 
@@ -319,37 +364,17 @@ body, html {
 .switch-btn {
     width: 100%;
     height: 40px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.5);
+    border: 0.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 @keyframes pulseGlow {
     from { transform: scale(1); }
     to { transform: scale(1.04); }
-}
-
-/* ================================================================= */
-/* 💡 [교정 파트] 촬영화면 패널 완벽 투명화 및 메뉴 버튼 위치 동기화 */
-/* ================================================================= */
-#scene-record .unified-panel-box {
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-top: none !important;
-    box-shadow: none !important;
-}
-
-#scene-record .text-menu-bar {
-    background-color: transparent !important;
-}
-
-#scene-record .menu-btn.active-sync {
-    background: rgba(255, 255, 255, 0.12);
-    color: #34C759;
-    font-weight: 700;
 }
