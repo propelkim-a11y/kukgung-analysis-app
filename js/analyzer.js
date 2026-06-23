@@ -1,6 +1,6 @@
 /**
  * analyzer.js
- * 렉 제거 최적화, 비디오 원본 비율 보존 및 자유 확대/축소 다중 분석 엔진
+ * 스타일러스 펜(S펜, 애플펜슬) 최적화, 렉 제거, 비디오 원본 비율 보존 및 자유 확대/축소 다중 분석 엔진
  */
 
 export class BowAnalyzer {
@@ -19,31 +19,34 @@ export class BowAnalyzer {
         this.startY = 0;
         this.lastTouchDist = 0; 
         this.toolMode = 'draw'; 
+        
+        // ⚡ 스타일러스 펜 인식을 위한 포인터 상태 추적 맵
+        this.activePointers = new Map();
     }
 
     init() {
         if (!this.canvas || !this.ctx) return;
 
-        // 기존 등록자 안전 제거 후 1회 재등록 (이벤트 꼬임 원천 차단)
-        this.canvas.removeEventListener('mousedown', this.boundHandleStart);
-        this.canvas.removeEventListener('mousemove', this.boundHandleMove);
-        this.canvas.removeEventListener('touchstart', this.boundHandleTouchStart);
-        this.canvas.removeEventListener('touchmove', this.boundHandleTouchMove);
+        // ⚡ [스타일러스 펜 패치] 기존 구형 touch/mouse 이벤트를 완전히 걷어내고 
+        // 펜, 터치, 마우스를 모두 완벽하게 구별하고 처리하는 최신 Pointer 이벤트 표준으로 대전환
+        this.canvas.removeEventListener('pointerdown', this.boundHandlePointerDown);
+        this.canvas.removeEventListener('pointermove', this.boundHandlePointerMove);
+        this.canvas.removeEventListener('pointerup', this.boundHandlePointerUp);
+        this.canvas.removeEventListener('pointercancel', this.boundHandlePointerUp);
 
-        this.boundHandleStart = (e) => this.handleStart(e);
-        this.boundHandleMove = (e) => this.handleMove(e);
-        this.boundHandleTouchStart = (e) => this.handleTouchStart(e);
-        this.boundHandleTouchMove = (e) => this.handleTouchMove(e);
+        this.boundHandlePointerDown = (e) => this.handlePointerDown(e);
+        this.boundHandlePointerMove = (e) => this.handlePointerMove(e);
+        this.boundHandlePointerUp = (e) => this.handlePointerUp(e);
 
-        this.canvas.addEventListener('mousedown', this.boundHandleStart);
-        this.canvas.addEventListener('mousemove', this.boundHandleMove);
-        
-        this.canvas.addEventListener('touchstart', this.boundHandleTouchStart, { passive: false });
-        this.canvas.addEventListener('touchmove', this.boundHandleTouchMove, { passive: false });
-        
-        const endDrag = () => { this.isDragging = false; this.lastTouchDist = 0; };
-        window.addEventListener('mouseup', endDrag);
-        this.canvas.addEventListener('touchend', endDrag);
+        this.canvas.addEventListener('pointerdown', this.boundHandlePointerDown);
+        this.canvas.addEventListener('pointermove', this.boundHandlePointerMove);
+        this.canvas.addEventListener('pointerup', this.boundHandlePointerUp);
+        this.canvas.addEventListener('pointercancel', this.boundHandlePointerUp);
+
+        // 마우스 휠을 돌려도 편리하게 확대/축소가 가능하도록 추가 지원
+        this.canvas.removeEventListener('wheel', this.boundHandleWheel);
+        this.boundHandleWheel = (e) => this.handleWheel(e);
+        this.canvas.addEventListener('wheel', this.boundHandleWheel, { passive: false });
 
         this.draw();
     }
@@ -51,6 +54,7 @@ export class BowAnalyzer {
     setToolMode(mode) {
         this.toolMode = mode; 
         this.isDragging = false;
+        this.activePointers.clear();
     }
 
     getCanvasCoordinates(clientX, clientY) {
@@ -64,63 +68,93 @@ export class BowAnalyzer {
         };
     }
 
-    handleStart(e) {
-        if (this.toolMode === 'move' || e.button === 2 || e.ctrlKey) { 
+    handlePointerDown(e) {
+        e.preventDefault();
+        this.canvas.setPointerCapture(e.pointerId);
+        this.activePointers.set(e.pointerId, e);
+
+        // ⚡ [Palm Rejection 패치] 손바닥이나 손가락이 터치 상태여도, 화면에 스타일러스 펜(S펜/애플펜슬)이 찍히면 
+        // 펜 입력을 최우선 순위로 인정하고 다른 터치 간섭을 모두 무시
+        const pointerType = e.pointerType; // 'mouse', 'pen', 'touch'
+        
+        // 두 손가락 멀티 터치 줌을 위한 상태 처리
+        if (this.activePointers.size === 2) {
+            const pointers = Array.from(this.activePointers.values());
+            this.lastTouchDist = this.getPointerDistance(pointers[0], pointers[1]);
+            return;
+        }
+
+        // '화면 이동/확대' 모드이거나 마우스 우클릭인 경우
+        if (this.toolMode === 'move' || e.button === 2) { 
             this.isDragging = true;
             this.startX = e.clientX - this.offsetX;
             this.startY = e.clientY - this.offsetY;
             return;
         }
-        const coord = this.getCanvasCoordinates(e.clientX, e.clientY);
-        this.points.push(coord);
-        this.draw();
-        this.calculateAngles();
-    }
 
-    handleMove(e) {
-        if (!this.isDragging) return;
-        this.offsetX = e.clientX - this.startX;
-        this.offsetY = e.clientY - this.startY;
-        this.draw();
-    }
-}
-    handleTouchStart(e) {
-        if (e.cancelable) e.preventDefault();
-        
-        if (e.touches.length === 2) { 
-            this.lastTouchDist = this.getTouchDistance(e.touches[0], e.touches[1]);
-        } else if (e.touches.length === 1) {
-            if (this.toolMode === 'move') { 
-                this.isDragging = true;
-                this.startX = e.touches[0].clientX - this.offsetX;
-                this.startY = e.touches[0].clientY - this.offsetY;
-            } else {
-                const coord = this.getCanvasCoordinates(e.touches[0].clientX, e.touches[0].clientY);
-                this.points.push(coord);
-                this.draw();
-                this.calculateAngles();
-            }
+        // '선 긋기' 모드일 때 (펜 또는 마우스 좌클릭, 주 손가락 터치만 선 긋기 허용)
+        if (this.toolMode === 'draw') {
+            // 펜이 찍힌 상태에서 다른 터치가 들어오면 선 긋기 방어
+            if (pointerType === 'touch' && this.hasPenActive()) return;
+
+            const coord = this.getCanvasCoordinates(e.clientX, e.clientY);
+            this.points.push(coord);
+            this.draw();
+            this.calculateAngles();
         }
     }
 
-    handleTouchMove(e) {
-        if (e.cancelable) e.preventDefault();
-        
-        if (e.touches.length === 2 && this.lastTouchDist > 0) {
-            const dist = this.getTouchDistance(e.touches[0], e.touches[1]);
+    hasPenActive() {
+        for (const p of this.activePointers.values()) {
+            if (p.pointerType === 'pen') return true;
+        }
+        return false;
+    }
+    handlePointerMove(e) {
+        if (!this.activePointers.has(e.pointerId)) return;
+        this.activePointers.set(e.pointerId, e); // 포인터 좌표 최신화
+
+        // 1. 손가락 2개 멀티 터치 피치 줌 작동
+        if (this.activePointers.size === 2 && this.lastTouchDist > 0) {
+            const pointers = Array.from(this.activePointers.values());
+            const dist = this.getPointerDistance(pointers[0], pointers[1]);
             const factor = dist / this.lastTouchDist;
             this.scale = Math.min(5.0, Math.max(1.0, this.scale * factor)); 
             this.lastTouchDist = dist;
             this.draw();
-        } else if (e.touches.length === 1 && this.isDragging) {
-            this.offsetX = e.touches[0].clientX - this.startX;
-            this.offsetY = e.touches[0].clientY - this.startY;
+            return;
+        }
+
+        // 2. 화면 이동 제어 (move 모드일 때)
+        if (this.isDragging) {
+            this.offsetX = e.clientX - this.startX;
+            this.offsetY = e.clientY - this.startY;
             this.draw();
         }
     }
 
-    getTouchDistance(t1, t2) {
-        return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2));
+    handlePointerUp(e) {
+        this.activePointers.delete(e.pointerId);
+        if (this.activePointers.size < 2) {
+            this.lastTouchDist = 0;
+        }
+        this.isDragging = false;
+    }
+
+    handleWheel(e) {
+        e.preventDefault();
+        // PC 크롬 마우스 휠 돌릴 때 줌인/줌아웃 가동 공식
+        const zoomFactor = 1.1;
+        if (e.deltaY < 0) {
+            this.scale = Math.min(5.0, this.scale * zoomFactor);
+        } else {
+            this.scale = Math.max(1.0, this.scale / zoomFactor);
+        }
+        this.draw();
+    }
+
+    getPointerDistance(p1, p2) {
+        return Math.sqrt(Math.pow(p2.clientX - p1.clientX, 2) + Math.pow(p2.clientY - p1.clientY, 2));
     }
 
     draw() {
