@@ -69,7 +69,6 @@ async function initApp() {
             recordBtn.style.pointerEvents = 'auto';
             if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
             
-            // 시차를 두고 센서를 가동하여 초기 로딩 병목 차단
             setTimeout(async () => {
                 if (window.isMobileDevice) {
                     try { await leveler.init(); } catch(e) {}
@@ -105,7 +104,7 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // 화면 이동 모드와 선 긋기 모드 제어 스위칭 리스너
+    // 화면 이동 모드가 왼쪽, 선 긋기 모드가 오른쪽 연동 매핑
     document.getElementById('btn-tool-move').onclick = () => {
         document.getElementById('btn-tool-move').classList.add('active');
         document.getElementById('btn-tool-draw').classList.remove('active');
@@ -189,12 +188,12 @@ async function stopRecording() {
 document.getElementById('btn-mode-shoot').onclick = () => switchMode('shoot');
 document.getElementById('btn-mode-analyze').onclick = () => switchMode('analyze');
 
-// 9. ⚡ [버그 정밀 패치] 중복 구문을 제거하여 로컬 파일 선택 시 정상적으로 주소가 인젝션되도록 가동
+// 9. ⚡ [긴급 수리 패치] 파일 데이터 읽기 참조 방식을 표준 코드로 안전하게 교정하여 엔진 정지 버그 차단
 const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
-        const file = e.target.files[0]; // 단일 파일 추출로 단순 매핑 고정
-        if (file) {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]; // 단일 파일 직접 참조 추출
             activeVideoRoll = 0; 
             loadVideoForAnalysis(URL.createObjectURL(file));
         }
@@ -214,7 +213,7 @@ function switchMode(mode) {
     const headerElement = document.querySelector('.header');
     
     if (mode === 'analyze') {
-        if (analysisComponents) analysisComponents.remove('hidden'); 
+        if (analysisComponents) analysisComponents.classList.remove('hidden'); 
         if (shootComponents) shootComponents.classList.add('hidden'); 
         if (headerElement) headerElement.classList.add('hidden'); 
     } else {
@@ -236,6 +235,7 @@ function loadVideoForAnalysis(url) {
         const timeline = document.getElementById('video-timeline');
         const container = document.getElementById('manual-analysis-box');
         
+        // 도화지 박스 정비례 크기로 캔버스 해상도 강제 맞춤 고정
         const rect = container.getBoundingClientRect();
         dc.width = oc.width = rect.width;
         dc.height = oc.height = rect.height;
@@ -282,14 +282,14 @@ if (timelineSlider) {
     });
 }
 
-// ⚡ [피드백 패치] 초당 30프레임 표준 규격을 대입해 0.1초에서 1프레임 단위(0.033초) 미세 정밀 조작으로 교정
-const FRAME_TIME = 1 / 30; // 약 0.0333초
+// 초당 30프레임 표준 규격을 대입해 1프레임 단위(0.033초) 미세 정밀 조작
+const FRAME_TIME = 1 / 30; 
 
 document.getElementById('btn-video-prev').onclick = () => { 
     const v = window.analysisVideo;
     if(v) {
         v.pause();
-        v.currentTime = Math.max(0, v.currentTime - FRAME_TIME); // 1프레임 뒤로
+        v.currentTime = Math.max(0, v.currentTime - FRAME_TIME); 
         if (timelineSlider) timelineSlider.value = v.currentTime;
         document.getElementById('btn-video-play').innerText = "▶️ 재생";
     }
@@ -299,7 +299,7 @@ document.getElementById('btn-video-next').onclick = () => {
     const v = window.analysisVideo;
     if(v) {
         v.pause();
-        v.currentTime = Math.min(v.duration, v.currentTime + FRAME_TIME); // 1프레임 앞으로
+        v.currentTime = Math.min(v.duration, v.currentTime + FRAME_TIME); 
         if (timelineSlider) timelineSlider.value = v.currentTime;
         document.getElementById('btn-video-play').innerText = "▶️ 재생";
     }
