@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1/2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부 (풀스크린 동기화 패치)
  */
 
 window.bowAppNodes = {};
@@ -39,16 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 💡 패치: 단일 대통합 하단 패널용 서브 레이어 노드 확보
-    nodes.subRecord = document.getElementById('content-sub-record');
-    nodes.subAnalyze = document.getElementById('content-sub-analyze');
-
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
+    // 2. 💡 [핵심 교정] 스마트폰 윈도우 실제 스크린 전체 면적으로 캔버스 스케일 동기화
     function resizeCanvasToDisplay() {
-        const rect = nodes.videoViewport.getBoundingClientRect();
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         const dpr = window.devicePixelRatio || 1;
-        nodes.drawCanvas.width = rect.width * dpr;
-        nodes.drawCanvas.height = rect.height * dpr;
+        
+        nodes.drawCanvas.width = width * dpr;
+        nodes.drawCanvas.height = height * dpr;
         
         if (window.bowAnalyzer) {
             window.bowAnalyzer.canvas = nodes.drawCanvas;
@@ -123,29 +121,21 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.cameraPreview.srcObject = null;
     }
 
-    // 💡 패치: [촬영 화면 복귀 스위칭] 하단 패널 고정 후 알맹이 서브 레이어만 체인지
+    // [촬영 화면 이탈 이동]
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
-        
-        nodes.subAnalyze.classList.remove('active');
-        nodes.subRecord.classList.add('active');
-        
         await startCamera();
         if (window.bowGyroSensor) window.bowGyroSensor.start();
     });
 
-    // 💡 패치: [분석 화면 진입 스위칭] 하단 패널 고정 후 알맹이 서브 레이어만 체인지
+    // [분석 화면 진입 이동 공통 함수]
     function transitToAnalyzeMode() {
         stopCamera();
         nodes.sceneRecord.classList.remove('active');
         nodes.sceneAnalyze.classList.add('active');
-        
-        nodes.subRecord.classList.remove('active');
-        nodes.subAnalyze.classList.add('active');
-        
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
         setTimeout(resizeCanvasToDisplay, 100);
@@ -249,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files;
         if (!file || file.length === 0) return;
 
-        await core.saveCache('lastVideoBlob', file[0]);
+        await core.saveCache('lastVideoBlob', file);
         const url = URL.createObjectURL(file[0]);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
