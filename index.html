@@ -44,24 +44,23 @@
                     <canvas id="output-canvas"></canvas>
                     <canvas id="drawing-canvas"></canvas>
                 </div>
+
+                <!-- ⚡ [피드백 적용] 화면 오른쪽 상단에 조그만 미니멀 초기화 아이콘 버튼 배치 -->
+                <div class="top-floating-toolbar">
+                    <button id="btn-clear-draw" class="mini-icon-btn" aria-label="초기화">🔄</button>
+                </div>
             </div>
         </main>
 
-        <!-- ⚡ [완벽 대통합] 1/3 크기 및 위치가 고정된 단 하나의 하단 반투명 컨트롤러 센터 박스 -->
+        <!-- [완벽 대통합] 1/3 크기 및 위치가 고정된 하단 반투명 컨트롤러 센터 박스 -->
         <div id="unified-control-center" class="unified-panel">
             
-            <!-- ⚡ [분석 모드 전용 내부 컴포넌트 라인] -->
+            <!-- [분석 모드 전용 내부 컴포넌트 라인] -->
             <div id="analysis-components" class="panel-inner-block hidden">
-                <!-- 선 긋기 / 화면 이동 모드 전환 메뉴 바 -->
+                <!-- ⚡ [피드백 적용] 좌우 위치 스위칭: 화면 이동/확대가 왼쪽, 선 긋기가 오른쪽 배치 -->
                 <div class="menu-tab-bar">
-                    <button id="btn-tool-draw" class="menu-tab-btn active">✏️ 선 긋기 모드</button>
                     <button id="btn-tool-move" class="menu-tab-btn">🔍 화면 이동/확대</button>
-                </div>
-
-                <!-- 툴바 (초기화 및 실시간 로그 안내) -->
-                <div class="tool-bar-inner">
-                    <button id="btn-clear-draw" class="tool-btn">🔄 초기화</button>
-                    <div id="angle-display" class="angle-badge">두 선을 선택하세요</div>
+                    <button id="btn-tool-draw" class="menu-tab-btn active">✏️ 선 긋기 모드</button>
                 </div>
 
                 <!-- 실시간 비디오 탐색 슬라이더 바 -->
@@ -76,7 +75,7 @@
                     <button id="btn-video-next" class="control-btn">⏩ +0.1s</button>
                 </div>
 
-                <!-- 정밀 각도 결과 리포트 창 및 업로드 팩 -->
+                <!-- 정밀 각도 결과 리포트 창 및 업로드 팩 ("두 선을 선택하세요" 뱃지 라인 영구 삭제) -->
                 <div class="report-box">
                     <div class="report-item main-result">
                         <span>📐 선택한 두 선의 각도</span>
@@ -89,16 +88,17 @@
                 </div>
             </div>
 
-            <!-- ⚡ [촬영 모드 전용 내부 컴포넌트 라인: 녹화 단추를 상단 배치 처리] -->
+            <!-- [촬영 모드 전용 내부 컴포넌트 라인] -->
             <div id="shoot-components" class="action-zone">
                 <button id="record-btn" aria-label="녹화"></button>
             </div>
 
-            <!-- ⚡ [공통 내장 하단 탭 스위치 라인] 촬영/결과보기 전환 버튼은 어떤 모드이든 '언제나 동일한 크기와 고정 위치'를 취함 -->
+            <!-- [공통 내장 하단 탭 스위치 라인] -->
             <div class="panel-global-footer">
                 <div class="mode-selector">
                     <button id="btn-mode-shoot" class="active">촬영하기</button>
-                    <button id="btn-mode-analyze">결과보기</button>
+                    <!-- ⚡ [피드백 적용] 결과보기 ➡️ 분석하기 텍스트 전면 교체 -->
+                    <button id="btn-mode-analyze">분석하기</button>
                 </div>
             </div>
         </div>
