@@ -1,13 +1,8 @@
-* { 
-    box-sizing: border-box; 
-    margin: 0; 
-    padding: 0; 
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #000000; 
-    color: #ffffff;
+    background-color: #000; color: #ffffff;
     height: 100dvh;
     overflow: hidden;
 }
@@ -16,14 +11,14 @@ body {
     display: flex; 
     flex-direction: column; 
     height: 100dvh;
-    background-color: #000000;
+    background-color: #000;
     position: relative;
 }
 
 .main-content { 
     flex: 1; 
     position: relative; 
-    background-color: #000000;
+    background-color: #000;
     overflow: hidden;
 }
 
@@ -40,10 +35,9 @@ body {
     width: 100%; 
     height: 100%; 
     object-fit: contain; 
-    background: #000000;
+    background: #000;
 }
 
-/* 상단 투명 헤더 (촬영 전용) */
 .header { 
     text-align: center; 
     padding: 20px; 
@@ -55,39 +49,34 @@ body {
     pointer-events: none; 
 }
 
-/* ⚡ [UI 대혁신] 하단 푸터 패널의 배경색을 100% 제거하여 영상 전체가 밑단까지 비치도록 설계 */
 .footer { 
-    background: transparent; 
-    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)); 
+    background: rgba(0, 0, 0, 0.2); 
+    padding: 15px 15px calc(10px + env(safe-area-inset-bottom)); 
     display: flex; 
     flex-direction: column; 
-    gap: 15px; 
+    gap: 12px; 
     align-items: center; 
-    z-index: 800; /* 분석 화면 단추들이 캔버스 위에 뜨도록 최상위로 고정 */
+    z-index: 1000; 
     position: absolute;
     bottom: 0;
     width: 100%;
     pointer-events: none; 
+    backdrop-filter: blur(8px); 
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .mode-selector, .action-zone {
     pointer-events: auto;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     width: 100%;
 }
 
-.mode-selector {
-    flex-direction: row;
-    margin-bottom: 5px;
-}
-
 #status-text { font-size: 1.1rem; font-weight: bold; color: #ff4d4d; }
 #angle-text { font-size: 1.2rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: auto; }
 
-/* 촬영 수평계 */
+/* 수평계 */
 .level-container { 
     position: absolute; 
     top: 50%; 
@@ -96,7 +85,7 @@ body {
     pointer-events: none; 
     z-index: 2; 
 }
-.center-target { width: 16px; height: 16px; border: 2px solid #ffffff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
+.center-target { width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; position: absolute; top:-8px; left:-8px; }
 .level-line { 
     width: 220px; height: 2px; 
     background-color: #ff4d4d; 
@@ -104,25 +93,23 @@ body {
     transition: transform 0.05s linear, background-color 0.3s; 
 }
 
-/* ⚡ [분석 특화] 자유로운 피팅 줌 확대를 실현할 제어 뷰포트 레이어 추가 */
+/* 분석 섹션 독립 패널 완전 투명화 */
 #analysis-section { 
-    z-index: 50; 
-    background: #000000;
-    overflow: hidden;
-}
-
-.zoom-viewport {
-    width: 100%;
+    z-index: 500; 
+    background: #000;
+    display: flex;
+    flex-direction: column;
     height: 100%;
-    position: relative;
-    transform-origin: 0 0; /* 자유 핀치줌 휠 드래그 원점 */
-    will-change: transform;
+    width: 100%;
+    padding-bottom: calc(180px + env(safe-area-inset-bottom)); 
 }
 
 .canvas-container { 
     width: 100%; 
-    height: 100%;
-    position: relative;
+    flex: 1; 
+    position: relative; 
+    overflow: hidden; 
+    touch-action: none; 
 }
 
 #drawing-canvas {
@@ -134,165 +121,90 @@ body {
     pointer-events: auto;
 }
 
-/* 분석 상단 투명 HUD 정보바 */
-.analysis-top-bar {
-    position: absolute;
-    top: 25px;
-    left: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    z-index: 600;
-    pointer-events: none;
+/* 우측 뱃지 툴바 */
+.tool-bar { 
+    position: absolute; top: 20px; right: 15px; 
+    display: flex; flex-direction: column; gap: 10px; z-index: 800; 
+}
+.tool-btn { 
+    padding: 10px 15px; background: rgba(0,0,0,0.6); 
+    border: 1px solid rgba(255,255,255,0.2); color: #fff; 
+    border-radius: 10px; font-size: 0.9rem; backdrop-filter: blur(5px); cursor: pointer;
 }
 .angle-badge {
-    padding: 8px 16px; 
-    background: rgba(0, 0, 0, 0.6); 
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 20px; 
-    font-size: 0.85rem; 
-    text-align: center;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-}
-.result-badge {
-    padding: 8px 24px;
-    background: rgba(0, 230, 118, 0.2);
-    border: 1px solid #00e676;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 1.3rem;
-    color: #00e676;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    box-shadow: 0 4px 15px rgba(0,230,118,0.3);
+    padding: 10px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.8rem; text-align: center;
 }
 
-/* ⚡ [타임라인 조작계] 슬라이더를 고해상도 투명 터치바로 개편 */
-.timeline-box {
-    width: 90%;
-    max-width: 500px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
+/* 재생 슬라이더 바 */
+.slider-container {
+    width: 100%;
+    padding: 0 25px;
+    margin: 10px 0;
+    z-index: 800;
+    pointer-events: auto;
 }
-#video-slider {
+#video-timeline {
     width: 100%;
     -webkit-appearance: none;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.2);
     height: 6px;
     border-radius: 3px;
     outline: none;
-    backdrop-filter: blur(2px);
 }
-#video-slider::-webkit-slider-thumb {
+#video-timeline::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: #007aff;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-    transition: transform 0.1s;
-}
-#video-slider::-webkit-slider-thumb:active {
-    transform: scale(1.3);
 }
 
-/* 미세 조절 프레임 플레이어 버튼 패널 */
+/* 비디오 조작 컨트롤러 패널 투명화 */
 .video-controls {
-    display: flex; 
-    justify-content: center; 
-    gap: 12px; 
-    margin-bottom: 15px;
-    width: 100%;
+    display: flex; justify-content: center; gap: 15px; 
+    margin-bottom: 10px; z-index: 800;
+    pointer-events: auto;
 }
 .control-btn {
-    padding: 8px 14px; 
-    background: rgba(255, 255, 255, 0.12); 
-    border: 1px solid rgba(255, 255, 255, 0.15); 
-    color: #ffffff; 
-    border-radius: 8px; 
-    font-size: 0.85rem; 
-    cursor: pointer;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-}
-.control-btn-play {
-    padding: 8px 20px;
-    background: rgba(0, 122, 255, 0.3);
-    border: 1px solid #007aff;
-    color: #ffffff;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: bold;
-    cursor: pointer;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    padding: 10px 18px; background: rgba(255, 255, 255, 0.12); 
+    border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; 
+    border-radius: 12px; backdrop-filter: blur(5px); font-size: 0.9rem; cursor: pointer;
 }
 
-/* 하단 최종 하이브리드 유틸 버튼 그룹 */
-.util-btn-group {
+/* 결과 리포트 투명 박스 */
+.report-box { 
+    padding: 15px; 
+    background: rgba(0, 0, 0, 0.5); 
+    border-radius: 15px; 
+    margin: 0 15px; 
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 800;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.main-result { text-align: center; }
+.main-result span:first-child { display: block; font-size: 0.85rem; opacity: 0.7; margin-bottom: 2px; }
+.highlight { font-weight: bold; color: #00e676; font-size: 2.3rem; display: block; }
+
+.analysis-actions {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    width: 90%;
-    max-width: 400px;
-}
-.tool-btn { 
-    flex: 1;
-    padding: 10px 0; 
-    background: rgba(255, 59, 48, 0.2); 
-    border: 1px solid #ff3b30; 
-    color: #ffffff; 
-    border-radius: 10px; 
-    font-size: 0.9rem; 
-    font-weight: bold;
-    backdrop-filter: blur(5px); 
-    -webkit-backdrop-filter: blur(5px);
-    cursor: pointer;
-    text-align: center;
-}
-.btn-secondary { 
-    flex: 1;
-    padding: 10px 0; 
-    background: rgba(255, 255, 255, 0.12); 
-    border: 1px solid rgba(255, 255, 255, 0.2); 
-    border-radius: 10px; 
-    color: #ffffff; 
-    font-weight: bold; 
-    font-size: 0.9rem;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    cursor: pointer;
-    text-align: center;
+    width: 100%;
 }
 
-/* 탭 셀렉터 링크 스타일 */
-.mode-selector button { padding: 8px 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #ffffff; border-radius: 20px; margin: 0 4px; cursor: pointer; font-size: 0.85rem; }
-.mode-selector button.active { background: #007aff; border-color: #007aff; font-weight: bold; }
+/* 촬영 버튼 및 스타일 */
+.mode-selector button { padding: 10px 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; border-radius: 25px; margin: 0 5px; cursor: pointer; }
+.mode-selector button.active { background: #007aff; }
 
-/* 큰 촬영 단추 원형 */
 #record-btn { 
-    width: 65px; 
-    height: 65px; 
-    flex-shrink: 0; 
-    border-radius: 50%; 
-    border: 4px solid #ffffff; 
-    background: rgba(255, 255, 255, 0.2); 
-    transition: all 0.2s ease-in-out; 
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    width: 65px; height: 65px; flex-shrink: 0; border-radius: 50%; border: 4px solid #fff; 
+    background: rgba(255,255,255,0.2); transition: all 0.3s; cursor: pointer;
 }
-#record-btn.recording { 
-    border-radius: 12px; 
-    background: #ff4d4d; 
-    width: 55px;
-    height: 55px;
-    animation: pulse 1.5s infinite; 
-}
+#record-btn.recording { border-radius: 15px; background: #ff4d4d; width: 55px; height: 55px; animation: pulse 1.5s infinite; }
 
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
@@ -301,3 +213,10 @@ body {
 }
 
 .hidden { display: none !important; }
+.btn-secondary { padding: 12px 25px; background: rgba(0, 122, 255, 0.6); border-radius: 10px; color: #fff; font-weight: bold; display: inline-block; cursor: pointer; text-align: center; width: 100%; border: 1px solid rgba(255,255,255,0.2); }
+
+.overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:5000; display:flex; justify-content:center; align-items:center; }
+.overlay-content { text-align: center; padding: 20px; background: #222; border-radius: 20px; border: 1px solid #444; max-width: 90%; width: 320px; }
+.overlay-content h2 { margin-bottom: 15px; }
+.overlay-content p { font-size: 0.95rem; line-height: 1.6; opacity: 0.8; margin-bottom: 25px; }
+#btn-permission { padding: 15px 30px; background: #007aff; color:#fff; border:none; border-radius:12px; font-weight:bold; font-size: 1.1rem; width: 100%; cursor: pointer; }
