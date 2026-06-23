@@ -8,14 +8,14 @@ let isRecording = false;
 let phoneRollAtRecord = 0;
 let activeVideoRoll = 0; 
 
-// 글로벌 인스턴스 마운트
+// 글로벌 분석 인스턴스 마운트
 let bowAnalyzer = new BowAnalyzer();
 
 const video = document.getElementById('video-preview');
 const recordBtn = document.getElementById('record-btn');
 const statusText = document.getElementById('status-text');
 
-// 1. 수평계 클래스 인스턴스 연동
+// 1. 기기 실시간 자이로 수평계 연동
 const leveler = new DynamicLeveler((isLevel, roll) => {
     phoneRollAtRecord = roll;
     if (recordBtn && window.isMobileDevice) {
@@ -23,7 +23,7 @@ const leveler = new DynamicLeveler((isLevel, roll) => {
     }
 });
 
-// 2. 범용 녹화 코덱 감지 구문
+// 2. 사파리/크롬 모바일 환경 최적 코덱 선별기
 function getSupportedMimeType() {
     const types = ['video/webm;codecs=vp8', 'video/mp4;codecs=avc1', 'video/webm', 'video/mp4'];
     for (const type of types) {
@@ -32,26 +32,28 @@ function getSupportedMimeType() {
     return ''; 
 }
 
-// 3. 접속 디바이스 환경 검사기
+// 3. 브라우저 접속 환경 모바일 검사 로직
 function checkMobile() {
     return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-// 4. 어플리케이션 초기화 구문
+// 4. 어플리케이션 스타터 및 스위치 기동
 async function initApp() {
     window.isMobileDevice = checkMobile();
 
+    // PC 디바이스 환경 전용 예외 스킵 처리
     if (!window.isMobileDevice) {
         const lvContainer = document.getElementById('level-container');
         if (lvContainer) lvContainer.style.display = 'none';
-        if (statusText) statusText.innerText = "PC 에뮬레이션 모드";
-        document.getElementById('angle-text').innerText = "가상 고정";
+        if (statusText) statusText.innerText = "PC 에뮬레이션 분석 모드";
+        document.getElementById('angle-text').innerText = "고정";
         recordBtn.style.border = '5px solid #007aff';
         recordBtn.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
     }
 
+    // 진입 권한 팝업 버튼 허용 클릭 리스너
     document.getElementById('btn-permission').onclick = async () => {
-        if (statusText) statusText.innerText = "카메라 장치 탐색 중...";
+        if (statusText) statusText.innerText = "카메라 노드 연결 중...";
         
         const videoConstraints = window.isMobileDevice 
             ? { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -67,6 +69,7 @@ async function initApp() {
             recordBtn.style.pointerEvents = 'auto';
             if (statusText && window.isMobileDevice) statusText.innerText = "촬영 준비 완료";
             
+            // 시차를 두고 센서를 가동하여 초기 로딩 병목 차단
             setTimeout(async () => {
                 if (window.isMobileDevice) {
                     try { await leveler.init(); } catch(e) {}
@@ -74,11 +77,11 @@ async function initApp() {
             }, 100);
 
         } catch (err) {
-            console.warn("실물 카메라 미감지: PC 분석 전용 모드로 진입합니다.");
+            console.warn("실물 웹캠 미감지: PC 수동 파일 업로드 모드로 안전 우회 진입합니다.");
             document.getElementById('permission-overlay').style.display = 'none';
             recordBtn.style.zIndex = '99999'; 
             recordBtn.style.pointerEvents = 'auto';
-            if (statusText) statusText.innerText = "수동 영상 분석 대기";
+            if (statusText) statusText.innerText = "수동 영상 파일 대기 중";
             loadDummyCanvasForPC();
         }
     };
@@ -102,21 +105,21 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // 선 긋기 모드와 화면 이동/확대 제어 스위칭 리스너 결합
-    document.getElementById('btn-tool-draw').onclick = () => {
-        document.getElementById('btn-tool-draw').classList.add('active');
-        document.getElementById('btn-tool-move').classList.remove('active');
-        bowAnalyzer.setToolMode('draw');
-    };
-
+    // ⚡ [피드백 적용 스위칭] 화면 이동 모드가 왼쪽, 선 긋기 모드가 오른쪽 연동 매핑
     document.getElementById('btn-tool-move').onclick = () => {
         document.getElementById('btn-tool-move').classList.add('active');
         document.getElementById('btn-tool-draw').classList.remove('active');
         bowAnalyzer.setToolMode('move');
     };
+
+    document.getElementById('btn-tool-draw').onclick = () => {
+        document.getElementById('btn-tool-draw').classList.add('active');
+        document.getElementById('btn-tool-move').classList.remove('active');
+        bowAnalyzer.setToolMode('draw');
+    };
 }
 
-// 5. 웹캠이 없는 PC용 가상 캔버스 안내 도화지 빌더
+// 5. 카메라가 아예 없는 데스크톱용 도화지 가상 배경 렌더러
 function loadDummyCanvasForPC() {
     const dc = document.getElementById('drawing-canvas');
     const oc = document.getElementById('output-canvas');
@@ -137,7 +140,7 @@ function loadDummyCanvasForPC() {
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('🏹 우측 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
-    ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 자유로운 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
+    ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 정밀 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
 async function startRecording() {
@@ -152,7 +155,7 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
-            // 로컬 장치 원본 자동 보관 다운로더
+            // 로컬 장치 클립보드 원본 자동 보관 다운로더
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -198,7 +201,7 @@ if (fileUploadInput) {
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈 (패널 대통합 버그 패치 버전)
+// 10. 상하단 레이아웃 분리 모듈
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -206,19 +209,19 @@ function switchMode(mode) {
     document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
     document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
 
-    // ⚡ [대통합 패치] 통합 제어 센터 내부의 분석/촬영 컴포넌트 가시성 동적 전환
+    // 통합 제어 센터 내부의 분석/촬영 컴포넌트 가시성 동적 전환
     const analysisComponents = document.getElementById('analysis-components');
     const shootComponents = document.getElementById('shoot-components');
     const headerElement = document.querySelector('.header');
     
     if (mode === 'analyze') {
-        if (analysisComponents) analysisComponents.classList.remove('hidden');
-        if (shootComponents) shootComponents.classList.add('hidden'); // 녹화 버튼 세트 숨김
-        if (headerElement) headerElement.classList.add('hidden'); // 상단 촬영용 수평계 숨김
+        if (analysisComponents) analysisComponents.remove('hidden');
+        if (shootComponents) shootComponents.classList.add('hidden'); 
+        if (headerElement) headerElement.classList.add('hidden'); 
     } else {
         if (analysisComponents) analysisComponents.classList.add('hidden');
-        if (shootComponents) shootComponents.classList.remove('hidden'); // 녹화 버튼 세트 복구
-        if (headerElement) headerElement.classList.remove('hidden'); // 상단 촬영용 수평계 복구
+        if (shootComponents) shootComponents.classList.remove('hidden'); 
+        if (headerElement) headerElement.classList.remove('hidden'); 
     }
 }
 
@@ -249,7 +252,7 @@ function loadVideoForAnalysis(url) {
         v.currentTime = 0.1; 
         switchMode('analyze');
         
-        // 직선 그리드 피치 투 줌 마운트
+        // 직선 그리드 피치 투 줌 마운트 초기화
         bowAnalyzer.init(); 
         
         v.onseeked = () => {
@@ -315,7 +318,7 @@ document.getElementById('btn-video-play').onclick = () => {
     }
 };
 
-// 13. 드로잉 캔버스 초기화 리스너
+// 13. 우측 상단 플로팅 미니 아이콘 연동 초기화 리스너
 document.getElementById('btn-clear-draw').onclick = () => { 
     if (bowAnalyzer) bowAnalyzer.clear(); 
 };
