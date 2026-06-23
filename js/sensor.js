@@ -21,9 +21,7 @@ export class DynamicLeveler {
                     return true;
                 }
                 return false;
-            } catch (err) {
-                return false;
-            }
+            } catch (err) { return false; }
         } else {
             window.addEventListener('deviceorientation', (e) => this.handleOrientation(e));
             return true;
@@ -31,7 +29,6 @@ export class DynamicLeveler {
     }
 
     handleOrientation(event) {
-        // ⚡ PC 모드이거나 센서 객체가 유실된 환경일 경우 고정축 스킵 방어 처리
         if (!window.isMobileDevice || !event) return;
 
         let roll = event.gamma || 0;  
@@ -45,13 +42,9 @@ export class DynamicLeveler {
             screenAngle = window.orientation;
         }
 
-        if (screenAngle === 90) {
-            displayAngle = -pitch;
-        } else if (screenAngle === 270 || screenAngle === -90) {
-            displayAngle = pitch;
-        } else if (screenAngle === 180) {
-            displayAngle = -roll;
-        }
+        if (screenAngle === 90) { displayAngle = -pitch; } 
+        else if (screenAngle === 270 || screenAngle === -90) { displayAngle = pitch; } 
+        else if (screenAngle === 180) { displayAngle = -roll; }
 
         if (Math.abs(pitch) > 85 && (screenAngle === 0 || screenAngle === 180)) return; 
 
