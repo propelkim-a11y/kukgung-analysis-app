@@ -1,8 +1,7 @@
 /**
  * js/app_gesture.js
- * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (6단계)
- * - 두 손가락 피치 줌(최대 5배) 및 한 손가락 화면 드래그 이동 스크롤
- * - 드로잉 모드와의 충돌을 차단하기 위한 간섭 필터 링링
+ * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기
+ * - [교정 완수] 두 손가락 포인터 트래킹 캐시 구현으로 핀치 줌 완벽 구동
  */
 
 class BowAppGesture {
@@ -11,15 +10,17 @@ class BowAppGesture {
         this.container = null;
         this.video = null;
 
+        // 멀티 터치 트래킹 맵 인프라 구축
+        this.activePointers = new Map();
+        this.initialDist = 0;
+        this.initialScale = 1;
+
         this.handlePointerDown = this.handlePointerDown.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerUp = this.handlePointerUp.bind(this);
         this.handleWheel = this.handleWheel.bind(this);
     }
 
-    /**
-     * 제스처 컨테이너 및 대상 비디오 바인딩
-     */
     init(containerEl, videoEl) {
         this.container = containerEl;
         this.video = videoEl;
@@ -28,60 +29,76 @@ class BowAppGesture {
 
     setupGestureEvents() {
         if (!this.container) return;
+        // 브라우저의 기본 스크롤 및 줌 제스처 방해 차단
+        this.container.style.touchAction = 'none';
+        
         this.container.addEventListener('pointerdown', this.handlePointerDown);
         this.container.addEventListener('pointermove', this.handlePointerMove);
         this.container.addEventListener('pointerup', this.handlePointerUp);
         this.container.addEventListener('pointercancel', this.handlePointerUp);
-        
-        // PC 마우스 개발 환경용 마우스 휠 리스너
         this.container.addEventListener('wheel', this.handleWheel, { passive: false });
     }
 
     handlePointerDown(e) {
-        // [선긋기] 모드인 경우 캔버스 펜 입력(analyzer.js)에 제어권을 양도하고 철수
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
-
-        // Palm Rejection: 스타일러스 활성화 도중 살이 먼저 닿아 유입되는 Direct 터치 차단
         if (e.pointerType === 'touch' && e.touchType === 'direct' && window.isStylusActive) return;
 
+        // 유입 포인터 등록
+        this.activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
         const state = this.core.state;
-        state.isDragging = true;
-        state.startX = e.clientX - state.offsetX;
-        state.startY = e.clientY - state.offsetY;
+
+        if (this.activePointers.size === 1) {
+            state.isDragging = true;
+            state.startX = e.clientX - state.offsetX;
+            state.startY = e.clientY - state.offsetY;
+        } else if (this.activePointers.size === 2) {
+            state.isDragging = false;
+            const ptrs = Array.from(this.activePointers.values());
+            this.initialDist = Math.hypot(ptrs[0].clientX - ptrs[1].clientX, ptrs[0].clientY - ptrs[1].clientY);
+            this.initialScale = state.scale;
+        }
     }
 
     handlePointerMove(e) {
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
+        if (!this.activePointers.has(e.pointerId)) return;
+
+        this.activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
         const state = this.core.state;
 
-        // 멀티 터치 피치 줌 제스처 판정
-        if (e.pointerType === 'touch' && e.targetTouches && e.targetTouches.length === 2) {
-            state.isDragging = false; // 확대 시 이동 락
-            const t1 = e.targetTouches[0];
-            const t2 = e.targetTouches[1];
-            const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        // 멀티 터치 피치 줌 (두 손가락 완벽 매핑)
+        if (this.activePointers.size === 2) {
+            const ptrs = Array.from(this.activePointers.values());
+            const currentDist = Math.hypot(ptrs[0].clientX - ptrs[1].clientX, ptrs[0].clientY - ptrs[1].clientY);
 
-            if (state.lastTouchDist > 0) {
-                const factor = currentDist / state.lastTouchDist;
-                this.applyZoom(state.scale * factor, (t1.clientX + t2.clientX) / 2, (t1.clientY + t2.clientY) / 2);
+            if (this.initialDist > 0) {
+                const factor = currentDist / this.initialDist;
+                const midX = (ptrs[0].clientX + ptrs[1].clientX) / 2;
+                const midY = (ptrs[0].clientY + ptrs[1].clientY) / 2;
+                this.applyZoom(this.initialScale * factor, midX, midY);
             }
-            state.lastTouchDist = currentDist;
             return;
         }
 
-        // 한 손가락 자유 드래그 이동 스크롤
-        if (!state.isDragging) return;
-        state.offsetX = e.clientX - state.startX;
-        state.offsetY = e.clientY - state.startY;
-        this.applyTransform();
+        // 한 손가락 자유 스크롤 드래그
+        if (state.isDragging && this.activePointers.size === 1) {
+            state.offsetX = e.clientX - state.startX;
+            state.offsetY = e.clientY - state.startY;
+            this.applyTransform();
+        }
     }
 
     handlePointerUp(e) {
+        this.activePointers.delete(e.pointerId);
         const state = this.core.state;
-        state.isDragging = false;
-        state.lastTouchDist = 0;
-        
-        // 조준선 좌표가 어긋나지 않도록 변환행렬 값을 데이터베이스 캐시에 실시간 기록
+
+        if (this.activePointers.size < 2) {
+            this.initialDist = 0;
+        }
+        if (this.activePointers.size === 0) {
+            state.isDragging = false;
+        }
+
         this.core.saveCache('lastTransform', {
             scale: state.scale,
             offsetX: state.offsetX,
@@ -97,18 +114,14 @@ class BowAppGesture {
         this.applyZoom(nextScale, e.clientX, e.clientY);
     }
 
-    /**
-     * 최대 5배 명세 한계값 제약 내에서 마우스/펜 포인터 좌표 중심 확대
-     */
     applyZoom(targetScale, clientX, clientY) {
         const state = this.core.state;
         const containerRect = this.container.getBoundingClientRect();
-        
-        const nextScale = Math.min(Math.max(targetScale, 1), 5); // 1배 ~ 5배 제한 범위 Lock
-        
+        const nextScale = Math.min(Math.max(targetScale, 1), 5); // 1배~5배 락
+
         const mouseX = clientX - containerRect.left;
         const mouseY = clientY - containerRect.top;
-        
+
         state.offsetX = mouseX - (mouseX - state.offsetX) * (nextScale / state.scale);
         state.offsetY = mouseY - (mouseY - state.offsetY) * (nextScale / state.scale);
         state.scale = nextScale;
@@ -116,9 +129,6 @@ class BowAppGesture {
         this.applyTransform();
     }
 
-    /**
-     * 물리적 변환을 비디오 노드와 분석 캔버스 좌표계에 동시 전사
-     */
     applyTransform() {
         const state = this.core.state;
         if (this.video) {
