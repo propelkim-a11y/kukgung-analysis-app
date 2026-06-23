@@ -2,7 +2,7 @@
  * js/app_gesture.js
  * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (6단계)
  * - 두 손가락 피치 줌(최대 5배) 및 한 손가락 화면 드래그 이동 스크롤
- * - 드로잉 모드와의 충돌을 차단하기 위한 간섭 필터 교정 완료
+ * - 비디오와 분석 캔버스를 동시에 변환하여 선 분리 현상 완벽 박멸
  */
 
 class BowAppGesture {
@@ -46,7 +46,7 @@ class BowAppGesture {
     }
 
     handlePointerDown(e) {
-        // [선긋기] 모드인 경우 캔버스 펜 입력(analyzer.js)에 제어권을 양도하고 철수
+        // [선긋기] 모인 경우 캔버스 펜 입력(analyzer.js)에 제어권을 양도하고 철수
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
         // Palm Rejection: 스타일러스 활성화 도중 살이 먼저 닿아 유입되는 Direct 터치 차단
@@ -148,13 +148,26 @@ class BowAppGesture {
     }
 
     /**
-     * 물리적 변환을 비디오 노드와 분석 캔버스 좌표계에 동시 전사
+     * 💡 교정: 물리적 변환(CSS)을 비디오 노드와 분석 캔버스 도화지 레이어 전체에 동시에 전사
+     * 이제 비디오가 커지면 선이 그려진 도화지도 완벽히 일치하는 스케일로 연동되어 움직입니다.
      */
     applyTransform() {
         const state = this.core.state;
+        const transformCSS = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
+        
+        // 1. 비디오 엘리먼트 확대/이동 변환
         if (this.video) {
-            this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
+            this.video.style.transform = transformCSS;
         }
+        
+        // 2. 캔버스 엘리먼트 자체를 물리적으로 동일하게 확대/이동 변환 (분리 현상 영구 차단)
+        const canvasEl = document.getElementById('draw-canvas');
+        if (canvasEl) {
+            canvasEl.style.transform = transformCSS;
+            canvasEl.style.transformOrigin = 'center center';
+        }
+
+        // 3. 분석기 기하학 좌표계 내부 행렬 동기화
         if (window.bowAnalyzer) {
             window.bowAnalyzer.updateTransform(state.scale, state.offsetX, state.offsetY);
         }
