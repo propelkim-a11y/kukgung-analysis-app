@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (레이아웃 패치 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -184,19 +184,13 @@ body, html {
     box-shadow: none;
 }
 
-/* [교정 2] 촬영 화면 패널 투명화 처리 */
+/* [요구사항 2] 촬영 화면 패널을 완벽하게 투명화 처리 */
 #scene-record .unified-panel-box {
     background: transparent !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     border: none !important;
     box-shadow: none !important;
-}
-
-/* 촬영용 더미 패널 핸들 공간 확보 (레이아웃 싱크용) */
-#scene-record .panel-slider-handle {
-    visibility: hidden;
-    pointer-events: none;
 }
 
 .panel-slider-handle {
@@ -223,36 +217,26 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 8. 4대 텍스트 메뉴 정렬 및 [교정 1] 촬영 화면용 싱크 바 */
-.text-menu-bar, .text-menu-bar-sync {
+/* 8. 4대 텍스트 메뉴 정렬 */
+.text-menu-bar {
     display: flex;
     width: 100%;
+    background-color: rgba(255, 255, 255, 0.06);
     padding: 3px;
     border-radius: 13px;
 }
 
-.text-menu-bar {
-    background-color: rgba(255, 255, 255, 0.06);
-}
-
-.text-menu-bar-sync {
-    background-color: transparent; /* 촬영 패널 투명화 연동 */
-}
-
-.menu-btn, .menu-btn-sync {
+.menu-btn {
     flex: 1;
     height: 38px;
     background: transparent;
     border: none;
+    color: rgba(255, 255, 255, 0.5);
     font-size: 14px;
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
     text-align: center;
-}
-
-.menu-btn {
-    color: rgba(255, 255, 255, 0.5);
     transition: all 0.2s ease;
 }
 
@@ -260,19 +244,6 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
-}
-
-/* [교정 1] 분석 모드의 '확대(두번째)' 위치와 완벽히 격자를 일치시키는 촬영용 버튼 */
-.menu-btn-sync {
-    background: rgba(255, 255, 255, 0.15);
-    color: #FFFFFF;
-    border: 0.5px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.menu-btn-dummy {
-    flex: 1;
-    height: 38px;
 }
 
 /* 9. 비디오 슬라이더 타임라인 */
