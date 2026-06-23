@@ -105,7 +105,7 @@ async function initApp() {
     recordBtn.addEventListener('touchstart', handleAction, { capture: true, passive: false });
     recordBtn.addEventListener('click', handleAction, { capture: true });
 
-    // ⚡ [피드백 적용 스위칭] 화면 이동 모드가 왼쪽, 선 긋기 모드가 오른쪽 연동 매핑
+    // 화면 이동 모드가 왼쪽, 선 긋기 모드가 오른쪽 연동 매핑
     document.getElementById('btn-tool-move').onclick = () => {
         document.getElementById('btn-tool-move').classList.add('active');
         document.getElementById('btn-tool-draw').classList.remove('active');
@@ -119,7 +119,7 @@ async function initApp() {
     };
 }
 
-// 5. 카메라가 아예 없는 데스크톱용 도화지 가상 배경 렌더러
+// 5. 웹캠이 없는 PC용 가상 캔버스 안내 도화지 빌더
 function loadDummyCanvasForPC() {
     const dc = document.getElementById('drawing-canvas');
     const oc = document.getElementById('output-canvas');
@@ -139,7 +139,7 @@ function loadDummyCanvasForPC() {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🏹 우측 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
+    ctx.fillText('🏹 하단 [영상 업로드 분석] 버튼을 눌러', oc.width / 2, oc.height / 2 - 20);
     ctx.fillText('보유하고 계신 국궁 동영상을 넣으면 정밀 각도 측정이 가능합니다.', oc.width / 2, oc.height / 2 + 30);
 }
 // 6. 비디오 녹화 시작 구문
@@ -155,7 +155,7 @@ async function startRecording() {
             const blob = new Blob(recordedChunks, { type: mime || 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
-            // 로컬 장치 클립보드 원본 자동 보관 다운로더
+            // 로컬 장치 원본 자동 보관 다운로더
             const a = document.createElement('a');
             a.href = url;
             const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -194,14 +194,14 @@ const fileUploadInput = document.getElementById('file-upload');
 if (fileUploadInput) {
     fileUploadInput.onchange = (e) => {
         const file = e.target.files;
-        if (file && file[0]) {
+        if (file && file) {
             activeVideoRoll = 0; 
-            loadVideoForAnalysis(URL.createObjectURL(file[0]));
+            loadVideoForAnalysis(URL.createObjectURL(file));
         }
     };
 }
 
-// 10. 상하단 레이아웃 분리 모듈
+// 10. 상하단 레이아웃 분리 모듈 (⚡ 숨겨진 메뉴 노출 차단 버그 전면 수정)
 function switchMode(mode) {
     document.getElementById('camera-section').classList.toggle('hidden', mode !== 'shoot');
     document.getElementById('analysis-section').classList.toggle('hidden', mode !== 'analyze');
@@ -209,19 +209,19 @@ function switchMode(mode) {
     document.getElementById('btn-mode-shoot').classList.toggle('active', mode === 'shoot');
     document.getElementById('btn-mode-analyze').classList.toggle('active', mode === 'analyze');
 
-    // 통합 제어 센터 내부의 분석/촬영 컴포넌트 가시성 동적 전환
+    // ⚡ [버그 해결] 대통합 이후 실제 HTML의 새 ID인 'analysis-components'와 'shoot-components'를 제어하도록 수정
     const analysisComponents = document.getElementById('analysis-components');
     const shootComponents = document.getElementById('shoot-components');
     const headerElement = document.querySelector('.header');
     
     if (mode === 'analyze') {
-        if (analysisComponents) analysisComponents.remove('hidden');
-        if (shootComponents) shootComponents.classList.add('hidden'); 
-        if (headerElement) headerElement.classList.add('hidden'); 
+        if (analysisComponents) analysisComponents.classList.remove('hidden'); // 분석 메뉴 강제 표출
+        if (shootComponents) shootComponents.classList.add('hidden'); // 촬영 버튼 격리 숨김
+        if (headerElement) headerElement.classList.add('hidden'); // 수평계 상단 메시지 숨김
     } else {
-        if (analysisComponents) analysisComponents.classList.add('hidden');
-        if (shootComponents) shootComponents.classList.remove('hidden'); 
-        if (headerElement) headerElement.classList.remove('hidden'); 
+        if (analysisComponents) analysisComponents.classList.add('hidden'); // 분석 메뉴 숨김
+        if (shootComponents) shootComponents.classList.remove('hidden'); // 촬영 버튼 복구
+        if (headerElement) headerElement.classList.remove('hidden'); // 수평계 상단 메시지 복구
     }
 }
 
@@ -252,7 +252,7 @@ function loadVideoForAnalysis(url) {
         v.currentTime = 0.1; 
         switchMode('analyze');
         
-        // 직선 그리드 피치 투 줌 마운트 초기화
+        // 직선 그리드 피치 투 줌 마운트
         bowAnalyzer.init(); 
         
         v.onseeked = () => {
