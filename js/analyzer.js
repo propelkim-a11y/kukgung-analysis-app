@@ -225,22 +225,46 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    drawBackgroundGrid(scaleX, scaleY) {
+       drawBackgroundGrid(scaleX, scaleY) {
         this.ctx.save();
+        
+        // 💡 [핵심 교정] 현재 확대 배율(transform.scale)로 선 두께를 나누어, 5배 확대해도 선이 두꺼워지지 않고 항상 0.75px 유지
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50; 
-        const widthBound = this.canvas.width * 2;
-        const heightBound = this.canvas.height * 2;
 
-        for (let x = -widthBound; x <= widthBound; x += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(x, -heightBound); this.ctx.lineTo(x, heightBound); this.ctx.stroke();
+        // 💡 [버그 원인 차단] 배율만큼 격자 크기를 역산하여 확대/축소 시에도 격자 눈금의 물리적 크기를 항상 일정하게 유지
+        const gridSize = 50 / this.transform.scale; 
+        
+        // 화면 해상도 대비 충분한 여백 영역 설정 (성능 최적화를 위해 무한 루프 범위를 타이트하게 제한)
+        const widthBound = this.canvas.width / this.transform.scale;
+        const heightBound = this.canvas.height / this.transform.scale;
+
+        // 현재 스크롤 이동 오프셋(offsetX/Y)을 반영하여 화면 이동 시 격자가 끊기지 않고 무한히 이어지도록 보정
+        const startX = Math.floor((-this.transform.offsetX * scaleX / this.transform.scale) / gridSize) * gridSize - widthBound;
+        const endX = startX + (widthBound * 3);
+
+        const startY = Math.floor((-this.transform.offsetY * scaleY / this.transform.scale) / gridSize) * gridSize - heightBound;
+        const endY = startY + (heightBound * 3);
+
+        // 세로 격자선 정밀 렌더링
+        for (let x = startX; x <= endX; x += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, startY);
+            this.ctx.lineTo(x, endY);
+            this.ctx.stroke();
         }
-        for (let y = -heightBound; y <= heightBound; y += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(-widthBound, y); this.ctx.lineTo(widthBound, y); this.ctx.stroke();
+
+        // 가로 격자선 정밀 렌더링
+        for (let y = startY; y <= endY; y += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, y);
+            this.ctx.lineTo(endX, y);
+            this.ctx.stroke();
         }
+        
         this.ctx.restore();
     }
+
 
     // 💡 [초정밀 고도화] 사잇각 시각화 호(Arc) 및 인라인 수치 타이포그래피 매핑 엔진
     drawInlineAngleArc(line1, line2, scaleX) {
