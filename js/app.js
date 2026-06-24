@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (스마트 다운로드 코덱 패치 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (열기 기능 무결점 완결판)
  */
 
 window.bowAppNodes = {};
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재生的';
+        nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         await startCamera();
@@ -219,8 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.recordStatus.textContent = '저장 중...';
                 const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
                 await core.saveCache('lastVideoBlob', videoBlob);
-                
-                // 💡 실제 기기에서 인코딩 완료된 코덱 종류 명세를 임시 저장해 추출 엔진에 전송
                 await core.saveCache('lastRecordedMime', mediaRecorder.mimeType || 'video/webm');
 
                 const videoURL = URL.createObjectURL(videoBlob);
@@ -271,11 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                // 💡 [갤럭시 갤러리 연동 마감] 실제 인코딩된 MIME 타입을 스캔하여 확장자 자동 추치
                 const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm';
                 let fileExtension = '.webm';
                 
-                // 갤럭시 One UI가 즉각 식별 가능한 포맷 매핑 구조화
                 if (actualMime.includes('mp4')) {
                     fileExtension = '.mp4';
                 }
@@ -393,18 +389,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
+    // 💡 [최종 수정 핵심부] 첫 번째 파일 객체를 정확히 적출하고, 완전히 화면에 사상된 뒤(loadeddata) 스케일 제어 바 가동
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files;
+        const targetFile = files[0]; // 0번 바이너리 원본 직계 적출 교정
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
         
+        // 데이터 하드웨어 전송 적재 완료 시점에 리사이즈 엔진 스위칭 인터랙션 고정
         nodes.mainVideo.addEventListener('loadeddata', () => {
             nodes.videoSlider.max = nodes.mainVideo.duration;
             nodes.videoSlider.step = 0.0001;
+            resizeCanvasToDisplay(); // 화각 왜곡 해상도 선형 보정 즉시 재출력
         }, { once: true });
 
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
