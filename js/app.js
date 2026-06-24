@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (하드웨어 가변 FPS 탑재 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (저사양 방어 스마트 쉴드 버전)
  */
 
 window.bowAppNodes = {};
@@ -40,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 💡 사용자가 직접 변경 선택하는 타겟 목표 타겟 프레임 속도 (기본값: 30)
     let selectedFPS = 30;
 
     // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
@@ -97,14 +96,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     /**
-     * 후면 카메라 스트리밍 구동부 (💡 선택된 가변 frameRate 주사율 실시간 동적 적용 마감)
+     * 후면 카메라 스트리밍 구동부
      */
     async function startCamera() {
-        if (cameraStream) stopCamera(); // 기존 캡처 스트림 청소 후 재요청
+        if (cameraStream) stopCamera();
         try {
             const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
-            
-            // 사용자가 선택한 프레임 바 숫자에 따라 하드웨어 스트림 요구조건 동적 세팅
             let videoConstraints = { 
                 facingMode: { ideal: "environment" }, 
                 width: 1280, 
@@ -120,9 +117,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 인프라 바인딩 성공`;
+            nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치 로드 실패. 비디오를 직접 열어 분석을 시작하세요.';
+            // 💡 [저사양 폰 과부하 방어] 고속 촬영 요청 실패 시 장치 한계에 맞춰 30fps 표준 사양으로 강제 하향 조정 정렬
+            if (selectedFPS > 30) {
+                selectedFPS = 30;
+                const activeBtn = document.querySelector('.fps-btn[data-fps="30"]');
+                if (activeBtn) {
+                    document.querySelectorAll('.fps-btn').forEach(b => b.classList.remove('active'));
+                    activeBtn.classList.add('active');
+                }
+                await startCamera();
+            } else {
+                nodes.recordStatus.textContent = '카메라 장치 로드 실패. 비디오를 직접 불러와서 분석을 시작하세요.';
+            }
             console.error(err);
         }
     }
@@ -135,16 +143,29 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.cameraPreview.srcObject = null;
     }
 
-    // 💡 [FPS 메뉴 바 이벤트 연동] 버튼을 누르는 순간 하드웨어 대역폭을 재배치하여 60fps~120fps 강제 전환
+    // 💡 [하드웨어 사양 자율 계측] 저사양 폰(CPU 코어 4개 이하 또는 램 부족)인 경우 고속 촬영 락 제어
     const fpsButtons = document.querySelectorAll('.fps-btn');
+    const cpuCores = navigator.hardwareConcurrency || 4;
+    
+    if (cpuCores <= 4) {
+        // 저사양 기기로 판정 시 120fps 이상 버튼을 비활성화하고 반투명 처리하여 튕김 완벽 예방
+        fpsButtons.forEach(btn => {
+            const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
+            if (fpsVal >= 120) {
+                btn.style.opacity = '0.25';
+                btn.style.pointerEvents = 'none';
+            }
+        });
+    }
+
     fpsButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (isRecording) return; // 녹화 도중 변환 차단
+            if (isRecording) return;
             fpsButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             selectedFPS = parseInt(btn.getAttribute('data-fps'), 10);
             if (nodes.sceneRecord.classList.contains('active')) {
-                await startCamera(); // 카메라 하드웨어 즉시 재가동 락 해제
+                await startCamera();
             }
         });
     });
@@ -238,11 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
         activeBtn.classList.add('active');
     }
 
-    // 💡 [가변 60fps~960fps 역산 엔진 완비] 동적으로 세팅된 프레임수에 따라 타임라인 정밀 밀리초 거리 보정
     let currentFrameTime = 1 / 30; 
     
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
-        // 비디오 엘리먼트 내장 스펙 정보 혹은 우리가 선택했던 기기 캡처 FPS 수치 추적 매핑
         const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
         currentFrameTime = 1 / detectedFPS;
         
