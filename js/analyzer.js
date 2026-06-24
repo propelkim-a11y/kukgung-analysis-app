@@ -1,7 +1,8 @@
 /**
  * js/analyzer.js (Part 1 of 2)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (영상 밀착 동기화 최종판)
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (크로스헤어 정밀 핀 튜닝 버전)
  */
+
 class BowAnalyzer {
     constructor() {
         this.canvas = null;
@@ -58,22 +59,14 @@ class BowAnalyzer {
         }
         return false;
     }
-    // 💡 [치명적 분리 버그 해결] X축과 Y축의 해상도 왜곡 비율을 개별 역산하여 확대/축소 시 선이 따로 노는 현상 원천 차단
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        
-        // 캔버스의 실제 내부 물리 해상도와 브라우저 디스플레이 화면 크기(CSS) 간의 독립 비율 산출
         const canvasScaleX = this.canvas.width / rect.width;
         const canvasScaleY = this.canvas.height / rect.height;
-
-        // 브라우저 뷰포트 상대 터치 좌표를 내부 해상도 좌표 공간으로 정밀 선형 사상
         const clientX = (event.clientX - rect.left) * canvasScaleX;
         const clientY = (event.clientY - rect.top) * canvasScaleY;
-
-        // 제스처 제어부(app_gesture.js)가 생성하는 CSS 패닝 거리(px)를 캔버스 배율 축에 가감 없이 일치화하여 강제 동기화
         const canvasX = (clientX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
-
         return { x: canvasX, y: canvasY };
     }
     handlePointerDown(event) {
@@ -237,14 +230,10 @@ class BowAnalyzer {
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
         const canvasScaleY = this.canvas.height / rect.height;
-        
-        // 💡 [2축 종횡비 동기화] 가로축(scaleX)과 세로축(canvasScaleY) 변환율을 캔버스 내부 트랜스레이트에 개별 분리 주입
-        // 이로써 확대 상태에서 캔버스가 비디오의 움직임을 나노 단위까지 똑같은 가속도로 완벽 추적합니다.
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
-        
         this.drawBackgroundGrid(scaleX, canvasScaleY);
-        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
+        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         this.lines.forEach(line => this.drawSingleLine(line));
@@ -260,19 +249,40 @@ class BowAnalyzer {
         }
         this.ctx.restore();
     }
+    // 💡 [그래픽스 디자인 패치 완비] 투박한 원형 핸들 대신 나노 두께의 세련된 정밀 크로스헤어 핀 조준선 투사
     drawSingleLine(line) {
         if (!line) return;
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
+
+        // 선 본체 그리기 (테크니컬 슬림 나노 실선으로 가늘고 정교하게 벼림)
         this.ctx.beginPath();
         this.ctx.moveTo(line.start.x, line.start.y);
         this.ctx.lineTo(line.end.x, line.end.y);
         this.ctx.stroke();
-        const radius = (4 * scaleX) / this.transform.scale;
+
+        // 십자 핀 조준 마크 렌더링 (확대 스케일에 영향을 받지 않는 고정 크기 가이드)
+        const pinSize = (8 * scaleX) / this.transform.scale;
+        this.ctx.save();
+        this.ctx.lineWidth = (1.0 * scaleX) / this.transform.scale;
+
+        // 시작점 십자 크로스헤어
         this.ctx.beginPath();
-        this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
-        this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
-        this.ctx.fill();
+        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
+        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
+        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
+        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
+        this.ctx.stroke();
+
+        // 끝점 십자 크로스헤어
+        this.ctx.beginPath();
+        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
+        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
+        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
+        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
+        this.ctx.stroke();
+
+        this.ctx.restore();
     }
 }
 window.bowAnalyzer = new BowAnalyzer();
