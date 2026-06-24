@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (자이로 연동 수직 가이드 탑재 완료)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (선긋기 강화 및 5메뉴 통합 버전)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -110,7 +110,7 @@ body, html {
     transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
 }
 
-/* 💡 [핵심 추가] 초정밀 실물 자이로 수직 가이드라인 UI 명세 */
+/* 초정밀 실물 자이로 수직 가이드라인 UI 명세 */
 #gyro-vertical-line {
     position: absolute;
     top: 5%;
@@ -218,7 +218,7 @@ body, html {
     background-color: transparent;
 }
 
-/* 8. 분석 화면용 4대 텍스트 메뉴 */
+/* 8. 분석 화면용 5대 텍스트 메뉴 바 (균등 레이아웃 보정 버전) */
 .text-menu-bar {
     display: flex;
     width: 100%;
@@ -234,7 +234,7 @@ body, html {
     background: transparent;
     border: none;
     color: rgba(255, 255, 255, 0.5);
-    font-size: 14px;
+    font-size: 13px; /* 💡 5대 메뉴 수용 안정화를 위한 13px 마이크로 조정 마감 */
     font-weight: 600;
     border-radius: 10px;
     cursor: pointer;
@@ -246,6 +246,12 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     color: #34C759;
     font-weight: 700;
+}
+
+/* 취소(Undo) 햅틱 버튼 전용 터치 피드백 스타일 명세 */
+#btn-undo:active {
+    color: #007AFF;
+    background: rgba(0, 122, 255, 0.15);
 }
 
 /* 9. 비디오 슬라이더 타임라인 */
