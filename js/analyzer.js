@@ -156,10 +156,12 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines));
+            // 💡 [배열 우회 교정] lines 배열 자체 대신 첫 번째 원소 객체인 [0]을 정확히 지정
+            this.broadcastAngle(this.getLineAngle(this.lines[0]));
         }
     }
     getLineAngle(line) {
+        if (!line) return 0;
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
         const dx = line.end.x - line.start.x;
@@ -169,9 +171,10 @@ class BowAnalyzer {
         return angle % 180;
     }
     getIntersectionAngle(line1, line2) {
+        if (!line1 || !line2) return 0;
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.start.x - line1.end.x);
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.end.x - line1.start.x);
         const angle2 = Math.atan2(-(line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
@@ -202,6 +205,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
     drawInlineAngleArc(line1, line2, scaleX) {
+        if (!line1 || !line2) return;
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
         const a1 = Math.atan2((line1.start.y - line1.end.y) * aspectCorrection, line1.start.x - line1.end.x);
@@ -233,12 +237,13 @@ class BowAnalyzer {
         this.drawBackgroundGrid(scaleX);
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
-        this.ctx.fillStyle = '#00FF6Green';
+        this.ctx.fillStyle = '#00FF66';
         this.lines.forEach(line => this.drawSingleLine(line));
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
+            // 💡 [배열 우회 교정] lines 배열 자체 대신 첫 번째 원소 객체인 [0]을 정확히 지정
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
@@ -248,6 +253,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
     drawSingleLine(line) {
+        if (!line) return;
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
         this.ctx.beginPath();
