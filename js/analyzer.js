@@ -1,13 +1,7 @@
 /**
  * js/analyzer.js (Part 1 of 2)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (기준점 동기화 완전판)
- * - 줌/이동 변환 행렬 역산 공식 재정립 (최대 확대 상태에서도 픽셀 오차 제로 보장)
- * - 단선(선 1개): 수평선(0도) 기준 절대 고각 정밀 실시간 매핑
- * - 복선(선 2개): 두 조준선 사이의 유클리드 교각(사잇각) 실시간 매핑
- * - 화면 빈 공간 더블 탭(Double Tap) 시 직전 가이드라인 단계별 제거(Undo) 인터랙션 탑재
- * - [축 교정 패치] 비디오와 캔버스의 transform-origin을 좌측 상단(0,0)으로 완벽 일치화
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (영상 밀착 동기화 최종판)
  */
-
 class BowAnalyzer {
     constructor() {
         this.canvas = null;
@@ -64,14 +58,22 @@ class BowAnalyzer {
         }
         return false;
     }
-    // 💡 [치명적 버그 해결] 비디오 엘리먼트의 비보정 CSS 변환 축과 캔버스 좌표 공간을 수학적으로 1:1 결합
+    // 💡 [치명적 분리 버그 해결] X축과 Y축의 해상도 왜곡 비율을 개별 역산하여 확대/축소 시 선이 따로 노는 현상 원천 차단
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const clientX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
-        const clientY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
-        const canvasResolutionScale = this.canvas.width / window.innerWidth;
-        const canvasX = (clientX - (this.transform.offsetX * canvasResolutionScale)) / this.transform.scale;
-        const canvasY = (clientY - (this.transform.offsetY * canvasResolutionScale)) / this.transform.scale;
+        
+        // 캔버스의 실제 내부 물리 해상도와 브라우저 디스플레이 화면 크기(CSS) 간의 독립 비율 산출
+        const canvasScaleX = this.canvas.width / rect.width;
+        const canvasScaleY = this.canvas.height / rect.height;
+
+        // 브라우저 뷰포트 상대 터치 좌표를 내부 해상도 좌표 공간으로 정밀 선형 사상
+        const clientX = (event.clientX - rect.left) * canvasScaleX;
+        const clientY = (event.clientY - rect.top) * canvasScaleY;
+
+        // 제스처 제어부(app_gesture.js)가 생성하는 CSS 패닝 거리(px)를 캔버스 배율 축에 가감 없이 일치화하여 강제 동기화
+        const canvasX = (clientX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
+        const canvasY = (clientY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
+
         return { x: canvasX, y: canvasY };
     }
     handlePointerDown(event) {
@@ -165,7 +167,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -190,17 +192,16 @@ class BowAnalyzer {
         const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: angle.toFixed(1) } });
         window.dispatchEvent(angleEvent);
     }
-    drawBackgroundGrid(scaleX) {
+    drawBackgroundGrid(scaleX, canvasScaleY) {
         this.ctx.save();
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
         const gridSize = 50; 
-        const canvasResolutionScale = this.canvas.width / window.innerWidth;
         const widthBound = this.canvas.width / this.transform.scale;
         const heightBound = this.canvas.height / this.transform.scale;
-        const startX = Math.floor((-this.transform.offsetX * canvasResolutionScale / this.transform.scale) / gridSize) * gridSize - widthBound;
+        const startX = Math.floor((-this.transform.offsetX * scaleX / this.transform.scale) / gridSize) * gridSize - widthBound;
         const endX = startX + (widthBound * 3);
-        const startY = Math.floor((-this.transform.offsetY * canvasResolutionScale / this.transform.scale) / gridSize) * gridSize - heightBound;
+        const startY = Math.floor((-this.transform.offsetY * canvasScaleY / this.transform.scale) / gridSize) * gridSize - heightBound;
         const endY = startY + (heightBound * 3);
         for (let x = startX; x <= endX; x += gridSize) {
             this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
@@ -235,13 +236,14 @@ class BowAnalyzer {
         this.ctx.save();
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
-        const canvasResolutionScale = this.canvas.width / window.innerWidth;
+        const canvasScaleY = this.canvas.height / rect.height;
         
-        // 💡 [매트릭스 축 교정 마감] 제스처 피벗과 정확히 동치되는 (0,0) 기준 스케일 및 오프셋 이동 행렬 주사
-        this.ctx.translate(this.transform.offsetX * canvasResolutionScale, this.transform.offsetY * canvasResolutionScale);
+        // 💡 [2축 종횡비 동기화] 가로축(scaleX)과 세로축(canvasScaleY) 변환율을 캔버스 내부 트랜스레이트에 개별 분리 주입
+        // 이로써 확대 상태에서 캔버스가 비디오의 움직임을 나노 단위까지 똑같은 가속도로 완벽 추적합니다.
+        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        this.drawBackgroundGrid(scaleX);
+        this.drawBackgroundGrid(scaleX, canvasScaleY);
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
@@ -249,7 +251,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
