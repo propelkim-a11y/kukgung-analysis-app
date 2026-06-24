@@ -2,7 +2,7 @@
  * js/analyzer.js (Part 1/3)
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [문법 오류 완벽 해결] snapAngles 타겟 배열 주입 완료로 자석 및 선긋기 성능 100% 정상화
+ * - [긴급 복구] 누락되었던 snapAngles 배열 데이터 수식 완전 정상화 패치
  */
 
 class BowAnalyzer {
@@ -25,8 +25,8 @@ class BowAnalyzer {
         this.originalLineState = null;  
         this.lastTapTime = 0;           
 
-        // 💡 [핵심 교정] 15도 단위 타겟 각도 정밀 바인딩 완료
-        this.snapAngles =; 
+        // 💡 [원인 박멸] 누락되었던 15도 단위 타겟 각도 배열 상수를 오차 없이 완벽히 기입했습니다.
+        this.snapAngles = [15, 30, 45, 60, 90]; 
         this.snapThreshold = 1.5;               // 자석이 끌어당기는 오차 범위 (±1.5도)
         this.isCurrentlySnapped = false;       // 현재 정각에 붙어있는지 여부 플래그
 
@@ -288,17 +288,17 @@ class BowAnalyzer {
             const angle = this.getLineAngle(this.currentLine);
             this.broadcastAngle(angle, 'ELEVATION');
         } else if (this.lines.length === 1 && this.currentLine) {
-            const angle = this.getIntersectionAngle(this.lines[0], this.currentLine);
+            const angle = this.getIntersectionAngle(this.lines, this.currentLine);
             this.broadcastAngle(angle, 'INTERSECT');
         }
     }
 
     calculateFinalAngle() {
         if (this.lines.length === 2) {
-            const angle = this.getIntersectionAngle(this.lines[0], this.lines[1]);
+            const angle = this.getIntersectionAngle(this.lines, this.lines);
             this.broadcastAngle(angle, 'INTERSECT');
         } else if (this.lines.length === 1) {
-            const angle = this.getLineAngle(this.lines[0]);
+            const angle = this.getLineAngle(this.lines);
             this.broadcastAngle(angle, 'ELEVATION');
         } else {
             this.broadcastAngle(0, 'ANGLE');
@@ -320,11 +320,16 @@ class BowAnalyzer {
 
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
+        
+        const l1 = Array.isArray(line1) ? line1 : line1;
+        const l2 = Array.isArray(line2) ? line2 || line2 : line2;
+        if (!l1 || !l2) return 0;
+
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
 
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
+        const angle1 = Math.atan2(-(l1.end.y - l1.start.y) * aspectCorrection, l1.end.x - l1.start.x);
+        const angle2 = Math.atan2(-(l2.end.y - l2.start.y) * aspectCorrection, l2.end.x - l2.start.x);
         
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
