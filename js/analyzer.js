@@ -2,7 +2,7 @@
  * js/analyzer.js (Part 1/3)
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [긴급 복구] 누락되었던 snapAngles 배열 데이터 수식 완전 정상화 패치
+ * - [3번 방안 정밀 패치] 네이티브 포인터 멀티 터치 분리 및 화면비 왜곡 계수 동기화로 정확한 자석 스냅 구현
  */
 
 class BowAnalyzer {
@@ -25,9 +25,12 @@ class BowAnalyzer {
         this.originalLineState = null;  
         this.lastTapTime = 0;           
 
-        // 💡 [원인 박멸] 누락되었던 15도 단위 타겟 각도 배열 상수를 오차 없이 완벽히 기입했습니다.
-        this.snapAngles = [15, 30, 45, 60, 90]; 
-        this.snapThreshold = 1.5;               // 자석이 끌어당기는 오차 범위 (±1.5도)
+        // 💡 3번 방안 전용 독립 포인터 캐시 맵 (제스처 파일 간섭 소거)
+        this.analyzerPointers = new Map();
+
+        // 15도 단위 타겟 각도 배열
+        this.snapAngles =; 
+        this.snapThreshold = 3.5;               // 눈으로 보기에 더 직관적이도록 자석 반경 확대 (±3.5도)
         this.isCurrentlySnapped = false;       // 현재 정각에 붙어있는지 여부 플래그
 
         this.handlePointerDown = this.handlePointerDown.bind(this);
@@ -52,6 +55,7 @@ class BowAnalyzer {
         this.toolMode = mode;
         this.selectedLine = null;
         this.editPart = null;
+        this.analyzerPointers.clear();
         this.render();
     }
 
@@ -61,6 +65,7 @@ class BowAnalyzer {
         this.selectedLine = null;
         this.editPart = null;
         this.isCurrentlySnapped = false;
+        this.analyzerPointers.clear();
         this.render();
         this.broadcastAngle(0, 'ANGLE');
     }
@@ -92,12 +97,19 @@ class BowAnalyzer {
         if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) return;
         if (event.pointerType === 'pen') window.isStylusActive = true;
 
-        this.canvas.setPointerCapture(event.pointerId);
+        // 💡 캔버스 자체 멀티 포인터 동적 맵에 누적 트래킹
+        this.analyzerPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+
+        // 화면 줌/스크롤 상태라면 포인터 캡처 생략
+        if (this.analyzerPointers.size < 2) {
+            this.canvas.setPointerCapture(event.pointerId);
+        }
+        
         const coords = this.getCanvasCoordinates(event);
         
         // 1단계: 더블 탭 개별 삭제 제스처 연산
         const now = Date.now();
-        if (now - this.lastTapTime < 250) {
+        if (now - this.lastTapTime < 250 && this.analyzerPointers.size === 1) {
             const hitLineIndex = this.findHitLineIndex(coords);
             if (hitLineIndex !== -1) {
                 this.lines.splice(hitLineIndex, 1);
@@ -111,6 +123,12 @@ class BowAnalyzer {
             }
         }
         this.lastTapTime = now;
+
+        // 다른 손가락이 이미 누르고 있는 상태(멀티 터치)라면 편집이나 새선 생성 차단
+        if (this.analyzerPointers.size >= 2) {
+            this.currentLine = null;
+            return;
+        }
 
         // 2단계: 기존에 그어진 선들의 적중 판정(Hit Test)
         const hitResult = this.hitTestLines(coords);
@@ -143,10 +161,16 @@ class BowAnalyzer {
      */
     handlePointerMove(event) {
         if (this.toolMode !== 'draw') return;
-        const coords = this.getCanvasCoordinates(event);
+        
+        // 무브 중인 포인터 실시간 좌표 갱신
+        if (this.analyzerPointers.has(event.pointerId)) {
+            this.analyzerPointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+        }
 
-        // 전역 제스처 포인터 맵 데이터의 개수 파싱 (멀티터치 감지)
-        const isMultiTouching = (window.bowAppGesture && window.bowAppGesture.activePointers && window.bowAppGesture.activePointers.size >= 2);
+        // 💡 3번 방안 물리 핵심: 캔버스 터치 도메인 안에서 손가락이 2개 이상 활성화되었는지 정밀 검출
+        const isMultiTouching = (this.analyzerPointers.size >= 2);
+
+        const coords = this.getCanvasCoordinates(event);
 
         if (this.selectedLine && this.editPart && this.originalLineState) {
             const dx = coords.x - this.dragStartCoords.x;
@@ -184,6 +208,10 @@ class BowAnalyzer {
         if (event.pointerType === 'pen') {
             setTimeout(() => { window.isStylusActive = false; }, 500);
         }
+        
+        // 맵에서 떨어지는 포인터 추방 해제
+        this.analyzerPointers.delete(event.pointerId);
+
         if (this.toolMode !== 'draw') return;
 
         if (this.selectedLine) {
@@ -206,15 +234,21 @@ class BowAnalyzer {
         }
     }
 
+    /**
+     * 💡 [왜곡 계수 전격 교정] 디스플레이 화면비 왜곡 계수를 소거하여 정확한 라디안 각 추출
+     */
     applySmartSnap(line, movingPart, isMultiTouching) {
         this.isCurrentlySnapped = false;
-        if (isMultiTouching) return; 
+        if (isMultiTouching) return; // 💡 다른 손가락을 대면 자석 기능이 즉시 풀리며 15.1도 미세조율 가동
 
         const rect = this.canvas.getBoundingClientRect();
+        
+        // 💡 핵심 교정: object-fit: cover 환경하에 캔버스 하드웨어 버퍼와 CSS 렌더링 픽셀 스케일 비동기 완벽 상쇄
         const aspectCorrection = rect.height / rect.width;
 
         const dx = line.end.x - line.start.x;
         const dy = (line.end.y - line.start.y) * aspectCorrection;
+        
         let rawAngle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (rawAngle < 0) rawAngle += 360;
         const baseAngle = rawAngle % 180;
@@ -225,7 +259,7 @@ class BowAnalyzer {
 
             if (diff <= this.snapThreshold) {
                 this.isCurrentlySnapped = true;
-                const lineLength = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
+                const lineLength = Math.hypot(line.end.x - line.start.x, (line.end.y - line.start.y) * aspectCorrection);
                 const targetRadian = (-targetAngle * Math.PI) / 180;
                 
                 if (movingPart === 'end') {
