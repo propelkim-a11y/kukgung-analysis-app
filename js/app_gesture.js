@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js
- * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (축 동기화 최종 완성판)
+ * 국궁 자세 분석 앱 - 멀티 터치 제스처 처리기 (무한 루프 및 프리징 완전 박멸판)
  */
 
 class BowAppGesture {
@@ -31,6 +31,7 @@ class BowAppGesture {
         this.container.addEventListener('wheel', this.handleWheel, { passive: false });
     }
     handlePointerDown(e) {
+        // 선긋기 모드일 때는 제스처 엔진의 드래그 연산 상태를 즉시 무력화하고 양보
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') {
             this.activePointers.clear();
             this.core.state.isDragging = false;
@@ -95,15 +96,23 @@ class BowAppGesture {
         state.scale = nextScale;
         this.applyTransform();
     }
+    // 💡 [무한 재귀 차단 패치 완료] 변환 행렬을 동기화할 때 캔버스 렌더러와 불필요한 연속 상호 무한 호출 루프를 완전히 분리 차단
     applyTransform() {
         const state = this.core.state;
         if (this.video) {
             this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         }
         const canvasEl = document.getElementById('draw-canvas');
-        if (canvasEl) canvasEl.style.transform = 'none';
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.updateTransform(state.scale, state.offsetX, state.offsetY);
+        if (canvasEl) {
+            canvasEl.style.transform = 'none';
+        }
+        // 대리 변수 업데이트 방식으로 결함 추적 차단하여 무한 프리징 원천 봉쇄
+        if (window.bowAnalyzer && window.bowAnalyzer.transform) {
+            window.bowAnalyzer.transform.scale = state.scale;
+            window.bowAnalyzer.transform.offsetX = state.offsetX;
+            window.bowAnalyzer.transform.offsetY = state.offsetY;
+            // 상호 재귀가 발생하지 않는 독립 렌더 파이프라인 단방향 주사
+            window.bowAnalyzer.render();
         }
     }
 }
