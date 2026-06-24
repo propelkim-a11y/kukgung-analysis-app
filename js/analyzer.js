@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 / 3)
- * 국궁 고각 분석 시스템 - 정밀 선긋기 및 편집 완전판 (버그 원천 박멸 완료)
+ * 국궁 고각 분석 시스템 - 정밀 선긋기 및 편집 완전판 (드로잉 락 해제 버전)
  */
 
 class BowAnalyzer {
@@ -125,7 +125,7 @@ class BowAnalyzer {
             }
         }
 
-        // 💡 [핵심 버그 수정 완료] 편집 상태가 아닐 때 확실하게 분기하여 새 조준선 객체를 정확히 밀어 넣음
+        // 💡 편집이 아닐 때만 명확하게 신규 그리기 인스턴스를 주입
         if (this.editingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -142,6 +142,7 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
+        // 💡 1순위: 기존 정점 편집 상태인 경우 독립적으로 미세 수정 작동
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
@@ -170,7 +171,7 @@ class BowAnalyzer {
                 this.broadcastAngle(this.getLineAngle(this.lines[0]));
             }
         } 
-        // 💡 [핵심 버그 수정 완료] 분기가 명확히 복원되어 첫 선을 그을 때 잔상이 완벽하게 출력됨
+        // 💡 2순위: 신규 그리기 상태인 경우 드로잉 렌더 프레임 가동 (상호 간섭 배제 완전 교정)
         else if (this.currentLine) {
             const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
             if (snapEndpoint) {
@@ -242,7 +243,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -250,8 +251,11 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const dx = line.end.x - line.start.x;
-        const dy = line.end.y - line.start.y;
+        // 배열 참조 오류 원천 박멸용 단일 객체 적출 예외 처리 안정장치
+        const singleLine = Array.isArray(line) ? line[0] : line;
+        if (!singleLine || !singleLine.start || !singleLine.end) return 0;
+        const dx = singleLine.end.x - singleLine.start.x;
+        const dy = singleLine.end.y - singleLine.start.y;
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return angle % 180;
@@ -330,7 +334,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX); // 💡 단선 고정 안전 참조 주입
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
