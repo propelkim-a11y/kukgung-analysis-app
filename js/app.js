@@ -1,6 +1,6 @@
 /**
- * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (롱프레스 고속 프레임 탑재)
+ * js/app.js (Part 1 of 3)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (가변 FPS 및 갤러리 저장 버전)
  */
 
 window.bowAppNodes = {};
@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnDraw = document.getElementById('btn-draw');
     nodes.btnReset = document.getElementById('btn-reset');
     nodes.videoInput = document.getElementById('video-input');
+    
+    // 신설된 갤러리 영상 다운로드 저장 버튼 매핑
+    nodes.btnDownloadVideo = document.getElementById('btn-download-video');
 
     nodes.videoSlider = document.getElementById('video-slider');
     nodes.btnFramePrev = document.getElementById('btn-frame-prev');
@@ -77,7 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-
+/**
+ * js/app.js (Part 2 of 3)
+ */
     /**
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
@@ -194,9 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
-/**
- * js/app.js (Part 2 of 2)
- */
+
     nodes.btnRecordToggle.addEventListener('click', () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -250,10 +253,38 @@ document.addEventListener('DOMContentLoaded', () => {
             isRecording = false;
         }
     });
-
+/**
+ * js/app.js (Part 3 of 3)
+ */
     function setActiveMenu(activeBtn) {
-        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw].forEach(btn => btn.classList.remove('active'));
-        activeBtn.classList.add('active');
+        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
+            if (btn) btn.classList.remove('active');
+        });
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    if (nodes.btnDownloadVideo) {
+        nodes.btnDownloadVideo.addEventListener('click', async () => {
+            try {
+                const savedBlob = await core.loadCache('lastVideoBlob');
+                if (!savedBlob) {
+                    alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.');
+                    return;
+                }
+                const url = URL.createObjectURL(savedBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                a.download = `kukgung_analysis_${dateStr}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('파일 내보내기 도중 오류가 발생했습니다.');
+                console.error(err);
+            }
+        });
     }
 
     let currentFrameTime = 1 / 30; 
@@ -287,15 +318,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💡 [롱프레스 연사 매커니즘 핵심 엔진 이식]
     let longPressTimer = null;
     let repeatInterval = null;
 
     function startFrameRepeat(direction) {
         clearFrameRepeat();
-        // 0.3초 누르고 있으면 타이머 발동
         longPressTimer = setTimeout(() => {
-            // 0.06초마다 프레임을 무한 연사하는 고속 루프 시동
             repeatInterval = setInterval(() => {
                 nodes.mainVideo.pause();
                 nodes.btnPlayPause.textContent = '재생';
@@ -315,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
         repeatInterval = null;
     }
     
-    // [뒤로] 버튼 이벤트 바인딩 (단발 클릭 + 롱프레스 연사 일체화)
     nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         nodes.mainVideo.pause();
@@ -324,7 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startFrameRepeat('prev');
     });
     
-    // [앞으로] 버튼 이벤트 바인딩 (단발 클릭 + 롱프레스 연사 일체화)
     nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         nodes.mainVideo.pause();
@@ -333,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startFrameRepeat('next');
     });
 
-    // 손가락을 떼거나 마우스가 버튼 영역을 벗어날 때 안전하게 연사 폐기 (메모리 누수 원천 차단)
     window.addEventListener('pointerup', clearFrameRepeat);
     window.addEventListener('pointercancel', clearFrameRepeat);
     nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
@@ -344,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files;
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
@@ -352,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
             window.bowGyroSensor.stop();
         }
-        setActiveMenu(nodes.btnMove);
+        setActiveMenu(nodes.btnOpen);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
             window.bowAnalyzer.setMode('move');
