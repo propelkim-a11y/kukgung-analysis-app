@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 / 3)
- * 국궁 고각 분석 시스템 - 정밀 선긋기 및 편집 완전판 (드로잉 락 해제 버전)
+ * js/analyzer.js (Part 1 / 4)
+ * 국궁 고각 분석 시스템 - 슬림 분할 에디션
  */
 
 class BowAnalyzer {
@@ -16,7 +16,7 @@ class BowAnalyzer {
         this.lastTapTime = 0;
         this.tapThreshold = 300; 
 
-        // 선 편집 미세 드래그 수정을 위한 상태 변수
+        // 선 편집 드래그 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
     }
@@ -48,7 +48,9 @@ class BowAnalyzer {
         }
         this.render();
     }
-
+/**
+ * js/analyzer.js (Part 2 / 4)
+ */
     clearLines() {
         this.lines = [];
         this.currentLine = null;
@@ -70,17 +72,15 @@ class BowAnalyzer {
 
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const canvasScaleX = this.canvas.width / rect.width;
-        const canvasScaleY = this.canvas.height / rect.height;
-        const clientX = (event.clientX - rect.left) * canvasScaleX;
-        const clientY = (event.clientY - rect.top) * canvasScaleY;
-        const canvasX = (clientX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
-        const canvasY = (clientY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        const cX = (event.clientX - rect.left) * scaleX;
+        const cY = (event.clientY - rect.top) * scaleY;
+        const canvasX = (cX - (this.transform.offsetX * scaleX)) / this.transform.scale;
+        const canvasY = (cY - (this.transform.offsetY * scaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
-/**
- * js/analyzer.js (Part 2 / 3)
- */
+
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -106,7 +106,6 @@ class BowAnalyzer {
         
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
-        
         const targetRadius = this.snapThreshold / this.transform.scale;
         this.editingLineIndex = -1;
         this.editingVertexType = null;
@@ -125,7 +124,6 @@ class BowAnalyzer {
             }
         }
 
-        // 💡 편집이 아닐 때만 명확하게 신규 그리기 인스턴스를 주입
         if (this.editingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -133,7 +131,9 @@ class BowAnalyzer {
             this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
         }
     }
-
+/**
+ * js/analyzer.js (Part 3 / 4)
+ */
     handlePointerMove(event) {
         if (this.toolMode !== 'draw') return;
         event.preventDefault();
@@ -142,7 +142,6 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
-        // 💡 1순위: 기존 정점 편집 상태인 경우 독립적으로 미세 수정 작동
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
@@ -171,7 +170,6 @@ class BowAnalyzer {
                 this.broadcastAngle(this.getLineAngle(this.lines[0]));
             }
         } 
-        // 💡 2순위: 신규 그리기 상태인 경우 드로잉 렌더 프레임 가동 (상호 간섭 배제 완전 교정)
         else if (this.currentLine) {
             const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
             if (snapEndpoint) {
@@ -229,7 +227,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 3 / 3)
+ * js/analyzer.js (Part 4 / 4)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -251,7 +249,6 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        // 배열 참조 오류 원천 박멸용 단일 객체 적출 예외 처리 안정장치
         const singleLine = Array.isArray(line) ? line[0] : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
@@ -334,7 +331,8 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX); // 💡 단선 고정 안전 참조 주입
+            // 💡 [참조 오류 차단 마감] 단선 상태 실시간 드로잉 시 배열 인덱스 [0]으로 명확히 객체 적출
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
