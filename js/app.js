@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (버튼 오타 완전 박멸)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (비동기 안전 바인딩 완전판)
  */
 
 window.bowAppNodes = {};
@@ -85,8 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
+        // 💡 [참조 크래시 해결] 모바일 디바이스 기기 환경일 때만 예외 처리 가동
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor) {
+        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
@@ -116,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = '카메라 장치 연동 완료';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치를 감지할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
+            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
             console.error(err);
         }
     }
@@ -134,11 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
-        // 💡 [오타 교정] classList 가 생략되었던 원초적 구문 에러 완벽 복원
         nodes.sceneRecord.classList.add('active');
         await startCamera();
+        
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor) {
+        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
     });
@@ -146,7 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // [분석 화면 진입 이동 공통 함수]
     function transitToAnalyzeMode() {
         stopCamera();
-        if (window.bowGyroSensor) window.bowGyroSensor.stop();
+        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
+            window.bowGyroSensor.stop();
+        }
         nodes.sceneRecord.classList.remove('active');
         nodes.sceneAnalyze.classList.add('active');
         setActiveMenu(nodes.btnMove);
@@ -160,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
     nodes.btnRecordToggle.addEventListener('click', () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor) {
+        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
         if (!cameraStream) return;
@@ -186,7 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.mainVideo.src = videoURL;
                 nodes.mainVideo.load();
                 stopCamera();
-                if (window.bowGyroSensor) window.bowGyroSensor.stop();
+                if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
+                    window.bowGyroSensor.stop();
+                }
                 nodes.sceneRecord.classList.remove('active');
                 nodes.sceneAnalyze.classList.add('active');
                 setActiveMenu(nodes.btnOpen);
@@ -249,12 +254,14 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files[0]; // 💡 단일 파일 타겟 안정화
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
-        if (window.bowGyroSensor) window.bowGyroSensor.stop();
+        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
+            window.bowGyroSensor.stop();
+        }
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
