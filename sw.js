@@ -1,10 +1,9 @@
 /**
- * sw.js (Service Worker) - 최종 완결판
+ * sw.js (Service Worker) - PC/모바일 호환 완결판
  */
 
-const CACHE_NAME = 'bow-archery-v15'; 
+const CACHE_NAME = 'bow-archery-v16'; 
 
-// 💡 [경로 완벽 정렬] 갤럭시 기기가 파일을 내려받을 때 오차가 없도록 주소 수식어 동기화
 const ASSETS_TO_CACHE = [
     '/kukgung-analysis-app/index.html',
     '/kukgung-analysis-app/style.css',
@@ -21,7 +20,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[PWA] 에셋 사전 백업 완료.');
+            console.log('[PWA] 크로스 플랫폼 에셋 캐싱 완료.');
             return cache.addAll(ASSETS_TO_CACHE);
         })
     );
@@ -34,7 +33,7 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cache) => {
                     if (cache !== CACHE_NAME) {
-                        console.log('[PWA] 이전 찌꺼기 청소 완료.');
+                        console.log('[PWA] 구버전 인프라 청소 완료.');
                         return caches.delete(cache);
                     }
                 })
