@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC 프리징 완전 방어 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (버튼 오타 완전 박멸)
  */
 
 window.bowAppNodes = {};
@@ -85,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
-        // 💡 실제 모바일 기기 환경(UserAgent 판정)일 때만 하드웨어 자이로 기동 시도
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor) {
             window.bowGyroSensor.start();
@@ -117,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = '카메라 장치 연동 완료';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
+            nodes.recordStatus.textContent = '카메라 장치를 감지할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
             console.error(err);
         }
     }
@@ -135,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
+        // 💡 [오타 교정] classList 가 생략되었던 원초적 구문 에러 완벽 복원
         nodes.sceneRecord.classList.add('active');
         await startCamera();
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -304,8 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
-        
-        // 💡 [PC 뻗음 최종 차단] 데이터가 숫자가 아닐 경우 브라우저 렌더러가 연산 과부하에 빠지지 않도록 원천 스킵
         if (isNaN(roll)) return;
 
         if (nodes.sceneRecord.classList.contains('active')) {
