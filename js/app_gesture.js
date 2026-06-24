@@ -1,6 +1,8 @@
 /**
- * js/app_gesture.js - 제스처 가로채기 완벽 차단 버전
+ * js/app_gesture.js
+ * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (기준점 동기화 완전판)
  */
+
 class BowAppGesture {
     constructor(coreInstance) {
         this.core = coreInstance;
@@ -29,7 +31,6 @@ class BowAppGesture {
         this.container.addEventListener('wheel', this.handleWheel, { passive: false });
     }
     handlePointerDown(e) {
-        // 💡 [핵심 교정] 선긋기 모드일 때는 제스처 내부 상태를 완전히 무력화하고 리턴
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') {
             this.activePointers.clear();
             this.core.state.isDragging = false;
@@ -50,7 +51,6 @@ class BowAppGesture {
         }
     }
     handlePointerMove(e) {
-        // 💡 [핵심 교정] 선긋기 모드일 때는 화면 밀림(Pan) 연산을 원천 봉쇄
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
         if (!this.activePointers.has(e.pointerId)) return;
         this.activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
@@ -60,9 +60,7 @@ class BowAppGesture {
             const currentDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
             if (this.initialDist > 0) {
                 const factor = currentDist / this.initialDist;
-                const midX = (pointers[0].clientX + pointers[1].clientX) / 2;
-                const midY = (pointers[0].clientY + pointers[1].clientY) / 2;
-                this.applyZoom(this.initialScale * factor, midX, midY);
+                this.applyZoom(this.initialScale * factor);
             }
             return;
         }
@@ -89,16 +87,12 @@ class BowAppGesture {
         const state = this.core.state;
         const zoomIntensity = 0.08;
         const nextScale = e.deltaY < 0 ? state.scale * (1 + zoomIntensity) : state.scale * (1 - zoomIntensity);
-        this.applyZoom(nextScale, e.clientX, e.clientY);
+        this.applyZoom(nextScale);
     }
-    applyZoom(targetScale, clientX, clientY) {
+    // 💡 [결정적 교정] 복잡한 마우스 피벗 축 대신 좌측 상단(0,0) 정순 기하학 선형 확대 매커니즘 정렬
+    applyZoom(targetScale) {
         const state = this.core.state;
-        const containerRect = this.container.getBoundingClientRect();
         const nextScale = Math.min(Math.max(targetScale, 1), 5);
-        const mouseX = clientX - containerRect.left;
-        const mouseY = clientY - containerRect.top;
-        state.offsetX = mouseX - (mouseX - state.offsetX) * (nextScale / state.scale);
-        state.offsetY = mouseY - (mouseY - state.offsetY) * (nextScale / state.scale);
         state.scale = nextScale;
         this.applyTransform();
     }
@@ -114,4 +108,5 @@ class BowAppGesture {
         }
     }
 }
+
 window.bowAppGesture = new BowAppGesture(window.bowAppCore);
