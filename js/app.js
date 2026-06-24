@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1/2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부 (선긋기 활성화 보정 완료)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부
  */
 
 window.bowAppNodes = {};
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.recordStatus = document.getElementById('record-status');
     nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
 
-    // 자이로 수직 가이드 노드 전역 등록
+    // 💡 [핵심 추가] 자이로 수직 가이드 노드 전역 등록
     nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
 
     nodes.videoViewport = document.getElementById('video-viewport');
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 2. 스마트폰 윈도우 실제 스크린 전체 면적으로 캔버스 스케일 동기화
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setActiveMenu(activeBtn) {
         [nodes.btnOpen, nodes.btnMove, nodes.btnDraw].forEach(btn => btn.classList.remove('active'));
-        if (activeBtn) activeBtn.classList.add('active');
+        activeBtn.classList.add('active');
     }
 
     const FRAME_TIME = 1 / 30;
@@ -239,9 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
     nodes.videoInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const file = files[0];
+        const file = e.target.files;
+        if (!file || file.length === 0) return;
 
         await core.saveCache('lastVideoBlob', file);
         const url = URL.createObjectURL(file);
@@ -253,7 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(resizeCanvasToDisplay, 100);
     });
 
-    // 💡 [핵심 교정 완료] 하단 패널 클릭 시 분석기(bowAnalyzer) 객체 내부에 정확한 모드 스트링 주입 연동
     nodes.btnMove.addEventListener('click', () => {
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
@@ -289,14 +287,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = e.detail.angle;
+        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
         if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
 
+    /**
+     * 💡 [핵심 교정] 실시간 자이로 데이터를 수평선뿐만 아니라 수직 가이드라인까지 동시 매핑
+     * 완벽 수평 상태 판정 시 두 물리선이 세련되게 초록색으로 동시 변환되는 메커니즘 연동
+     */
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         
         if (nodes.sceneRecord.classList.contains('active')) {
+            // 1. 실시간 수평 가이드선 각도 문자 맵 및 회전 전사
             if (nodes.gyroHorizonLine) {
                 nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
                 nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
@@ -308,6 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // 2. 실시간 수직 가이드선 물리 정렬 회전 전사 (수평선과 90도로 수평 직교를 유지하며 정밀 트랙킹)
             if (nodes.gyroVerticalLine) {
                 nodes.gyroVerticalLine.style.transform = `translateX(-50%) rotate(${-roll}deg)`;
                 
