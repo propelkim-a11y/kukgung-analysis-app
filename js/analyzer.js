@@ -71,12 +71,25 @@ class BowAnalyzer {
     }
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
-        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) return;
-        if (event.pointerType === 'pen') window.isStylusActive = true;
+
+        // 1. [펜 끊김 방지 핵심] 브라우저 고유의 화면 줌/스크롤 제스처를 원천 차단하여 펜 입력 독점
         event.preventDefault();
+
+        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) {
+            return; 
+        }
+        if (event.pointerType === 'pen') {
+            window.isStylusActive = true;
+        }
+
+        // 2. [캡처 바인딩 고도화] 포인터가 캔버스 경계를 잠시 벗어나도 스트림이 끊기지 않도록 하드웨어 캡처 고정
+        this.canvas.setPointerCapture(event.pointerId);
+        
+        // 💡 펜의 연속 더블 탭으로 인한 오작동 타이머 최적화 처리
         const currentTime = new Date().getTime();
         const tapLength = currentTime - this.lastTapTime;
         this.lastTapTime = currentTime;
+
         if (tapLength < this.tapThreshold && tapLength > 0) {
             this.currentLine = null;
             const hasUndone = this.undoLastLine();
@@ -86,13 +99,21 @@ class BowAnalyzer {
             }
             return; 
         }
-        this.canvas.setPointerCapture(event.pointerId);
+
         const coords = this.getCanvasCoordinates(event);
         let startPt = { x: coords.x, y: coords.y };
+        
         const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
-        if (snappedPt) startPt = snappedPt;
-        this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
+        if (snappedPt) {
+            startPt = snappedPt;
+        }
+
+        this.currentLine = {
+            start: startPt,
+            end: { x: coords.x, y: coords.y }
+        };
     }
+
 /**
  * js/analyzer.js (Part 2 of 2)
  */
