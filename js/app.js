@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (저사양 방어 스마트 쉴드 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (롱프레스 고속 프레임 탑재)
  */
 
 window.bowAppNodes = {};
@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
         } catch (err) {
-            // 💡 [저사양 폰 과부하 방어] 고속 촬영 요청 실패 시 장치 한계에 맞춰 30fps 표준 사양으로 강제 하향 조정 정렬
             if (selectedFPS > 30) {
                 selectedFPS = 30;
                 const activeBtn = document.querySelector('.fps-btn[data-fps="30"]');
@@ -129,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 await startCamera();
             } else {
-                nodes.recordStatus.textContent = '카메라 장치 로드 실패. 비디오를 직접 불러와서 분석을 시작하세요.';
+                nodes.recordStatus.textContent = '카메라 장치 로드 실패.';
             }
             console.error(err);
         }
@@ -143,12 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.cameraPreview.srcObject = null;
     }
 
-    // 💡 [하드웨어 사양 자율 계측] 저사양 폰(CPU 코어 4개 이하 또는 램 부족)인 경우 고속 촬영 락 제어
     const fpsButtons = document.querySelectorAll('.fps-btn');
     const cpuCores = navigator.hardwareConcurrency || 4;
     
     if (cpuCores <= 4) {
-        // 저사양 기기로 판정 시 120fps 이상 버튼을 비활성화하고 반투명 처리하여 튕김 완벽 예방
         fpsButtons.forEach(btn => {
             const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
             if (fpsVal >= 120) {
@@ -264,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
         currentFrameTime = 1 / detectedFPS;
-        
         nodes.videoSlider.max = nodes.mainVideo.duration;
         resizeCanvasToDisplay();
     });
@@ -290,25 +286,65 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.btnPlayPause.textContent = '재생';
         }
     });
+
+    // 💡 [롱프레스 연사 매커니즘 핵심 엔진 이식]
+    let longPressTimer = null;
+    let repeatInterval = null;
+
+    function startFrameRepeat(direction) {
+        clearFrameRepeat();
+        // 0.3초 누르고 있으면 타이머 발동
+        longPressTimer = setTimeout(() => {
+            // 0.06초마다 프레임을 무한 연사하는 고속 루프 시동
+            repeatInterval = setInterval(() => {
+                nodes.mainVideo.pause();
+                nodes.btnPlayPause.textContent = '재생';
+                if (direction === 'next') {
+                    nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
+                } else {
+                    nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
+                }
+            }, 60); 
+        }, 300);
+    }
+
+    function clearFrameRepeat() {
+        if (longPressTimer) clearTimeout(longPressTimer);
+        if (repeatInterval) clearInterval(repeatInterval);
+        longPressTimer = null;
+        repeatInterval = null;
+    }
     
-    nodes.btnFramePrev.addEventListener('click', () => {
+    // [뒤로] 버튼 이벤트 바인딩 (단발 클릭 + 롱프레스 연사 일체화)
+    nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
+        startFrameRepeat('prev');
     });
     
-    nodes.btnFrameNext.addEventListener('click', () => {
+    // [앞으로] 버튼 이벤트 바인딩 (단발 클릭 + 롱프레스 연사 일체화)
+    nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
+        startFrameRepeat('next');
     });
+
+    // 손가락을 떼거나 마우스가 버튼 영역을 벗어날 때 안전하게 연사 폐기 (메모리 누수 원천 차단)
+    window.addEventListener('pointerup', clearFrameRepeat);
+    window.addEventListener('pointercancel', clearFrameRepeat);
+    nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
+    nodes.btnFrameNext.addEventListener('pointerleave', clearFrameRepeat);
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files;
+        const targetFile = files[0];
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
