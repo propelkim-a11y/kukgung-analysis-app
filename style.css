@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (분석 십자선 제거 완결본)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (자이로 연동 수직 가이드 탑재 완료)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -73,7 +73,7 @@ body, html {
     display: none !important;
 }
 
-/* 💡 교정: 시인성 높은 십자 가이드라인이 오직 촬영 화면(#scene-record) 내부에서만 작동하도록 범위 가두기 */
+/* 시인성 높은 십자 가이드라인 (촬영화면 전용) */
 #scene-record .center-crosshair-v {
     left: 50%;
     top: 0;
@@ -110,11 +110,28 @@ body, html {
     transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
 }
 
-#gyro-horizon-line.perfect-level {
-    height: 2px;
+/* 💡 [핵심 추가] 초정밀 실물 자이로 수직 가이드라인 UI 명세 */
+#gyro-vertical-line {
+    position: absolute;
+    top: 5%;
+    left: 50%;
+    width: 1px;
+    height: 90%;
+    background-color: rgba(255, 59, 48, 0.8);
+    transform-origin: center;
+    z-index: 6;
+    pointer-events: none;
+    transition: background-color 0.1s, width 0.1s, box-shadow 0.1s;
+}
+
+/* 완벽 수평 판정 시 수평선과 수직선이 동시에 초록색 테크니컬 라이팅 네온 발광 연동 */
+#gyro-horizon-line.perfect-level, #gyro-vertical-line.perfect-level {
     background-color: #34C759;
     box-shadow: 0 0 14px rgba(52, 199, 89, 0.8);
 }
+
+#gyro-horizon-line.perfect-level { height: 2px; }
+#gyro-vertical-line.perfect-level { width: 2px; }
 
 #gyro-horizon-line::after {
     content: attr(data-angle);
@@ -142,7 +159,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 하단 패널 영역 (애플 감성의 고투명 반투명 스타일 및 높이 규격 통일) */
+/* 7. 하단 패널 영역 (애플 디자인 가이드라인 준수 투명 스타일 마감) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -160,7 +177,6 @@ body, html {
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* 분석 화면 전용 슬라이딩 무빙 제어 */
 #scene-analyze .unified-panel-box {
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -169,7 +185,6 @@ body, html {
     transform: translateY(calc(100% - 34px));
 }
 
-/* 상단 제어 바 영역 높이 물리 통일 */
 .panel-slider-handle, .panel-slider-handle-placeholder {
     width: 100%;
     height: 34px;
@@ -189,7 +204,6 @@ body, html {
     border-radius: 3px;
 }
 
-/* 패널 내부 컨텐츠 박스 여백 및 수직 정렬 완벽 싱크 */
 .panel-content-wrapper {
     height: calc(100% - 34px);
     display: flex;
@@ -198,7 +212,6 @@ body, html {
     padding: 8px 24px 16px 24px;
 }
 
-/* 분석 화면의 4대 버튼 메뉴 바 높이를 정렬하는 스페이서 */
 .apple-layout-sync-spacer {
     width: 100%;
     height: 44px;
@@ -339,7 +352,6 @@ body, html {
     to { transform: scale(1.04); }
 }
 
-/* 구형 마크업 강제 방어 상태 유지 */
 .text-menu-bar-sync, #btn-record-move-sync {
     display: none !important;
     visibility: hidden !important;
