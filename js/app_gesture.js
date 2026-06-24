@@ -1,8 +1,6 @@
 /**
  * js/app_gesture.js
- * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (6단계)
- * - 두 손가락 피치 줌(최대 5배) 및 한 손가락 화면 드래그 이동 스크롤
- * - 캔버스 간섭을 완전히 걷어내어 축 뒤틀림 현상 원천 차단
+ * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (수정본)
  */
 
 class BowAppGesture {
@@ -10,7 +8,6 @@ class BowAppGesture {
         this.core = coreInstance;
         this.container = null;
         this.video = null;
-
         this.activePointers = new Map();
         this.initialDist = 0;
         this.initialScale = 1;
@@ -35,11 +32,11 @@ class BowAppGesture {
         this.container.addEventListener('pointermove', this.handlePointerMove);
         this.container.addEventListener('pointerup', this.handlePointerUp);
         this.container.addEventListener('pointercancel', this.handlePointerUp);
-        
         this.container.addEventListener('wheel', this.handleWheel, { passive: false });
     }
 
     handlePointerDown(e) {
+        // 💡 [핵심 교정] 분석기 모드가 'draw'(선긋기)일 때는 제스처 엔진이 이벤트를 원천 양보하고 비활성화됨
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
         if (e.pointerType === 'touch' && e.touchType === 'direct' && window.isStylusActive) return;
 
@@ -59,6 +56,7 @@ class BowAppGesture {
     }
 
     handlePointerMove(e) {
+        // 💡 [핵심 교정] 선긋기 모드일 때는 마우스/펜 드래그 이동 연산을 원천 차단하여 화면 밀림 차단
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
         if (!this.activePointers.has(e.pointerId)) return;
         
@@ -68,7 +66,6 @@ class BowAppGesture {
         if (this.activePointers.size === 2) {
             const pointers = Array.from(this.activePointers.values());
             const currentDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
-            
             if (this.initialDist > 0) {
                 const factor = currentDist / this.initialDist;
                 const midX = (pointers[0].clientX + pointers[1].clientX) / 2;
@@ -88,13 +85,8 @@ class BowAppGesture {
     handlePointerUp(e) {
         this.activePointers.delete(e.pointerId);
         const state = this.core.state;
-        
-        if (this.activePointers.size < 2) {
-            this.initialDist = 0;
-        }
-        if (this.activePointers.size === 0) {
-            state.isDragging = false;
-        }
+        if (this.activePointers.size < 2) this.initialDist = 0;
+        if (this.activePointers.size === 0) state.isDragging = false;
         
         this.core.saveCache('lastTransform', {
             scale: state.scale,
@@ -104,6 +96,7 @@ class BowAppGesture {
     }
 
     handleWheel(e) {
+        if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
         e.preventDefault();
         const state = this.core.state;
         const zoomIntensity = 0.08;
@@ -114,31 +107,23 @@ class BowAppGesture {
     applyZoom(targetScale, clientX, clientY) {
         const state = this.core.state;
         const containerRect = this.container.getBoundingClientRect();
-        
         const nextScale = Math.min(Math.max(targetScale, 1), 5);
-        
         const mouseX = clientX - containerRect.left;
         const mouseY = clientY - containerRect.top;
         
         state.offsetX = mouseX - (mouseX - state.offsetX) * (nextScale / state.scale);
         state.offsetY = mouseY - (mouseY - state.offsetY) * (nextScale / state.scale);
         state.scale = nextScale;
-
         this.applyTransform();
     }
 
     applyTransform() {
         const state = this.core.state;
-        
         if (this.video) {
             this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         }
-        
         const canvasEl = document.getElementById('draw-canvas');
-        if (canvasEl) {
-            canvasEl.style.transform = 'none';
-        }
-
+        if (canvasEl) canvasEl.style.transform = 'none';
         if (window.bowAnalyzer) {
             window.bowAnalyzer.updateTransform(state.scale, state.offsetX, state.offsetY);
         }
