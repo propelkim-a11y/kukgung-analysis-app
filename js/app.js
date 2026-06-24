@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC/모바일 하드웨어 겸용 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC/모바일 장치 완벽 호환 에디션)
  */
 
 window.bowAppNodes = {};
@@ -85,8 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
-        // 💡 [PC 예외 처리 패치] 기기에 실제 방향 센서 바인딩 능력이 존재할 때만 자이로 가동 유도 (PC 뻗음 현상 제거)
-        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
+        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             window.bowGyroSensor.start();
         }
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
@@ -99,19 +98,28 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     /**
-     * 후면 카메라 스트리밍 구동부
+     * 💡 [PC 완벽 호환 패치] 장치별 카메라 하드웨어 최적화 로드
      */
     async function startCamera() {
         try {
-            // PC 웹캠 및 스마트폰 환경 공용 캡처 명세 정렬
+            // 모바일 후면 카메라 요청 규격을 기본으로 세팅
+            let videoConstraints = { facingMode: { ideal: "environment" }, width: 1280, height: 720 };
+            
+            // 스마트폰이 아닌 일반 PC 환경인지를 정밀 검사
+            const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
+            if (isPC) {
+                // PC 환경일 때는 후면 지정을 제외하고 기본 웹캠 장치를 다이렉트로 인식 유도
+                videoConstraints = { width: 1280, height: 720 };
+            }
+
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: "environment" }, width: 1280, height: 720 },
+                video: videoConstraints,
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = '카메라 연동 성공';
+            nodes.recordStatus.textContent = '카메라 장치 연동 완료';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다.';
+            nodes.recordStatus.textContent = '카메라 장치를 감지할 수 없습니다. (비디오 파일을 열어 분석을 시작하세요.)';
             console.error(err);
         }
     }
@@ -129,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
-        nodes.sceneRecord.add('active');
+        nodes.sceneRecord.classList.add('active');
         await startCamera();
         if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
             window.bowGyroSensor.start();
@@ -158,13 +166,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cameraStream) return;
         if (!isRecording) {
             recordedChunks = [];
+            
+            // 💡 [PC 완벽 호환 패치] 데스크톱 환경과 모바일 환경의 지원 코덱 교차 예외 처리
             let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp8' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-            mediaRecorder = new MediaRecorder(cameraStream, options);
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' }; // PC 크롬/사파리 방어코드
+
+            try {
+                mediaRecorder = new MediaRecorder(cameraStream, options);
+            } catch (e) {
+                // 시스템 기본 코덱으로 강제 우회 설정
+                mediaRecorder = new MediaRecorder(cameraStream);
+            }
+
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = async () => {
                 nodes.recordStatus.textContent = '저장 중...';
-                const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
                 await core.saveCache('lastVideoBlob', videoBlob);
                 const videoURL = URL.createObjectURL(videoBlob);
                 nodes.mainVideo.src = videoURL;
