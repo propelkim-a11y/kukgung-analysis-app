@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC/모바일 하드웨어 겸용 버전)
  */
 
 window.bowAppNodes = {};
@@ -85,7 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
-        if (window.bowGyroSensor) {
+        // 💡 [PC 예외 처리 패치] 기기에 실제 방향 센서 바인딩 능력이 존재할 때만 자이로 가동 유도 (PC 뻗음 현상 제거)
+        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
             window.bowGyroSensor.start();
         }
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
@@ -102,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function startCamera() {
         try {
+            // PC 웹캠 및 스마트폰 환경 공용 캡처 명세 정렬
             cameraStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: { ideal: "environment" }, width: 1280, height: 720 },
                 audio: false
@@ -109,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = '카메라 연동 성공';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 권한 차단됨';
+            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다.';
             console.error(err);
         }
     }
@@ -127,14 +129,17 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.sceneAnalyze.classList.remove('active');
-        nodes.sceneRecord.classList.add('active');
+        nodes.sceneRecord.add('active');
         await startCamera();
-        if (window.bowGyroSensor) window.bowGyroSensor.start();
+        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
+            window.bowGyroSensor.start();
+        }
     });
 
     // [분석 화면 진입 이동 공통 함수]
     function transitToAnalyzeMode() {
         stopCamera();
+        if (window.bowGyroSensor) window.bowGyroSensor.stop();
         nodes.sceneRecord.classList.remove('active');
         nodes.sceneAnalyze.classList.add('active');
         setActiveMenu(nodes.btnMove);
@@ -147,7 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
  * js/app.js (Part 2 of 2)
  */
     nodes.btnRecordToggle.addEventListener('click', () => {
-        if (window.bowGyroSensor) window.bowGyroSensor.start();
+        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
+            window.bowGyroSensor.start();
+        }
         if (!cameraStream) return;
         if (!isRecording) {
             recordedChunks = [];
@@ -163,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.mainVideo.src = videoURL;
                 nodes.mainVideo.load();
                 stopCamera();
+                if (window.bowGyroSensor) window.bowGyroSensor.stop();
                 nodes.sceneRecord.classList.remove('active');
                 nodes.sceneAnalyze.classList.add('active');
                 setActiveMenu(nodes.btnOpen);
@@ -230,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
-        
+        if (window.bowGyroSensor) window.bowGyroSensor.stop();
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
