@@ -1,6 +1,6 @@
 /**
- * js/app.js (Part 1/2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부
+ * js/app.js (Part 1 / 2)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부 (선긋기 강화 패치 완료)
  */
 
 window.bowAppNodes = {};
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.recordStatus = document.getElementById('record-status');
     nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
 
-    // 💡 [핵심 추가] 자이로 수직 가이드 노드 전역 등록
+    // 💡 실시간 자이로 연동 물리 수직 가이드라인 노드 전역 등록
     nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
 
     nodes.videoViewport = document.getElementById('video-viewport');
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnOpen = document.getElementById('btn-open');
     nodes.btnMove = document.getElementById('btn-move');
     nodes.btnDraw = document.getElementById('btn-draw');
+    nodes.btnUndo = document.getElementById('btn-undo'); // 💡 [추가] 취소 단추 노드 인터페이스 매핑
     nodes.btnReset = document.getElementById('btn-reset');
     nodes.videoInput = document.getElementById('video-input');
 
@@ -195,9 +196,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 💡 [디자인 패치] 실행 취소(btnUndo)는 상태 토글 버튼이 아니므로 활성화 스타일 순환에서 정밀하게 제외합니다.
     function setActiveMenu(activeBtn) {
         [nodes.btnOpen, nodes.btnMove, nodes.btnDraw].forEach(btn => btn.classList.remove('active'));
-        activeBtn.classList.add('active');
+        if (activeBtn !== nodes.btnUndo) {
+            activeBtn.classList.add('active');
+        }
     }
 
     const FRAME_TIME = 1 / 30;
@@ -242,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files;
         if (!file || file.length === 0) return;
 
-        await core.saveCache('lastVideoBlob', file);
-        const url = URL.createObjectURL(file);
+        await core.saveCache('lastVideoBlob', file[0]);
+        const url = URL.createObjectURL(file[0]);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
 
@@ -260,6 +264,17 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnDraw.addEventListener('click', () => {
         setActiveMenu(nodes.btnDraw);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('draw');
+    });
+
+    // 💡 [기능 추가] 실행 취소 클릭 시 1획 철회 및 IndexedDB 영구 저장소 상태 즉시 갱신
+    nodes.btnUndo.addEventListener('click', () => {
+        if (window.bowAnalyzer) {
+            const success = window.bowAnalyzer.undoLastLine();
+            if (success) {
+                core.saveCache('lastLines', window.bowAnalyzer.lines);
+                console.log('[App] 가장 최근에 그려진 가이드선 1개를 철회하고 동기화했습니다.');
+            }
+        }
     });
 
     nodes.btnReset.addEventListener('click', () => {
@@ -292,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /**
-     * 💡 [핵심 교정] 실시간 자이로 데이터를 수평선뿐만 아니라 수직 가이드라인까지 동시 매핑
+     * 실시간 자이로 데이터를 수평선뿐만 아니라 수직 가이드라인까지 동시 매핑
      * 완벽 수평 상태 판정 시 두 물리선이 세련되게 초록색으로 동시 변환되는 메커니즘 연동
      */
     window.addEventListener('bowGyroUpdate', (e) => {
