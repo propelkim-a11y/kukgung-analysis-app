@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (통합 투명 마감 버전)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (100% 완전 투명 마감 버전)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -160,7 +160,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 하단 패널 영역 (💡 촬영·분석 통합 순정 투명 크리스탈 마감 패치) */
+/* 7. 하단 패널 영역 (💡 100% 완전 투명 크리스탈 마감 패치) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -170,13 +170,14 @@ body, html {
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
     
-    /* 기존 어두운 마감을 완전히 걷어내고 초고농도 사투레이션 블러 투명 마감 처리 */
-    background: rgba(10, 10, 15, 0.3) !important; 
-    backdrop-filter: blur(40px) saturate(220%) !important;
-    -webkit-backdrop-filter: blur(40px) saturate(220%) !important;
-    border-top: 0.5px solid rgba(255, 255, 255, 0.15) !important;
+    /* 블러와 어두운 배경색을 완전히 제거하여 100% 투명화 투사 */
+    background: transparent !important; 
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    
+    /* 패널의 경계만 연하게 알려주는 최상단 반투명 흰색 실선 가이드 */
+    border-top: 0.5px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 30px 30px 0 0 !important;
-    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35) !important;
 }
 
 #scene-analyze .unified-panel-box {
@@ -202,7 +203,7 @@ body, html {
 .handle-bar {
     width: 38px;
     height: 5px;
-    background-color: rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.4);
     border-radius: 3px;
 }
 
@@ -226,7 +227,7 @@ body, html {
     width: 100%;
     height: 44px;
     padding: 3px;
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: rgba(255, 255, 255, 0.12);
     border-radius: 13px;
 }
 
@@ -235,7 +236,7 @@ body, html {
     height: 38px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 14px;
     font-weight: 600;
     border-radius: 10px;
@@ -245,7 +246,7 @@ body, html {
 }
 
 .menu-btn.active {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.2);
     color: #34C759;
     font-weight: 700;
 }
@@ -261,7 +262,7 @@ body, html {
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.25);
     border-radius: 2px;
     outline: none;
 }
@@ -288,7 +289,7 @@ body, html {
 .control-btn {
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.9);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -301,11 +302,12 @@ body, html {
 
 /* 11. 촬영 컨트롤 */
 .status-text {
-    color: rgba(255, 255, 255, 0.85);
+    color: #FFFFFF;
     font-size: 13px;
     text-align: center;
-    font-weight: 500;
-    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+    font-weight: 600;
+    /* 💡 배경이 밝아져도 텍스트가 묻히지 않도록 애플 순정 섀도우 처리 강화 */
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .control-row-center {
@@ -316,7 +318,7 @@ body, html {
 }
 
 .action-btn-main {
-    background: rgba(0, 0, 0, 0.35); 
+    background: rgba(0, 0, 0, 0.5); 
     border: 3px solid #FFFFFF;
     color: #FFFFFF;
     font-size: 15px;
@@ -324,7 +326,7 @@ body, html {
     padding: 10px 28px;
     border-radius: 22px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
     transition: all 0.2s ease;
 }
 
@@ -339,14 +341,14 @@ body, html {
 .switch-btn {
     width: 100%;
     height: 40px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes pulseGlow {
