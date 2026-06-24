@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (가변 FPS 및 갤러리 저장 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (타임라인 슬라이더 완벽 동기화 버전)
  */
 
 window.bowAppNodes = {};
@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnReset = document.getElementById('btn-reset');
     nodes.videoInput = document.getElementById('video-input');
     
-    // 신설된 갤러리 영상 다운로드 저장 버튼 매핑
     nodes.btnDownloadVideo = document.getElementById('btn-download-video');
 
     nodes.videoSlider = document.getElementById('video-slider');
@@ -74,6 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
         await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
         resizeCanvasToDisplay();
         gesture.applyTransform();
+        // 세션 복원 시에도 슬라이더 최대 범위를 영상 시간과 강제 일치화
+        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration)) {
+            nodes.videoSlider.max = nodes.mainVideo.duration;
+            nodes.videoSlider.step = 0.001;
+        }
     });
 
     let cameraStream = null;
@@ -83,9 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
 /**
  * js/app.js (Part 2 of 3)
  */
-    /**
-     * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
-     */
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -100,9 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('click', triggerSensorUnlock);
     window.addEventListener('touchstart', triggerSensorUnlock);
 
-    /**
-     * 후면 카메라 스트리밍 구동부
-     */
     async function startCamera() {
         if (cameraStream) stopCamera();
         try {
@@ -172,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // [촬영 화면 이탈 이동]
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
@@ -185,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // [분석 화면 진입 이동]
     function transitToAnalyzeMode() {
         stopCamera();
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
@@ -289,10 +285,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentFrameTime = 1 / 30; 
     
+    // 💡 [슬라이더 바 길이 연동 패치] 비디오 로드와 즉시 최대길이 및 정밀 간격 조절 물리 결합
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
         currentFrameTime = 1 / detectedFPS;
+        
+        // 슬라이더바 범위를 전체 재생시간으로 주입하고 미세조정 단위를 소수점 4자리까지 초정밀 스케일링
         nodes.videoSlider.max = nodes.mainVideo.duration;
+        nodes.videoSlider.step = 0.0001; 
+        
         resizeCanvasToDisplay();
     });
 
@@ -305,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoSlider.addEventListener('input', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = nodes.videoSlider.value;
+        nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
     });
     
     nodes.btnPlayPause.addEventListener('click', () => {
@@ -369,11 +370,18 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files;
+        const targetFile = files[0];
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
+        
+        // 💡 외부 비디오 수동 로드 시에도 강제로 타임라인 스케일 즉시 동기화 바인딩
+        nodes.mainVideo.addEventListener('loadeddata', () => {
+            nodes.videoSlider.max = nodes.mainVideo.duration;
+            nodes.videoSlider.step = 0.0001;
+        }, { once: true });
+
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
             window.bowGyroSensor.stop();
         }
