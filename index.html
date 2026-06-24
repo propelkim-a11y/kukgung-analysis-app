@@ -4,7 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>국궁 자세 분석 시스템 (Archery Mechanics Analyzer)</title>
-    <link rel="stylesheet" href="style.css?v=10.0">
+    
+    <!-- 💡 [통합 패치] 애플(iOS) 홈 화면 순정 아이콘 인식 태그 -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- 💡 [통합 패치] 갤럭시(Android) 홈 화면 순정 웹앱 인식 매니페스트 등록 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#050507">
+
+    <link rel="stylesheet" href="style.css?v=11.0">
 </head>
 <body>
 
@@ -34,6 +44,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- ================================================================= -->
     <!-- [SCENE 2] 분석 모드 화면 -->
@@ -77,10 +88,10 @@
 
     <input type="file" id="video-input" accept="video/*" style="display: none;">
 
-    <script src="js/sensor.js?v=10.0"></script>
-    <script src="js/analyzer.js?v=10.0"></script>
-    <script src="js/app_core.js?v=10.0"></script>
-    <script src="js/app_gesture.js?v=10.0"></script>
-    <script src="js/app.js?v=10.0"></script>
+    <script src="js/sensor.js?v=11.0"></script>
+    <script src="js/analyzer.js?v=11.0"></script>
+    <script src="js/app_core.js?v=11.0"></script>
+    <script src="js/app_gesture.js?v=11.0"></script>
+    <script src="js/app.js?v=11.0"></script>
 </body>
 </html>
