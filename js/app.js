@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC/모바일 장치 완벽 호환 에디션)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (PC 프리징 완전 방어 버전)
  */
 
 window.bowAppNodes = {};
@@ -85,7 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
-        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // 💡 실제 모바일 기기 환경(UserAgent 판정)일 때만 하드웨어 자이로 기동 시도
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (isMobile && window.bowGyroSensor) {
             window.bowGyroSensor.start();
         }
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
@@ -98,17 +100,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     /**
-     * 💡 [PC 완벽 호환 패치] 장치별 카메라 하드웨어 최적화 로드
+     * 후면 카메라 스트리밍 구동부
      */
     async function startCamera() {
         try {
-            // 모바일 후면 카메라 요청 규격을 기본으로 세팅
-            let videoConstraints = { facingMode: { ideal: "environment" }, width: 1280, height: 720 };
-            
-            // 스마트폰이 아닌 일반 PC 환경인지를 정밀 검사
             const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
+            let videoConstraints = { facingMode: { ideal: "environment" }, width: 1280, height: 720 };
             if (isPC) {
-                // PC 환경일 때는 후면 지정을 제외하고 기본 웹캠 장치를 다이렉트로 인식 유도
                 videoConstraints = { width: 1280, height: 720 };
             }
 
@@ -119,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = '카메라 장치 연동 완료';
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치를 감지할 수 없습니다. (비디오 파일을 열어 분석을 시작하세요.)';
+            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
             console.error(err);
         }
     }
@@ -139,7 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         await startCamera();
-        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (isMobile && window.bowGyroSensor) {
             window.bowGyroSensor.start();
         }
     });
@@ -160,23 +159,21 @@ document.addEventListener('DOMContentLoaded', () => {
  * js/app.js (Part 2 of 2)
  */
     nodes.btnRecordToggle.addEventListener('click', () => {
-        if (window.bowGyroSensor && typeof DeviceOrientationEvent !== 'undefined') {
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (isMobile && window.bowGyroSensor) {
             window.bowGyroSensor.start();
         }
         if (!cameraStream) return;
         if (!isRecording) {
             recordedChunks = [];
-            
-            // 💡 [PC 완벽 호환 패치] 데스크톱 환경과 모바일 환경의 지원 코덱 교차 예외 처리
             let options = { mimeType: 'video/webm;codecs=vp9' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp8' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' }; // PC 크롬/사파리 방어코드
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' };
 
             try {
                 mediaRecorder = new MediaRecorder(cameraStream, options);
             } catch (e) {
-                // 시스템 기본 코덱으로 강제 우회 설정
                 mediaRecorder = new MediaRecorder(cameraStream);
             }
 
@@ -307,6 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
+        
+        // 💡 [PC 뻗음 최종 차단] 데이터가 숫자가 아닐 경우 브라우저 렌더러가 연산 과부하에 빠지지 않도록 원천 스킵
+        if (isNaN(roll)) return;
+
         if (nodes.sceneRecord.classList.contains('active')) {
             if (nodes.gyroHorizonLine) {
                 nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
