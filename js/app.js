@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (비동기 안전 바인딩 완전판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (녹화 싱크 최적화 버전)
  */
 
 window.bowAppNodes = {};
@@ -85,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
      */
     const triggerSensorUnlock = async () => {
-        // 💡 [참조 크래시 해결] 모바일 디바이스 기기 환경일 때만 예외 처리 가동
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
@@ -203,7 +202,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.btnRecordToggle.textContent = '녹화시작';
                 nodes.btnRecordToggle.classList.remove('recording');
             };
-            mediaRecorder.start();
+            
+            // 💡 [레이턴시 병목 박멸] 1초(1000ms) 단위 실시간 청크 분할 축적으로 메모리 릭 및 무반응 프리징 완전 보정
+            mediaRecorder.start(1000);
             isRecording = true;
             nodes.btnRecordToggle.textContent = '녹화종료/분석';
             nodes.btnRecordToggle.classList.add('recording');
@@ -247,14 +248,14 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext.addEventListener('click', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + FRAME_TIME);
+        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime - FRAME_TIME);
     });
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0]; // 💡 단일 파일 타겟 안정화
+        const targetFile = files[0];
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
