@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (녹화 Duration 타임스탬프 복원 판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (스마트 다운로드 코덱 패치 버전)
  */
 
 window.bowAppNodes = {};
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
+        nodes.btnPlayPause.textContent = '재生的';
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         await startCamera();
@@ -219,6 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.recordStatus.textContent = '저장 중...';
                 const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
                 await core.saveCache('lastVideoBlob', videoBlob);
+                
+                // 💡 실제 기기에서 인코딩 완료된 코덱 종류 명세를 임시 저장해 추출 엔진에 전송
+                await core.saveCache('lastRecordedMime', mediaRecorder.mimeType || 'video/webm');
+
                 const videoURL = URL.createObjectURL(videoBlob);
                 nodes.mainVideo.src = videoURL;
                 nodes.mainVideo.load();
@@ -266,13 +270,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.');
                     return;
                 }
+                
+                // 💡 [갤럭시 갤러리 연동 마감] 실제 인코딩된 MIME 타입을 스캔하여 확장자 자동 추치
+                const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm';
+                let fileExtension = '.webm';
+                
+                // 갤럭시 One UI가 즉각 식별 가능한 포맷 매핑 구조화
+                if (actualMime.includes('mp4')) {
+                    fileExtension = '.mp4';
+                }
+
                 const url = URL.createObjectURL(savedBlob);
                 const a = document.createElement('a');
                 a.href = url;
+                
                 const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-                a.download = `kukgung_analysis_${dateStr}.webm`;
+                a.download = `kukgung_analysis_${dateStr}${fileExtension}`;
+                
                 document.body.appendChild(a);
                 a.click();
+                
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (err) {
@@ -284,28 +301,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentFrameTime = 1 / 30; 
     
-    // 💡 [WebM 타임스탬프 복원 엔진 주입] 실시간 인코딩 파일의 누락된 전체 시간을 완벽 사상
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
         currentFrameTime = 1 / detectedFPS;
 
-        // 촬영 원본 비디오 자체에 재생 시간이 누락되어(Infinity 등) 들어온 상태인지 정밀 스캔
         if (!isFinite(nodes.mainVideo.duration) || nodes.mainVideo.duration === 0 || isNaN(nodes.mainVideo.duration)) {
-            // 브라우저 내부 타임라인 끝자락(1e9초 뒤)으로 가상 재생 시점을 초고속 강제 워프시킴
             nodes.mainVideo.currentTime = 1e9;
-            
-            // 끝부분을 밟는 즉시 브라우저 커널이 복원해낸 진짜 전체 영상 초(s) 정보를 슬라이더에 강제 박제
             nodes.mainVideo.addEventListener('timeupdate', function recoverDuration() {
                 if (nodes.mainVideo.duration && isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
                     nodes.videoSlider.max = nodes.mainVideo.duration;
                     nodes.videoSlider.step = 0.0001;
-                    // 메타데이터 복원이 완료되었으므로 안전하게 0초(처음 시점)로 귀환하여 일시정지
                     nodes.mainVideo.currentTime = 0;
                     nodes.mainVideo.removeEventListener('timeupdate', recoverDuration);
                 }
             });
         } else {
-            // 이미 정보가 온전한 수동 [열기] 파일은 곧바로 전체 스케일 매핑 매칭
             nodes.videoSlider.max = nodes.mainVideo.duration;
             nodes.videoSlider.step = 0.0001;
         }
@@ -386,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files;
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
