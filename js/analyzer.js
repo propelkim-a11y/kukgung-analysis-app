@@ -1,380 +1,359 @@
 /**
- * js/analyzer.js (Part 1/3)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
- * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [긴급 패치] 선긋기 모드 중 화면 확대/축소 제스처 전사 차단 및 버블링 완벽 방어 완료
+ * style.css
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (자이로 연동 수직 가이드 탑재 완료)
  */
 
-class BowAnalyzer {
-    constructor() {
-        this.canvas = null;
-        this.ctx = null;
-        
-        // 다중 선 데이터 구조
-        this.lines = []; 
-        this.currentLine = null;
-
-        // 변환 상태 행렬
-        this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
-        this.toolMode = 'move'; 
-
-        // 편집 상태 트래킹 변수 인프라
-        this.selectedLine = null;       
-        this.editPart = null;           
-        this.dragStartCoords = null;    
-        this.originalLineState = null;  
-        this.lastTapTime = 0;           
-
-        this.handlePointerDown = this.handlePointerDown.bind(this);
-        this.handlePointerMove = this.handlePointerMove.bind(this);
-        this.handlePointerUp = this.handlePointerUp.bind(this);
-    }
-
-    init(canvasElement) {
-        this.canvas = canvasElement;
-        this.ctx = this.canvas.getContext('2d');
-        this.setupPointerEvents();
-    }
-
-    updateTransform(scale, offsetX, offsetY) {
-        this.transform.scale = scale;
-        this.transform.offsetX = offsetX;
-        this.transform.offsetY = offsetY;
-        this.render();
-    }
-
-    setMode(mode) {
-        this.toolMode = mode;
-        this.selectedLine = null;
-        this.editPart = null;
-        this.render();
-    }
-
-    clearLines() {
-        this.lines = [];
-        this.currentLine = null;
-        this.selectedLine = null;
-        this.editPart = null;
-        this.render();
-        this.broadcastAngle(0, 'ANGLE');
-    }
-
-    setupPointerEvents() {
-        if (!this.canvas) return;
-        this.canvas.addEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.addEventListener('pointermove', this.handlePointerMove);
-        this.canvas.addEventListener('pointerup', this.handlePointerUp);
-        this.canvas.addEventListener('pointercancel', this.handlePointerUp);
-    }
-
-    getCanvasCoordinates(event) {
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-
-        const clientX = (event.clientX - rect.left) * scaleX;
-        const clientY = (event.clientY - rect.top) * scaleY;
-
-        const canvasX = (clientX - (this.transform.offsetX * scaleX)) / this.transform.scale;
-        const canvasY = (clientY - (this.transform.offsetY * scaleY)) / this.transform.scale;
-
-        return { x: canvasX, y: canvasY };
-    }
-
-    handlePointerDown(event) {
-        if (this.toolMode !== 'draw') return;
-        
-        // 💡 [핵심 교정] 선긋기 상태일 때 터치 이벤트가 제스처 파일(app_gesture.js)로 새어나가지 않도록 완벽 엄격 차단
-        event.stopPropagation();
-        
-        if (event.pointerType === 'touch' && event.touchType === 'direct' && window.isStylusActive) return;
-        if (event.pointerType === 'pen') window.isStylusActive = true;
-
-        this.canvas.setPointerCapture(event.pointerId);
-        const coords = this.getCanvasCoordinates(event);
-        
-        // 1단계: 더블 탭 개별 삭제 제스처 연산
-        const now = Date.now();
-        if (now - this.lastTapTime < 250) {
-            const hitLineIndex = this.findHitLineIndex(coords);
-            if (hitLineIndex !== -1) {
-                this.lines.splice(hitLineIndex, 1);
-                this.selectedLine = null;
-                this.editPart = null;
-                this.render();
-                this.calculateFinalAngle();
-                this.currentLine = null;
-                return;
-            }
-        }
-        this.lastTapTime = now;
-
-        // 2단계: 기존에 그어진 선들의 적중 판정(Hit Test)
-        const hitResult = this.hitTestLines(coords);
-
-        if (hitResult) {
-            this.selectedLine = hitResult.line;
-            this.editPart = hitResult.part; 
-            this.dragStartCoords = coords;
-            this.originalLineState = {
-                start: { x: hitResult.line.start.x, y: hitResult.line.start.y },
-                end: { x: hitResult.line.end.x, y: hitResult.line.end.y }
-            };
-        } else {
-            this.selectedLine = null;
-            this.editPart = null;
-
-            if (this.lines.length >= 2) {
-                this.lines = [];
-            }
-
-            this.currentLine = {
-                start: { x: coords.x, y: coords.y },
-                end: { x: coords.x, y: coords.y }
-            };
-        }
-        this.render();
-    }
-    /**
-     * js/analyzer.js (Part 2/3)
-     */
-    handlePointerMove(event) {
-        if (this.toolMode !== 'draw') return;
-        
-        // 💡 [핵심 교정] 움직임 도중에도 터치 이벤트 버블링을 방제하여 강제 무브/줌 트리거 무효화
-        event.stopPropagation();
-        
-        const coords = this.getCanvasCoordinates(event);
-
-        if (this.selectedLine && this.editPart && this.originalLineState) {
-            const dx = coords.x - this.dragStartCoords.x;
-            const dy = coords.y - this.dragStartCoords.y;
-
-            if (this.editPart === 'start') {
-                this.selectedLine.start.x = this.originalLineState.start.x + dx;
-                this.selectedLine.start.y = this.originalLineState.start.y + dy;
-            } else if (this.editPart === 'end') {
-                this.selectedLine.end.x = this.originalLineState.end.x + dx;
-                this.selectedLine.end.y = this.originalLineState.end.y + dy;
-            } else if (this.editPart === 'body') {
-                this.selectedLine.start.x = this.originalLineState.start.x + dx;
-                this.selectedLine.start.y = this.originalLineState.start.y + dy;
-                this.selectedLine.end.x = this.originalLineState.end.x + dx;
-                this.selectedLine.end.y = this.originalLineState.end.y + dy;
-            }
-            this.render();
-            this.calculateFinalAngle(); 
-            return;
-        }
-
-        if (this.currentLine) {
-            this.currentLine.end = { x: coords.x, y: coords.y };
-            this.render();
-            this.calculateAnglesInline();
-        }
-    }
-
-    handlePointerUp(event) {
-        if (event.pointerType === 'pen') {
-            setTimeout(() => { window.isStylusActive = false; }, 500);
-        }
-        if (this.toolMode !== 'draw') return;
-        
-        // 💡 [핵심 교정] 터치 업 순간까지 이벤트를 완벽하게 독점 포획
-        event.stopPropagation();
-
-        if (this.selectedLine) {
-            this.editPart = null;
-            this.dragStartCoords = null;
-            this.originalLineState = null;
-            this.calculateFinalAngle();
-            this.render();
-            return;
-        }
-
-        if (this.currentLine) {
-            const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
-            if (dist > 5) {
-                this.lines.push(this.currentLine);
-            }
-            this.currentLine = null;
-            this.render();
-            this.calculateFinalAngle();
-        }
-    }
-
-    findHitLineIndex(coords) {
-        const threshold = 20 / this.transform.scale;
-        for (let i = 0; i < this.lines.length; i++) {
-            const hit = this.checkHitLine(this.lines[i], coords, threshold);
-            if (hit && hit.part === 'body') return i;
-        }
-        return -1;
-    }
-
-    hitTestLines(coords) {
-        const threshold = 25 / this.transform.scale; 
-        for (let i = this.lines.length - 1; i >= 0; i--) {
-            const result = this.checkHitLine(this.lines[i], coords, threshold);
-            if (result) return { line: this.lines[i], part: result.part };
-        }
-        return null;
-    }
-    /**
-     * js/analyzer.js (Part 3/3)
-     */
-    checkHitLine(line, coords, threshold) {
-        const distToStart = Math.hypot(line.start.x - coords.x, line.start.y - coords.y);
-        if (distToStart < threshold) return { part: 'start' };
-
-        const distToEnd = Math.hypot(line.end.x - coords.x, line.end.y - coords.y);
-        if (distToEnd < threshold) return { part: 'end' };
-
-        const x0 = coords.x, y0 = coords.y;
-        const x1 = line.start.x, y1 = line.start.y;
-        const x2 = line.end.x, y2 = line.end.y;
-
-        const lineLen = Math.hypot(x2 - x1, y2 - y1);
-        if (lineLen === 0) return null;
-
-        const u = ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / (lineLen * lineLen);
-        if (u >= 0 && u <= 1) {
-            const distance = Math.abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / lineLen;
-            if (distance < threshold) return { part: 'body' };
-        }
-
-        return null;
-    }
-
-    calculateAnglesInline() {
-        if (this.lines.length === 0 && this.currentLine) {
-            const angle = this.getLineAngle(this.currentLine);
-            this.broadcastAngle(angle, 'ELEVATION');
-        } else if (this.lines.length === 1 && this.currentLine) {
-            const angle = this.getIntersectionAngle(this.lines, this.currentLine);
-            this.broadcastAngle(angle, 'INTERSECT');
-        }
-    }
-
-    calculateFinalAngle() {
-        if (this.lines.length === 2) {
-            const angle = this.getIntersectionAngle(this.lines, this.lines);
-            this.broadcastAngle(angle, 'INTERSECT');
-        } else if (this.lines.length === 1) {
-            const angle = this.getLineAngle(this.lines);
-            this.broadcastAngle(angle, 'ELEVATION');
-        } else {
-            this.broadcastAngle(0, 'ANGLE');
-        }
-    }
-
-    getLineAngle(line) {
-        if (!line) return 0;
-        const rect = this.canvas.getBoundingClientRect();
-        const aspectCorrection = rect.height / rect.width;
-
-        const dx = line.end.x - line.start.x;
-        const dy = (line.end.y - line.start.y) * aspectCorrection;
-
-        let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
-        if (angle < 0) angle += 360;
-        return angle % 180;
-    }
-
-    getIntersectionAngle(line1, line2) {
-        if (!line1 || !line2) return 0;
-        
-        const l1 = Array.isArray(line1) ? line1 : line1;
-        const l2 = Array.isArray(line2) ? line2 || line2 : line2;
-        if (!l1 || !l2) return 0;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const aspectCorrection = rect.height / rect.width;
-
-        const angle1 = Math.atan2(-(l1.end.y - l1.start.y) * aspectCorrection, l1.end.x - l1.start.x);
-        const angle2 = Math.atan2(-(l2.end.y - l2.start.y) * aspectCorrection, l2.end.x - l2.start.x);
-        
-        let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
-        if (diff > 180) diff = 360 - diff;
-        return diff;
-    }
-
-    broadcastAngle(angle, prefixText) {
-        const angleEvent = new CustomEvent('bowAngleUpdate', {
-            detail: { angle: `${prefixText} ${angle.toFixed(1)}°` }
-        });
-        window.dispatchEvent(angleEvent);
-    }
-
-    drawBackgroundGrid(scaleX, scaleY) {
-        this.ctx.save();
-        this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
-        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.25)'; 
-
-        const gridSize = 50; 
-        const widthBound = this.canvas.width * 5;
-        const heightBound = this.canvas.height * 5;
-
-        for (let x = -widthBound; x <= widthBound; x += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(x, -heightBound); this.ctx.lineTo(x, heightBound); this.ctx.stroke();
-        }
-        for (let y = -heightBound; y <= heightBound; y += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(-widthBound, y); this.ctx.lineTo(widthBound, y); this.ctx.stroke();
-        }
-        this.ctx.restore();
-    }
-
-    render() {
-        if (!this.ctx || !this.canvas) return;
-
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.save();
-        
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        
-        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
-        this.ctx.scale(this.transform.scale, this.transform.scale);
-
-        this.drawBackgroundGrid(scaleX, scaleY);
-
-        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
-        this.lines.forEach(line => {
-            if (line === this.selectedLine) {
-                this.ctx.strokeStyle = '#FFFF00';
-                this.ctx.fillStyle = '#FFFF00';
-            } else {
-                this.ctx.strokeStyle = '#00FF66';
-                this.ctx.fillStyle = '#00FF66';
-            }
-            this.drawSingleLine(line);
-        });
-
-        if (this.currentLine) {
-            this.ctx.strokeStyle = '#FFFF00';
-            this.ctx.fillStyle = '#FFFF00';
-            this.drawSingleLine(this.currentLine);
-        }
-
-        this.ctx.restore();
-    }
-
-    drawSingleLine(line) {
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x, line.start.y);
-        this.ctx.lineTo(line.end.x, line.end.y);
-        this.ctx.stroke();
-
-        const radius = (6 * scaleX) / this.transform.scale;
-        this.ctx.beginPath();
-        this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
-        this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
-        this.ctx.fill();
-    }
+/* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-window.bowAnalyzer = new BowAnalyzer();
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #050507;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    letter-spacing: -0.5px;
+}
+
+/* 2. 두 화면 간의 레이아웃 상호 간섭 원천 차단 */
+.app-scene {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: none !important;
+}
+
+.app-scene.active {
+    display: block !important;
+}
+
+/* 3. 상단 비디오/카메라 영역 화면 전체 100% 독점 */
+.viewport-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh; 
+    overflow: hidden;
+    background-color: #050507;
+    z-index: 1;
+}
+
+#camera-preview, #main-video, #draw-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover !important;
+    transform-origin: top left !important;
+}
+
+#camera-preview, #main-video {
+    z-index: 2;
+}
+
+#draw-canvas {
+    z-index: 3;
+    pointer-events: auto;
+}
+
+.background-grid-layer {
+    display: none !important;
+}
+
+/* 시인성 높은 십자 가이드라인 (촬영화면 전용) */
+#scene-record .center-crosshair-v {
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    border-left: 1px dashed rgba(255, 255, 255, 0.2);
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+#scene-record .center-crosshair-h {
+    top: 50%;
+    left: 0;
+    height: 1px;
+    width: 100%;
+    border-top: 1px dashed rgba(255, 255, 255, 0.2);
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 5. 초정밀 실물 수평기 자이로 UI 및 실시간 각도 숫자 매핑 */
+#gyro-horizon-line {
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    width: 90%;
+    height: 1px;
+    background-color: rgba(255, 59, 48, 0.8);
+    transform-origin: center;
+    z-index: 6;
+    pointer-events: none;
+    transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
+}
+
+/* 💡 [핵심 추가] 초정밀 실물 자이로 수직 가이드라인 UI 명세 */
+#gyro-vertical-line {
+    position: absolute;
+    top: 5%;
+    left: 50%;
+    width: 1px;
+    height: 90%;
+    background-color: rgba(255, 59, 48, 0.8);
+    transform-origin: center;
+    z-index: 6;
+    pointer-events: none;
+    transition: background-color 0.1s, width 0.1s, box-shadow 0.1s;
+}
+
+/* 완벽 수평 판정 시 수평선과 수직선이 동시에 초록색 테크니컬 라이팅 네온 발광 연동 */
+#gyro-horizon-line.perfect-level, #gyro-vertical-line.perfect-level {
+    background-color: #34C759;
+    box-shadow: 0 0 14px rgba(52, 199, 89, 0.8);
+}
+
+#gyro-horizon-line.perfect-level { height: 2px; }
+#gyro-vertical-line.perfect-level { width: 2px; }
+
+#gyro-horizon-line::after {
+    content: attr(data-angle);
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    font-weight: 700;
+    color: #FFFFFF;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+}
+
+/* 6. 우측 상단 플로팅 각도 리포트 */
+.floating-report {
+    position: absolute;
+    top: calc(24px + env(safe-area-inset-top));
+    right: 24px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #34C759;
+    text-shadow: 0px 4px 12px rgba(0, 0, 0, 0.9);
+    z-index: 10;
+    font-variant-numeric: tabular-nums;
+    font-family: "SF Pro Display", -apple-system, sans-serif;
+}
+
+/* 7. 하단 패널 영역 (애플 디자인 가이드라인 준수 투명 스타일 마감) */
+.unified-panel-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 33.333vh; 
+    z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom);
+    
+    background: rgba(10, 10, 15, 0.3) !important; 
+    backdrop-filter: blur(40px) saturate(220%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(220%) !important;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 30px 30px 0 0 !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+#scene-analyze .unified-panel-box {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#scene-analyze .unified-panel-box.collapsed {
+    transform: translateY(calc(100% - 34px));
+}
+
+.panel-slider-handle, .panel-slider-handle-placeholder {
+    width: 100%;
+    height: 34px;
+}
+
+.panel-slider-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.handle-bar {
+    width: 38px;
+    height: 5px;
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+}
+
+.panel-content-wrapper {
+    height: calc(100% - 34px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px 24px 16px 24px;
+}
+
+.apple-layout-sync-spacer {
+    width: 100%;
+    height: 44px;
+    background-color: transparent;
+}
+
+/* 8. 분석 화면용 4대 텍스트 메뉴 */
+.text-menu-bar {
+    display: flex;
+    width: 100%;
+    height: 44px;
+    padding: 3px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 13px;
+}
+
+.menu-btn {
+    flex: 1;
+    height: 38px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.menu-btn.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #34C759;
+    font-weight: 700;
+}
+
+/* 9. 비디오 슬라이더 타임라인 */
+.timeline-container {
+    width: 100%;
+    padding: 0 4px;
+}
+
+#video-slider {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    outline: none;
+}
+
+#video-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    cursor: pointer;
+}
+
+/* 10. 비디오 제어바 */
+.video-control-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 48px;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 16px;
+}
+
+.control-btn:active {
+    color: #34C759;
+}
+
+/* 11. 촬영 컨트롤 */
+.status-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+    text-align: center;
+    font-weight: 500;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.control-row-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.action-btn-main {
+    background: rgba(0, 0, 0, 0.4); 
+    border: 3px solid #FFFFFF;
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 10px 28px;
+    border-radius: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease;
+}
+
+.action-btn-main.recording {
+    background: #FF3B30;
+    border-color: #FF3B30;
+    color: #FFFFFF;
+    box-shadow: 0 0 20px rgba(255, 59, 48, 0.5);
+    animation: pulseGlow 1.5s infinite alternate;
+}
+
+.switch-btn {
+    width: 100%;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes pulseGlow {
+    from { transform: scale(1); }
+    to { transform: scale(1.04); }
+}
+
+.text-menu-bar-sync, #btn-record-move-sync {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
