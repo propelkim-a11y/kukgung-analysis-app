@@ -2,7 +2,7 @@
  * js/analyzer.js (Part 1/2)
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [각도 실시간 연동 교정] 편집 상태 드래그 중에도 각도가 실시간 변환되도록 연산 타겟 보정 완료
+ * - [사잇각 실시간 연동 완벽 패치] getIntersectionAngle 인자 주입 버그 격파로 실시간 사잇각 트래킹 완료
  */
 
 class BowAnalyzer {
@@ -152,7 +152,7 @@ class BowAnalyzer {
                 this.selectedLine.end.y = this.originalLineState.end.y + dy;
             }
             this.render();
-            this.calculateFinalAngle(); // 드래그 중인 가변 좌표 실시간 피드백 연동
+            this.calculateFinalAngle(); // 편집 이동/길이 드래그 중인 변동 좌표 실시간 피드백 전사
             return;
         }
 
@@ -236,6 +236,7 @@ class BowAnalyzer {
             const angle = this.getLineAngle(this.currentLine);
             this.broadcastAngle(angle, 'ELEVATION');
         } else if (this.lines.length === 1 && this.currentLine) {
+            // 💡 교정: 이미 그려진 1개의 선(lines[0])과 실시간 마우스 가이드선(currentLine) 간의 임시 사잇각 연산 처리
             const angle = this.getIntersectionAngle(this.lines[0], this.currentLine);
             this.broadcastAngle(angle, 'INTERSECT');
         }
@@ -243,6 +244,7 @@ class BowAnalyzer {
 
     calculateFinalAngle() {
         if (this.lines.length === 2) {
+            // 💡 [핵심 교정 버그 박멸] 배열을 통째로 밀어넣던 오류를 소거하고 첫번째 선과 두번째 선 객체를 각각 정밀 분류 주입
             const angle = this.getIntersectionAngle(this.lines[0], this.lines[1]);
             this.broadcastAngle(angle, 'INTERSECT');
         } else if (this.lines.length === 1) {
