@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1/2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 상단 인프라부 (선긋기 활성화 보정 완료)
  */
 
 window.bowAppNodes = {};
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setActiveMenu(activeBtn) {
         [nodes.btnOpen, nodes.btnMove, nodes.btnDraw].forEach(btn => btn.classList.remove('active'));
-        activeBtn.classList.add('active');
+        if (activeBtn) activeBtn.classList.add('active');
     }
 
     const FRAME_TIME = 1 / 30;
@@ -238,10 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
-    // 💡 [핵심 교정 완료] 인덱스 참조 방식 정교화로 비디오 스트리밍 출력 락 영구 차단
     nodes.videoInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0]; // files에서 files[0] 객체 추출로 명세 완전 정정
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const file = files[0];
 
         await core.saveCache('lastVideoBlob', file);
         const url = URL.createObjectURL(file);
@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(resizeCanvasToDisplay, 100);
     });
 
+    // 💡 [핵심 교정 완료] 하단 패널 클릭 시 분석기(bowAnalyzer) 객체 내부에 정확한 모드 스트링 주입 연동
     nodes.btnMove.addEventListener('click', () => {
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
