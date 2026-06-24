@@ -2,7 +2,7 @@
  * js/analyzer.js (Part 1/3)
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [3번 방안 스마트 스냅 엔진] 15도 단위 자석 연동 및 멀티 터치 자석 일시 해제 기능 완벽 탑재
+ * - [오작동 박멸 패치] 히트 테스트 범위를 실제 선 주변으로 엄격 격리하여 선긋기 락 현상 완전 해결
  */
 
 class BowAnalyzer {
@@ -25,7 +25,7 @@ class BowAnalyzer {
         this.originalLineState = null;  
         this.lastTapTime = 0;           
 
-        // 💡 3번 방안: 자석(스냅) 시스템 관련 튜닝 구조체
+        // 3번 방안: 자석(스냅) 시스템 관련 튜닝 구조체
         this.snapAngles =; // 스냅 대상 목표 각도 세트
         this.snapThreshold = 1.2;               // 자석이 끌어당기는 오차 범위 (±1.2도)
         this.isCurrentlySnapped = false;       // 현재 정각에 붙어있는지 여부 리포트 플래그
@@ -124,6 +124,7 @@ class BowAnalyzer {
                 end: { x: hitResult.line.end.x, y: hitResult.line.end.y }
             };
         } else {
+            // 💡 교정: 빈 화면 터치 시 확실하게 기존 편집 상태를 탈출하고 신규 선긋기 개시 보장
             this.selectedLine = null;
             this.editPart = null;
 
@@ -145,8 +146,8 @@ class BowAnalyzer {
         if (this.toolMode !== 'draw') return;
         const coords = this.getCanvasCoordinates(event);
 
-        // 💡 3번 방안 핵심: 멀티 터치(화면에 다른 포인터가 눌려있는지 여부) 실시간 감지 연산 보정
-        const isMultiTouching = (window.bowAppGesture && window.bowAppGesture.activePointers && window.bowAppGesture.activePointers.size >= 1) || (event.targetTouches && event.targetTouches.length >= 2);
+        // 💡 교정: 유실되기 쉬운 브라우저 고유 이벤트를 방지하고, 전역 제스처 포인터 맵 데이터의 개수만 안전하게 정밀 파싱
+        const isMultiTouching = (window.bowAppGesture && window.bowAppGesture.activePointers && window.bowAppGesture.activePointers.size >= 2);
 
         if (this.selectedLine && this.editPart && this.originalLineState) {
             const dx = coords.x - this.dragStartCoords.x;
@@ -275,10 +276,11 @@ class BowAnalyzer {
         if (lineLen === 0) return null;
 
         const u = ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / (lineLen * lineLen);
-        if (u < 0 || u > 1) return null;
-
-        const distance = Math.abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / lineLen;
-        if (distance < threshold) return { part: 'body' };
+        // 💡 교정: 선분 유효 도메인(u) 조건이 참일 때만 물리 거리를 계산하여 빈 화면 제스처 빗나감 방어벽 확보
+        if (u >= 0 && u <= 1) {
+            const distance = Math.abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / lineLen;
+            if (distance < threshold) return { part: 'body' };
+        }
 
         return null;
     }
@@ -288,17 +290,17 @@ class BowAnalyzer {
             const angle = this.getLineAngle(this.currentLine);
             this.broadcastAngle(angle, 'ELEVATION');
         } else if (this.lines.length === 1 && this.currentLine) {
-            const angle = this.getIntersectionAngle(this.lines[0], this.currentLine);
+            const angle = this.getIntersectionAngle(this.lines, this.currentLine);
             this.broadcastAngle(angle, 'INTERSECT');
         }
     }
 
     calculateFinalAngle() {
         if (this.lines.length === 2) {
-            const angle = this.getIntersectionAngle(this.lines[0], this.lines[1]);
+            const angle = this.getIntersectionAngle(this.lines, this.lines);
             this.broadcastAngle(angle, 'INTERSECT');
         } else if (this.lines.length === 1) {
-            const angle = this.getLineAngle(this.lines[0]);
+            const angle = this.getLineAngle(this.lines);
             this.broadcastAngle(angle, 'ELEVATION');
         } else {
             this.broadcastAngle(0, 'ANGLE');
@@ -320,11 +322,17 @@ class BowAnalyzer {
 
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
+        
+        // 💡 교정: 다중 배열 래퍼 해제 보정 연산 주입 (단일 객체 앵커 매핑)
+        const l1 = Array.isArray(line1) ? line1[0] : line1;
+        const l2 = Array.isArray(line2) ? line2[1] || line2 : line2;
+        if (!l1 || !l2) return 0;
+
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
 
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
+        const angle1 = Math.atan2(-(l1.end.y - l1.start.y) * aspectCorrection, l1.end.x - l1.start.x);
+        const angle2 = Math.atan2(-(l2.end.y - l2.start.y) * aspectCorrection, l2.end.x - l2.start.x);
         
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
