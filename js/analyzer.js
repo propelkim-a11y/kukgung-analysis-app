@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 / 4)
- * 국궁 고각 분석 시스템 - 슬림 분할 에디션
+ * js/analyzer.js (Part 1 / 3)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판
  */
 
 class BowAnalyzer {
@@ -16,14 +16,24 @@ class BowAnalyzer {
         this.lastTapTime = 0;
         this.tapThreshold = 300; 
 
-        // 선 편집 드래그 수정을 위한 상태 변수
+        // 선 편집 미세 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
+
+        this.handlePointerDown = this.handlePointerDown.bind(this);
+        this.handlePointerMove = this.handlePointerMove.bind(this);
+        this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
+    // 💡 [하드웨어 충돌 박멸] 리스너를 단 1번만 영구 결합하여 중복 누적 버그 차단
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
+        
+        this.canvas.addEventListener('pointerdown', this.handlePointerDown);
+        this.canvas.addEventListener('pointermove', this.handlePointerMove);
+        this.canvas.addEventListener('pointerup', this.handlePointerUp);
+        this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
 
     updateTransform(scale, offsetX, offsetY) {
@@ -35,22 +45,9 @@ class BowAnalyzer {
 
     setMode(mode) {
         this.toolMode = mode;
-        if (!this.canvas) return;
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove);
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp);
-        this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
-        if (mode === 'draw') {
-            this.canvas.addEventListener('pointerdown', this.handlePointerDown);
-            this.canvas.addEventListener('pointermove', this.handlePointerMove);
-            this.canvas.addEventListener('pointerup', this.handlePointerUp);
-            this.canvas.addEventListener('pointercancel', this.handlePointerUp);
-        }
         this.render();
     }
-/**
- * js/analyzer.js (Part 2 / 4)
- */
+
     clearLines() {
         this.lines = [];
         this.currentLine = null;
@@ -72,15 +69,17 @@ class BowAnalyzer {
 
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        const cX = (event.clientX - rect.left) * scaleX;
-        const cY = (event.clientY - rect.top) * scaleY;
-        const canvasX = (cX - (this.transform.offsetX * scaleX)) / this.transform.scale;
-        const canvasY = (cY - (this.transform.offsetY * scaleY)) / this.transform.scale;
+        const canvasScaleX = this.canvas.width / rect.width;
+        const canvasScaleY = this.canvas.height / rect.height;
+        const cX = (event.clientX - rect.left) * canvasScaleX;
+        const cY = (event.clientY - rect.top) * canvasScaleY;
+        const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
+        const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
-
+/**
+ * js/analyzer.js (Part 2 / 3)
+ */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -131,9 +130,7 @@ class BowAnalyzer {
             this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
         }
     }
-/**
- * js/analyzer.js (Part 3 / 4)
- */
+
     handlePointerMove(event) {
         if (this.toolMode !== 'draw') return;
         event.preventDefault();
@@ -227,7 +224,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 4 / 4)
+ * js/analyzer.js (Part 3 / 3)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -241,7 +238,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines));
+            this.broadcastAngle(this.getLineAngle(this.lines[0]));
         } else {
             this.broadcastAngle(0);
         }
@@ -331,7 +328,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [참조 오류 차단 마감] 단선 상태 실시간 드로잉 시 배열 인덱스 [0]으로 명확히 객체 적출
+            // 💡 [참조 크래시 완전 해결] lines 배열 원본 전체 대신 첫 번째 선 객체인 this.lines[0]을 명확하게 타겟팅
             this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
