@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.recordStatus = document.getElementById('record-status');
     nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
 
-    // 💡 [핵심 추가] 자이로 수직 가이드 노드 전역 등록
+    // 자이로 수직 가이드 노드 전역 등록
     nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
 
     nodes.videoViewport = document.getElementById('video-viewport');
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
+    // 2. 스마트폰 윈도우 실제 스크린 전체 면적으로 캔버스 스케일 동기화
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -238,9 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
 
+    // 💡 [핵심 교정 완료] 인덱스 참조 방식 정교화로 비디오 스트리밍 출력 락 영구 차단
     nodes.videoInput.addEventListener('change', async (e) => {
-        const file = e.target.files;
-        if (!file || file.length === 0) return;
+        const file = e.target.files[0]; // files에서 files[0] 객체 추출로 명세 완전 정정
+        if (!file) return;
 
         await core.saveCache('lastVideoBlob', file);
         const url = URL.createObjectURL(file);
@@ -287,19 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
+        nodes.angleReport.textContent = e.detail.angle;
         if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
 
-    /**
-     * 💡 [핵심 교정] 실시간 자이로 데이터를 수평선뿐만 아니라 수직 가이드라인까지 동시 매핑
-     * 완벽 수평 상태 판정 시 두 물리선이 세련되게 초록색으로 동시 변환되는 메커니즘 연동
-     */
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         
         if (nodes.sceneRecord.classList.contains('active')) {
-            // 1. 실시간 수평 가이드선 각도 문자 맵 및 회전 전사
             if (nodes.gyroHorizonLine) {
                 nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
                 nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
@@ -311,7 +307,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 2. 실시간 수직 가이드선 물리 정렬 회전 전사 (수평선과 90도로 수평 직교를 유지하며 정밀 트랙킹)
             if (nodes.gyroVerticalLine) {
                 nodes.gyroVerticalLine.style.transform = `translateX(-50%) rotate(${-roll}deg)`;
                 
