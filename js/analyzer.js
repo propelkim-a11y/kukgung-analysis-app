@@ -1,7 +1,13 @@
 /**
  * js/analyzer.js (Part 1 of 2)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (비디오-캔버스 축 완벽 동기화 버전)
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (기준점 동기화 완전판)
+ * - 줌/이동 변환 행렬 역산 공식 재정립 (최대 확대 상태에서도 픽셀 오차 제로 보장)
+ * - 단선(선 1개): 수평선(0도) 기준 절대 고각 정밀 실시간 매핑
+ * - 복선(선 2개): 두 조준선 사이의 유클리드 교각(사잇각) 실시간 매핑
+ * - 화면 빈 공간 더블 탭(Double Tap) 시 직전 가이드라인 단계별 제거(Undo) 인터랙션 탑재
+ * - [축 교정 패치] 비디오와 캔버스의 transform-origin을 좌측 상단(0,0)으로 완벽 일치화
  */
+
 class BowAnalyzer {
     constructor() {
         this.canvas = null;
@@ -61,17 +67,11 @@ class BowAnalyzer {
     // 💡 [치명적 버그 해결] 비디오 엘리먼트의 비보정 CSS 변환 축과 캔버스 좌표 공간을 수학적으로 1:1 결합
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        
-        // 브라우저 뷰포트 내의 순수 물리적인 스타일 좌표 거리 구하기 (DPR 연산 간섭 제거)
         const clientX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
         const clientY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
-
-        // 캔버스 자체 해상도 비율(DPR 배율)을 구하여 이동 오프셋 크기 보정식 동기화
         const canvasResolutionScale = this.canvas.width / window.innerWidth;
-        
         const canvasX = (clientX - (this.transform.offsetX * canvasResolutionScale)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * canvasResolutionScale)) / this.transform.scale;
-
         return { x: canvasX, y: canvasY };
     }
     handlePointerDown(event) {
@@ -237,7 +237,7 @@ class BowAnalyzer {
         const scaleX = this.canvas.width / rect.width;
         const canvasResolutionScale = this.canvas.width / window.innerWidth;
         
-        // 💡 [매트릭스 축 교정] 비디오의 물리 스크롤 패닝(offsetX, offsetY) 속도 궤적과 캔버스 변환 행렬을 정확히 일치화
+        // 💡 [매트릭스 축 교정 마감] 제스처 피벗과 정확히 동치되는 (0,0) 기준 스케일 및 오프셋 이동 행렬 주사
         this.ctx.translate(this.transform.offsetX * canvasResolutionScale, this.transform.offsetY * canvasResolutionScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
