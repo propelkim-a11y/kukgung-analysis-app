@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (타임라인 슬라이더 완벽 동기화 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (녹화 Duration 타임스탬프 복원 판)
  */
 
 window.bowAppNodes = {};
@@ -73,10 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
         await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
         resizeCanvasToDisplay();
         gesture.applyTransform();
-        // 세션 복원 시에도 슬라이더 최대 범위를 영상 시간과 강제 일치화
-        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration)) {
+        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
             nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.001;
+            nodes.videoSlider.step = 0.0001;
         }
     });
 
@@ -285,20 +284,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentFrameTime = 1 / 30; 
     
-    // 💡 [슬라이더 바 길이 연동 패치] 비디오 로드와 즉시 최대길이 및 정밀 간격 조절 물리 결합
+    // 💡 [WebM 타임스탬프 복원 엔진 주입] 실시간 인코딩 파일의 누락된 전체 시간을 완벽 사상
     nodes.mainVideo.addEventListener('loadedmetadata', () => {
         const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
         currentFrameTime = 1 / detectedFPS;
-        
-        // 슬라이더바 범위를 전체 재생시간으로 주입하고 미세조정 단위를 소수점 4자리까지 초정밀 스케일링
-        nodes.videoSlider.max = nodes.mainVideo.duration;
-        nodes.videoSlider.step = 0.0001; 
+
+        // 촬영 원본 비디오 자체에 재생 시간이 누락되어(Infinity 등) 들어온 상태인지 정밀 스캔
+        if (!isFinite(nodes.mainVideo.duration) || nodes.mainVideo.duration === 0 || isNaN(nodes.mainVideo.duration)) {
+            // 브라우저 내부 타임라인 끝자락(1e9초 뒤)으로 가상 재생 시점을 초고속 강제 워프시킴
+            nodes.mainVideo.currentTime = 1e9;
+            
+            // 끝부분을 밟는 즉시 브라우저 커널이 복원해낸 진짜 전체 영상 초(s) 정보를 슬라이더에 강제 박제
+            nodes.mainVideo.addEventListener('timeupdate', function recoverDuration() {
+                if (nodes.mainVideo.duration && isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+                    nodes.videoSlider.max = nodes.mainVideo.duration;
+                    nodes.videoSlider.step = 0.0001;
+                    // 메타데이터 복원이 완료되었으므로 안전하게 0초(처음 시점)로 귀환하여 일시정지
+                    nodes.mainVideo.currentTime = 0;
+                    nodes.mainVideo.removeEventListener('timeupdate', recoverDuration);
+                }
+            });
+        } else {
+            // 이미 정보가 온전한 수동 [열기] 파일은 곧바로 전체 스케일 매핑 매칭
+            nodes.videoSlider.max = nodes.mainVideo.duration;
+            nodes.videoSlider.step = 0.0001;
+        }
         
         resizeCanvasToDisplay();
     });
 
     nodes.mainVideo.addEventListener('timeupdate', () => {
-        if (!isNaN(nodes.mainVideo.currentTime)) {
+        if (!isNaN(nodes.mainVideo.currentTime) && isFinite(nodes.mainVideo.duration)) {
             nodes.videoSlider.value = nodes.mainVideo.currentTime;
         }
     });
@@ -376,7 +392,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
         
-        // 💡 외부 비디오 수동 로드 시에도 강제로 타임라인 스케일 즉시 동기화 바인딩
         nodes.mainVideo.addEventListener('loadeddata', () => {
             nodes.videoSlider.max = nodes.mainVideo.duration;
             nodes.videoSlider.step = 0.0001;
