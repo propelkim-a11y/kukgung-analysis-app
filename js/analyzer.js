@@ -1,9 +1,10 @@
 /**
- * js/analyzer.js
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
+ * js/analyzer.js (Part 1 / 2)
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (선긋기 강화 버전)
  * - S펜 / 애플펜슬 Palm Rejection 및 포인터 분리
  * - 줌/이동 변환 행렬 역산 (확대 상태에서도 정확한 조준점 매핑)
  * - [디자인 시스템 패치] 애플 순정 인디고 블루(Indigo Blue) 정밀 그리드 이식 완료
+ * - [기능 강화] 자석 스냅 시스템, 인라인 각도 아크 및 실행 취소(Undo) 완벽 구현
  */
 
 class BowAnalyzer {
@@ -21,6 +22,10 @@ class BowAnalyzer {
         };
 
         this.toolMode = 'move'; 
+        
+        // 💡 자석 스냅 감도 임계값 (물리 픽셀 기준 범위)
+        this.snapThreshold = 12; 
+        this.isSnapped = false;
 
         this.handlePointerDown = this.handlePointerDown.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
@@ -49,6 +54,24 @@ class BowAnalyzer {
         this.currentLine = null;
         this.render();
         this.broadcastAngle(0);
+    }
+
+    // 💡 최신 실행 취소(Undo) 파이프라인
+    undoLastLine() {
+        if (this.lines.length > 0) {
+            this.lines.pop();
+            this.render();
+            if (this.lines.length >= 2) {
+                this.calculateFinalAngle();
+            } else if (this.lines.length === 1) {
+                const angle = this.getLineAngle(this.lines[0]);
+                this.broadcastAngle(angle);
+            } else {
+                this.broadcastAngle(0);
+            }
+            return true;
+        }
+        return false;
     }
 
     setupPointerEvents() {
@@ -86,17 +109,48 @@ class BowAnalyzer {
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
 
+        // 💡 시작점 끝점 융합 자석 스냅 검사
+        let startPt = { x: coords.x, y: coords.y };
+        const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
+        if (snappedPt) {
+            startPt = snappedPt;
+        }
+
         this.currentLine = {
-            start: { x: coords.x, y: coords.y },
+            start: startPt,
             end: { x: coords.x, y: coords.y }
         };
     }
-
     handlePointerMove(event) {
         if (this.toolMode !== 'draw' || !this.currentLine) return;
 
         const coords = this.getCanvasCoordinates(event);
-        this.currentLine.end = { x: coords.x, y: coords.y };
+        let targetX = coords.x;
+        let targetY = coords.y;
+
+        this.isSnapped = false;
+
+        // 1. 기존 선들의 endpoints 주변 자석 착 감김 처리
+        const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
+        if (snapEndpoint) {
+            targetX = snapEndpoint.x;
+            targetY = snapEndpoint.y;
+            this.isSnapped = true;
+        } else {
+            // 2. 수평(0도), 수직(90도) 스마트 직교 스냅 보정
+            const dx = targetX - this.currentLine.start.x;
+            const dy = targetY - this.currentLine.start.y;
+            
+            if (Math.abs(dx) < this.snapThreshold) {
+                targetX = this.currentLine.start.x; // 수직선 완전 고정
+                this.isSnapped = true;
+            } else if (Math.abs(dy) < this.snapThreshold) {
+                targetY = this.currentLine.start.y; // 수평선 완전 고정
+                this.isSnapped = true;
+            }
+        }
+
+        this.currentLine.end = { x: targetX, y: targetY };
         
         this.render();
         this.calculateAnglesInline();
@@ -115,39 +169,40 @@ class BowAnalyzer {
         }
         
         this.currentLine = null;
+        this.isSnapped = false;
         this.render();
         this.calculateFinalAngle();
     }
 
+    findCloseEndpoint(x, y) {
+        for (let line of this.lines) {
+            if (Math.hypot(line.start.x - x, line.start.y - y) < this.snapThreshold) return line.start;
+            if (Math.hypot(line.end.x - x, line.end.y - y) < this.snapThreshold) return line.end;
+        }
+        return null;
+    }
+
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
-            const angle = this.getLineAngle(this.currentLine);
-            this.broadcastAngle(angle);
+            this.broadcastAngle(this.getLineAngle(this.currentLine));
         } else if (this.lines.length >= 1 && this.currentLine) {
-            const angle = this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine);
-            this.broadcastAngle(angle);
+            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
         }
     }
 
     calculateFinalAngle() {
         if (this.lines.length >= 2) {
-            const line1 = this.lines[this.lines.length - 2];
-            const line2 = this.lines[this.lines.length - 1];
-            const angle = this.getIntersectionAngle(line1, line2);
-            this.broadcastAngle(angle);
+            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            const angle = this.getLineAngle(this.lines);
-            this.broadcastAngle(angle);
+            this.broadcastAngle(this.getLineAngle(this.lines));
         }
     }
 
     getLineAngle(line) {
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
-
         const dx = line.end.x - line.start.x;
         const dy = (line.end.y - line.start.y) * aspectCorrection;
-
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return angle % 180;
@@ -156,10 +211,8 @@ class BowAnalyzer {
     getIntersectionAngle(line1, line2) {
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
-
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y) * aspectCorrection, line1.end.x - line1.start.x);
         const angle2 = Math.atan2(-(line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
-        
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
         return diff;
@@ -172,40 +225,49 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    /**
-     * 💡 [디자인 시스템 피드백 보정] 
-     * 미니멀한 두께(0.75px)를 고수하여 정밀 분석 시야를 완전히 확보하되,
-     * 영상 뒤편에서 이질감 없이 스포티하게 조화를 이루는 애플 고유의 인디고 블루 가이드 매핑
-     */
     drawBackgroundGrid(scaleX, scaleY) {
         this.ctx.save();
-        
-        // 정갈한 나노 단위 굵기 유지
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
-        
-        // 💡 애플 시그니처 테크니컬 인디고 블루 색상 및 최적화 투명도 주입
-        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.25)'; 
+        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
+        const gridSize = 50; 
+        const widthBound = this.canvas.width * 2;
+        const heightBound = this.canvas.height * 2;
 
-        const gridSize = 50; // 50px 물리 규격 고정
-        
-        const widthBound = this.canvas.width * 5;
-        const heightBound = this.canvas.height * 5;
-
-        // 세로선 그리기
         for (let x = -widthBound; x <= widthBound; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, -heightBound);
-            this.ctx.lineTo(x, heightBound);
-            this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(x, -heightBound); this.ctx.lineTo(x, heightBound); this.ctx.stroke();
         }
-
-        // 가로선 그리기
         for (let y = -heightBound; y <= heightBound; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(-widthBound, y);
-            this.ctx.lineTo(widthBound, y);
-            this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(-widthBound, y); this.ctx.lineTo(widthBound, y); this.ctx.stroke();
         }
+        this.ctx.restore();
+    }
+
+    // 💡 [초정밀 고도화] 사잇각 시각화 호(Arc) 및 인라인 수치 타이포그래피 매핑 엔진
+    drawInlineAngleArc(line1, line2, scaleX) {
+        const rect = this.canvas.getBoundingClientRect();
+        const aspectCorrection = rect.height / rect.width;
+
+        const a1 = Math.atan2((line1.start.y - line1.end.y) * aspectCorrection, line1.start.x - line1.end.x);
+        const a2 = Math.atan2((line2.end.y - line2.start.y) * aspectCorrection, line2.end.x - line2.start.x);
+        
+        const deg = this.getIntersectionAngle(line1, line2);
+
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
+        const radius = (35 * scaleX) / this.transform.scale;
+        
+        // 타원 왜곡 보정을 풀어내며 정원 그리기
+        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
+        this.ctx.stroke();
+
+        // 텍스트 매핑
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        this.ctx.shadowBlur = 4;
+        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
         this.ctx.restore();
     }
 
@@ -213,7 +275,6 @@ class BowAnalyzer {
         if (!this.ctx || !this.canvas) return;
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
         this.ctx.save();
         
         const rect = this.canvas.getBoundingClientRect();
@@ -223,19 +284,27 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * scaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
 
-        // 1단계: 동영상 위에 연동되는 50px 인디고 블루 격자선 렌더링
+        // 1단계: 격자선
         this.drawBackgroundGrid(scaleX, scaleY);
 
-        // 2단계: 기 확정된 조준선 그리기
+        // 2단계: 확정 조준선
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         this.lines.forEach(line => this.drawSingleLine(line));
 
-        // 3단계: 실시간 드래그 가이드라인 그리기
+        // 💡 3단계 고도화: 인라인 앵글 아크 실시간 중첩 시각화
+        if (this.lines.length >= 2) {
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
+        } else if (this.lines.length === 1 && this.currentLine) {
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
+        }
+
+        // 4단계: 실시간 드래그선
         if (this.currentLine) {
-            this.ctx.strokeStyle = '#FFFF00';
-            this.ctx.fillStyle = '#FFFF00';
+            // 💡 자석 스냅 발광 피드백 매핑
+            this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
+            this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
             this.drawSingleLine(this.currentLine);
         }
 
