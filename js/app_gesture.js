@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js
- * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (기준점 동기화 완전판)
+ * 국궁 자세 분석 앱 - 스타일러스 및 멀티 터치 제스처 처리기 (축 동기화 최종 완성판)
  */
 
 class BowAppGesture {
@@ -89,7 +89,6 @@ class BowAppGesture {
         const nextScale = e.deltaY < 0 ? state.scale * (1 + zoomIntensity) : state.scale * (1 - zoomIntensity);
         this.applyZoom(nextScale);
     }
-    // 💡 [결정적 교정] 복잡한 마우스 피벗 축 대신 좌측 상단(0,0) 정순 기하학 선형 확대 매커니즘 정렬
     applyZoom(targetScale) {
         const state = this.core.state;
         const nextScale = Math.min(Math.max(targetScale, 1), 5);
