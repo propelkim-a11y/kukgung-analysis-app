@@ -16,7 +16,10 @@
         <div class="viewport-container">
             <!-- 실시간 자이로 연동 물리 수평 가이드선 및 각도 표기용 앵커 -->
             <div id="gyro-horizon-line" data-angle="0.0°"></div>
-            <!-- 상시 중앙 가이드 십자선 (촬영 정렬용 유지) -->
+            <!-- 💡 [핵심 추가] 실시간 자이로 연동 물리 수직 가이드선 앵커 -->
+            <div id="gyro-vertical-line"></div>
+
+            <!-- 상시 중앙 가이드 십자선 (촬영 정렬용 고정 지표) -->
             <div class="center-crosshair-v"></div>
             <div class="center-crosshair-h"></div>
             
@@ -61,8 +64,6 @@
 
             <!-- 스타일러스 수동 선긋기 조준선 캔버스 -->
             <canvas id="draw-canvas"></canvas>
-
-            <!-- 💡 교정: 분석 화면 내부에 고정되어 시야를 방해하던 수평·수직 중앙 점선 레이어 완전 삭제 -->
 
             <!-- 애플 스타일 순정 타이포그래피 리포트 배치 -->
             <div id="angle-report" class="floating-report">ANGLE 0.0°</div>
