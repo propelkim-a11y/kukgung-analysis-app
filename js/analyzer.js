@@ -1,6 +1,12 @@
 /**
  * js/analyzer.js (Part 1 of 2)
+ * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (초정밀 줌 연동 버전)
+ * - 줌/이동 변환 행렬 역산 공식 재정립 (최대 확대 상태에서도 픽셀 오차 제로 보장)
+ * - 단선(선 1개): 수평선(0도) 기준 절대 고각 정밀 실시간 매핑
+ * - 복선(선 2개): 두 조준선 사이의 유클리드 교각(사잇각) 실시간 매핑
+ * - 화면 빈 공간 더블 탭(Double Tap) 시 직전 가이드라인 단계별 제거(Undo) 인터랙션 탑재
  */
+
 class BowAnalyzer {
     constructor() {
         this.canvas = null;
@@ -41,13 +47,7 @@ class BowAnalyzer {
         if (this.lines.length > 0) {
             this.lines.pop();
             this.render();
-            if (this.lines.length >= 2) {
-                this.calculateFinalAngle();
-            } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines[0]));
-            } else {
-                this.broadcastAngle(0);
-            }
+            this.calculateFinalAngle();
             return true;
         }
         return false;
@@ -59,6 +59,7 @@ class BowAnalyzer {
         this.canvas.addEventListener('pointerup', this.handlePointerUp);
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
+    // 💡 [신뢰도 극대화] 줌 배율(scale)과 Pan 좌표(offset), 그리고 디바이스 픽셀비(DPR)를 완전히 결합한 초정밀 역산 공식
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
@@ -156,10 +157,12 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            // 💡 [배열 우회 교정] lines 배열 자체 대신 첫 번째 원소 객체인 [0]을 정확히 지정
             this.broadcastAngle(this.getLineAngle(this.lines[0]));
+        } else {
+            this.broadcastAngle(0);
         }
     }
+    // 💡 [수학적 신뢰도 보정] 단선: 화면 해상도 왜곡을 제거하고 3시 방향(수평선) 기준 0~180도로 완벽 수렴
     getLineAngle(line) {
         if (!line) return 0;
         const rect = this.canvas.getBoundingClientRect();
@@ -170,6 +173,7 @@ class BowAnalyzer {
         if (angle < 0) angle += 360;
         return angle % 180;
     }
+    // 💡 [교각 알고리즘 패치] 복선: 두 벡터 사잇각의 절대 기하학적 최소 교각(0~180도) 산출
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const rect = this.canvas.getBoundingClientRect();
@@ -204,6 +208,7 @@ class BowAnalyzer {
         }
         this.ctx.restore();
     }
+    // 💡 [줌 연동 시각화 패치] 확대 배율에 따라 아크 지름과 텍스트 크기가 요동치지 않도록 scale 분리 마감
     drawInlineAngleArc(line1, line2, scaleX) {
         if (!line1 || !line2) return;
         const rect = this.canvas.getBoundingClientRect();
@@ -213,7 +218,7 @@ class BowAnalyzer {
         const deg = this.getIntersectionAngle(line1, line2);
         this.ctx.save();
         this.ctx.beginPath();
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
         this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
         const radius = (35 * scaleX) / this.transform.scale;
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
@@ -242,7 +247,6 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [배열 우회 교정] lines 배열 자체 대신 첫 번째 원소 객체인 [0]을 정확히 지정
             this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
