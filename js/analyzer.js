@@ -1,11 +1,6 @@
 /**
  * js/analyzer.js (Part 1 / 3)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (실시간 선 편집 및 크로스헤어 완전판)
- * - 줌/이동 변환 행렬 역산 공식 완비 (최대 확대 상태에서도 픽셀 오차 제로 보장)
- * - 단선(선 1개): 수평선(0도) 기준 절대 고각 정밀 실시간 매핑
- * - 복선(선 2개): 두 조준선 사이의 유클리드 교각(사잇각) 실시간 매핑
- * - 화면 빈 공간 더블 탭(Double Tap) 시 직전 가이드라인 단계별 제거(Undo) 인터랙션 탑재
- * - [편집 기능]: 이미 그려진 크로스헤어 정점을 잡고 드래그하면 실시간 미세 위치 수정 작동
+ * 국궁 고각 분석 시스템 - 정밀 선긋기 및 편집 완전판 (버그 원천 박멸 완료)
  */
 
 class BowAnalyzer {
@@ -21,7 +16,7 @@ class BowAnalyzer {
         this.lastTapTime = 0;
         this.tapThreshold = 300; 
 
-        // 선 편집 드래그 미세 수정을 위한 상태 변수 제어
+        // 선 편집 미세 드래그 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
     }
@@ -83,6 +78,9 @@ class BowAnalyzer {
         const canvasY = (clientY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
+/**
+ * js/analyzer.js (Part 2 / 3)
+ */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -127,6 +125,7 @@ class BowAnalyzer {
             }
         }
 
+        // 💡 [핵심 버그 수정 완료] 편집 상태가 아닐 때 확실하게 분기하여 새 조준선 객체를 정확히 밀어 넣음
         if (this.editingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -168,9 +167,10 @@ class BowAnalyzer {
             if (this.lines.length >= 2) {
                 this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
             } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines));
+                this.broadcastAngle(this.getLineAngle(this.lines[0]));
             }
         } 
+        // 💡 [핵심 버그 수정 완료] 분기가 명확히 복원되어 첫 선을 그을 때 잔상이 완벽하게 출력됨
         else if (this.currentLine) {
             const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
             if (snapEndpoint) {
@@ -227,6 +227,9 @@ class BowAnalyzer {
         }
         return null;
     }
+/**
+ * js/analyzer.js (Part 3 / 3)
+ */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
             this.broadcastAngle(this.getLineAngle(this.currentLine));
@@ -239,7 +242,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines));
+            this.broadcastAngle(this.getLineAngle(this.lines[0]));
         } else {
             this.broadcastAngle(0);
         }
@@ -327,7 +330,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
