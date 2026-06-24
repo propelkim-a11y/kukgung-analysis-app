@@ -1,272 +1,309 @@
 /**
- * js/analyzer.js (Part 1 of 2)
- * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (초정밀 펜&각도 매핑 버전)
+ * js/app.js (Part 1 of 2)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (스타일러스 펜 끊김 완전 해결 버전)
  */
-class BowAnalyzer {
-    constructor() {
-        this.canvas = null;
-        this.ctx = null;
-        this.lines = []; 
-        this.currentLine = null;
-        this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
-        this.toolMode = 'move'; 
-        this.snapThreshold = 15; 
-        this.isSnapped = false;
-        this.lastTapTime = 0;
-        this.tapThreshold = 300; 
-        this.handlePointerDown = this.handlePointerDown.bind(this);
-        this.handlePointerMove = this.handlePointerMove.bind(this);
-        this.handlePointerUp = this.handlePointerUp.bind(this);
-    }
-    init(canvasElement) {
-        this.canvas = canvasElement;
-        this.ctx = this.canvas.getContext('2d');
-    }
-    updateTransform(scale, offsetX, offsetY) {
-        this.transform.scale = scale;
-        this.transform.offsetX = offsetX;
-        this.transform.offsetY = offsetY;
-        this.render();
-    }
-    setMode(mode) {
-        this.toolMode = mode;
-        if (!this.canvas) return;
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove);
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp);
-        this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
-        if (mode === 'draw') {
-            this.canvas.addEventListener('pointerdown', this.handlePointerDown);
-            this.canvas.addEventListener('pointermove', this.handlePointerMove);
-            this.canvas.addEventListener('pointerup', this.handlePointerUp);
-            this.canvas.addEventListener('pointercancel', this.handlePointerUp);
-        }
-        this.render();
-    }
-    clearLines() {
-        this.lines = [];
-        this.currentLine = null;
-        this.render();
-        this.broadcastAngle(0);
-    }
-    undoLastLine() {
-        if (this.lines.length > 0) {
-            this.lines.pop();
-            this.render();
-            this.calculateFinalAngle();
-            return true;
-        }
-        return false;
-    }
-    getCanvasCoordinates(event) {
-        const rect = this.canvas.getBoundingClientRect();
+
+window.bowAppNodes = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const core = window.bowAppCore;
+    const gesture = window.bowAppGesture;
+
+    // 1. 공용 DOM 핵심 노드 전역 인프라 매핑
+    const nodes = window.bowAppNodes;
+    nodes.sceneRecord = document.getElementById('scene-record');
+    nodes.sceneAnalyze = document.getElementById('scene-analyze');
+    nodes.btnGoAnalyze = document.getElementById('btn-go-analyze');
+    nodes.btnGoRecord = document.getElementById('btn-go-record');
+
+    nodes.cameraPreview = document.getElementById('camera-preview');
+    nodes.btnRecordToggle = document.getElementById('btn-record-toggle');
+    nodes.recordStatus = document.getElementById('record-status');
+    nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
+    nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
+
+    nodes.videoViewport = document.getElementById('video-viewport');
+    nodes.mainVideo = document.getElementById('main-video');
+    nodes.drawCanvas = document.getElementById('draw-canvas');
+    nodes.unifiedPanel = document.getElementById('unified-panel');
+    nodes.panelHandle = document.getElementById('panel-handle');
+    
+    nodes.btnOpen = document.getElementById('btn-open');
+    nodes.btnMove = document.getElementById('btn-move');
+    nodes.btnDraw = document.getElementById('btn-draw');
+    nodes.btnReset = document.getElementById('btn-reset');
+    nodes.videoInput = document.getElementById('video-input');
+
+    nodes.videoSlider = document.getElementById('video-slider');
+    nodes.btnFramePrev = document.getElementById('btn-frame-prev');
+    nodes.btnPlayPause = document.getElementById('btn-play-pause');
+    nodes.btnFrameNext = document.getElementById('btn-frame-next');
+    nodes.angleReport = document.getElementById('angle-report');
+
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
+    function resizeCanvasToDisplay() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         const dpr = window.devicePixelRatio || 1;
-        const clientX = (event.clientX - rect.left) * (this.canvas.width / rect.width);
-        const clientY = (event.clientY - rect.top) * (this.canvas.height / rect.height);
-        const canvasX = (clientX - (this.transform.offsetX * dpr)) / this.transform.scale;
-        const canvasY = (clientY - (this.transform.offsetY * dpr)) / this.transform.scale;
-        return { x: canvasX, y: canvasY };
-    }
-    handlePointerDown(event) {
-        if (this.toolMode !== 'draw') return;
         
-        // 💡 [펜 끊김 방지] 스타일러스 펜 입력과 터치 신호를 명확히 분리하여 팜 리젝션 완벽 지원
-        if (event.pointerType === 'pen') {
-            window.isStylusActive = true;
-        } else if (event.pointerType === 'touch' && window.isStylusActive) {
-            return; 
-        }
+        nodes.drawCanvas.width = width * dpr;
+        nodes.drawCanvas.height = height * dpr;
         
-        event.preventDefault();
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - this.lastTapTime;
-        this.lastTapTime = currentTime;
-        if (tapLength < this.tapThreshold && tapLength > 0) {
-            this.currentLine = null;
-            const hasUndone = this.undoLastLine();
-            if (hasUndone) {
-                const undoEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
-                window.dispatchEvent(undoEvent);
-            }
-            return; 
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.canvas = nodes.drawCanvas;
+            window.bowAnalyzer.ctx = nodes.drawCanvas.getContext('2d');
+            window.bowAnalyzer.render();
         }
-        this.canvas.setPointerCapture(event.pointerId);
-        const coords = this.getCanvasCoordinates(event);
-        let startPt = { x: coords.x, y: coords.y };
-        const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
-        if (snappedPt) startPt = snappedPt;
-        this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
     }
+    window.addEventListener('resize', resizeCanvasToDisplay);
+    resizeCanvasToDisplay();
+
+    // 3. 제스처 및 드로잉 분석 모듈 초기 가동
+    gesture.init(nodes.videoViewport, nodes.mainVideo);
+    if (window.bowAnalyzer) {
+        window.bowAnalyzer.init(nodes.drawCanvas);
+    }
+
+    // 4. 대용량 IndexedDB 캐시 인프라 로드 및 동기화
+    core.initDB().then(async () => {
+        await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+        resizeCanvasToDisplay();
+        gesture.applyTransform();
+    });
+
+    nodes.mainVideo.addEventListener('loadedmetadata', () => {
+        nodes.videoSlider.max = nodes.mainVideo.duration;
+        resizeCanvasToDisplay();
+    });
+
+    let cameraStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    /**
+     * 최초 화면 터치 시 브라우저 보안 샌드박스를 풀고 카메라와 자이로 즉시 가동
+     */
+    const triggerSensorUnlock = async () => {
+        if (window.bowGyroSensor) {
+            window.bowGyroSensor.start();
+        }
+        if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
+            await startCamera();
+        }
+        window.removeEventListener('click', triggerSensorUnlock);
+        window.removeEventListener('touchstart', triggerSensorUnlock);
+    };
+    window.addEventListener('click', triggerSensorUnlock);
+    window.addEventListener('touchstart', triggerSensorUnlock);
+
+    /**
+     * 후면 카메라 스트리밍 구동부
+     */
+    async function startCamera() {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: "environment" }, width: 1280, height: 720 },
+                audio: false
+            });
+            nodes.cameraPreview.srcObject = cameraStream;
+            nodes.recordStatus.textContent = '카메라 연동 성공';
+        } catch (err) {
+            nodes.recordStatus.textContent = '카메라 권한 차단됨';
+            console.error(err);
+        }
+    }
+
+    function stopCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        nodes.cameraPreview.srcObject = null;
+    }
+
+    // [촬영 화면 이탈 이동]
+    nodes.btnGoRecord.addEventListener('click', async () => {
+        nodes.mainVideo.pause();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.sceneAnalyze.classList.remove('active');
+        nodes.sceneRecord.classList.add('active');
+        await startCamera();
+        // 촬영 모드로 돌아갈 때만 자이로 센서를 다시 켬
+        if (window.bowGyroSensor) window.bowGyroSensor.start();
+    });
+
+    // [분석 화면 진입 이동 공통 함수]
+    function transitToAnalyzeMode() {
+        stopCamera();
+        // 💡 [핵심 교정] 분석 모드로 진입하는 순간 하드웨어 자이로 센서 구동을 물리적으로 '완전 정지'
+        // 센서가 백그라운드에서 브라우저 메인 스레드를 뒤흔드는 스크롤 연산 과부하를 차단하여 펜 주사율 100% 회복
+        if (window.bowGyroSensor) window.bowGyroSensor.stop();
+        
+        nodes.sceneRecord.classList.remove('active');
+        nodes.sceneAnalyze.classList.add('active');
+        setActiveMenu(nodes.btnMove);
+        if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
+        setTimeout(resizeCanvasToDisplay, 100);
+    }
+
+    nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
 /**
- * js/analyzer.js (Part 2 of 2)
+ * js/app.js (Part 2 of 2)
  */
-    handlePointerMove(event) {
-        if (this.toolMode !== 'draw' || !this.currentLine) return;
-        event.preventDefault();
-        const coords = this.getCanvasCoordinates(event);
-        let targetX = coords.x;
-        let targetY = coords.y;
-        this.isSnapped = false;
-        const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
-        if (snapEndpoint) {
-            targetX = snapEndpoint.x;
-            targetY = snapEndpoint.y;
-            this.isSnapped = true;
+    nodes.btnRecordToggle.addEventListener('click', () => {
+        if (window.bowGyroSensor) window.bowGyroSensor.start();
+        if (!cameraStream) return;
+        if (!isRecording) {
+            recordedChunks = [];
+            let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
+            mediaRecorder = new MediaRecorder(cameraStream, options);
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = async () => {
+                nodes.recordStatus.textContent = '저장 중...';
+                const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                await core.saveCache('lastVideoBlob', videoBlob);
+                const videoURL = URL.createObjectURL(videoBlob);
+                nodes.mainVideo.src = videoURL;
+                nodes.mainVideo.load();
+                stopCamera();
+                
+                // 💡 [핵심 교정] 분석 모드 진입 시 자이로 센서 물리적 전원 차단하여 펜 자원 확보
+                if (window.bowGyroSensor) window.bowGyroSensor.stop();
+
+                nodes.sceneRecord.classList.remove('active');
+                nodes.sceneAnalyze.classList.add('active');
+                setActiveMenu(nodes.btnOpen);
+                if (window.bowAnalyzer) {
+                    window.bowAnalyzer.clearLines();
+                    window.bowAnalyzer.setMode('move');
+                }
+                setTimeout(resizeCanvasToDisplay, 100);
+                nodes.btnRecordToggle.textContent = '녹화시작';
+                nodes.btnRecordToggle.classList.remove('recording');
+            };
+            mediaRecorder.start();
+            isRecording = true;
+            nodes.btnRecordToggle.textContent = '녹화종료/분석';
+            nodes.btnRecordToggle.classList.add('recording');
+            nodes.recordStatus.textContent = '촬영 중...';
         } else {
-            const adjustedThreshold = this.snapThreshold / this.transform.scale;
-            const dx = targetX - this.currentLine.start.x;
-            const dy = targetY - this.currentLine.start.y;
-            if (Math.abs(dx) < adjustedThreshold) {
-                targetX = this.currentLine.start.x;
-                this.isSnapped = true;
-            } else if (Math.abs(dy) < adjustedThreshold) {
-                targetY = this.currentLine.start.y;
-                this.isSnapped = true;
+            mediaRecorder.stop();
+            isRecording = false;
+        }
+    });
+
+    function setActiveMenu(activeBtn) {
+        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw].forEach(btn => btn.classList.remove('active'));
+        activeBtn.classList.add('active');
+    }
+
+    const FRAME_TIME = 1 / 30;
+    nodes.mainVideo.addEventListener('timeupdate', () => {
+        if (!isNaN(nodes.mainVideo.currentTime)) {
+            nodes.videoSlider.value = nodes.mainVideo.currentTime;
+        }
+    });
+    nodes.videoSlider.addEventListener('input', () => {
+        nodes.mainVideo.pause();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.mainVideo.currentTime = nodes.videoSlider.value;
+    });
+    nodes.btnPlayPause.addEventListener('click', () => {
+        if (nodes.mainVideo.paused) {
+            nodes.mainVideo.play();
+            nodes.btnPlayPause.textContent = '일시정지';
+        } else {
+            nodes.mainVideo.pause();
+            nodes.btnPlayPause.textContent = '재생';
+        }
+    });
+    nodes.btnFramePrev.addEventListener('click', () => {
+        nodes.mainVideo.pause();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - FRAME_TIME);
+    });
+    nodes.btnFrameNext.addEventListener('click', () => {
+        nodes.mainVideo.pause();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + FRAME_TIME);
+    });
+    nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
+    
+    nodes.videoInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const targetFile = files[0];
+        await core.saveCache('lastVideoBlob', targetFile);
+        const url = URL.createObjectURL(targetFile);
+        nodes.mainVideo.src = url;
+        nodes.mainVideo.load();
+        
+        // 💡 비디오 수동 로딩 시에도 분석 모드이므로 자이로 완전 정지
+        if (window.bowGyroSensor) window.bowGyroSensor.stop();
+
+        setActiveMenu(nodes.btnMove);
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.clearLines();
+            window.bowAnalyzer.setMode('move');
+        }
+        setTimeout(resizeCanvasToDisplay, 100);
+    });
+
+    nodes.btnMove.addEventListener('click', () => {
+        setActiveMenu(nodes.btnMove);
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.setMode('move');
+            window.bowAnalyzer.render();
+        }
+    });
+
+    nodes.btnDraw.addEventListener('click', () => {
+        setActiveMenu(nodes.btnDraw);
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.setMode('draw');
+            window.bowAnalyzer.render();
+        }
+    });
+
+    nodes.btnReset.addEventListener('click', () => {
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.clearLines();
+            core.saveCache('lastLines', []);
+        }
+        core.state.scale = 1;
+        core.state.offsetX = 0;
+        core.state.offsetY = 0;
+        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
+        core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+    });
+    nodes.panelHandle.addEventListener('click', () => {
+        core.state.isPanelOpen = !core.state.isPanelOpen;
+        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
+        else nodes.unifiedPanel.classList.add('collapsed');
+    });
+    window.addEventListener('bowAngleUpdate', (e) => {
+        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
+        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
+    });
+    window.addEventListener('bowGestureUndo', (e) => {
+        core.saveCache('lastLines', e.detail.lines);
+    });
+    window.addEventListener('bowGyroUpdate', (e) => {
+        const { roll, isLevel } = e.detail;
+        if (nodes.sceneRecord.classList.contains('active')) {
+            if (nodes.gyroHorizonLine) {
+                nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
+                nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
+                if (isLevel) nodes.gyroHorizonLine.classList.add('perfect-level');
+                else nodes.gyroHorizonLine.classList.remove('perfect-level');
+            }
+            if (nodes.gyroVerticalLine) {
+                nodes.gyroVerticalLine.style.transform = `translateX(-50%) rotate(${-roll}deg)`;
+                if (isLevel) nodes.gyroVerticalLine.classList.add('perfect-level');
+                else nodes.gyroVerticalLine.classList.remove('perfect-level');
             }
         }
-        this.currentLine.end = { x: targetX, y: targetY };
-        this.render();
-        this.calculateAnglesInline();
-    }
-    handlePointerUp(event) {
-        if (event.pointerType === 'pen') {
-            setTimeout(() => { window.isStylusActive = false; }, 500);
-        }
-        if (this.toolMode !== 'draw' || !this.currentLine) return;
-        const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
-        if (dist > (8 / this.transform.scale)) {
-            this.lines.push(this.currentLine);
-        }
-        this.currentLine = null;
-        this.isSnapped = false;
-        this.render();
-        this.calculateFinalAngle();
-    }
-    findCloseEndpoint(x, y) {
-        const adjustedThreshold = this.snapThreshold / this.transform.scale;
-        for (let line of this.lines) {
-            if (Math.hypot(line.start.x - x, line.start.y - y) < adjustedThreshold) return line.start;
-            if (Math.hypot(line.end.x - x, line.end.y - y) < adjustedThreshold) return line.end;
-        }
-        return null;
-    }
-    calculateAnglesInline() {
-        if (this.lines.length === 0 && this.currentLine) {
-            this.broadcastAngle(this.getLineAngle(this.currentLine));
-        } else if (this.lines.length >= 1 && this.currentLine) {
-            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
-        }
-    }
-    calculateFinalAngle() {
-        if (this.lines.length >= 2) {
-            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
-        } else if (this.lines.length === 1) {
-            // 💡 [배열 우회 교정 완비] lines 배열 자체가 아닌, 첫 번째 단선 객체인 this.lines[0]을 직접 명시하여 각도 연산 오차 원천 박멸
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
-        } else {
-            this.broadcastAngle(0);
-        }
-    }
-    // 💡 [수학적 신뢰도 보정 완료] 캔버스 해상도에 완벽하게 일치화된 3시 수평선 기준 절대 고각 산출 (0° ~ 180°)
-    getLineAngle(line) {
-        if (!line) return 0;
-        const dx = line.end.x - line.start.x;
-        const dy = line.end.y - line.start.y;
-        let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
-        if (angle < 0) angle += 360;
-        return angle % 180;
-    }
-    // 💡 [교각 알고리즘 정밀화 완료] 두 단일선 간의 완벽한 기하학 벡터 최소 사잇각 추적 (0° ~ 180°)
-    getIntersectionAngle(line1, line2) {
-        if (!line1 || !line2) return 0;
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
-        let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
-        if (diff > 180) diff = 360 - diff;
-        return diff;
-    }
-    broadcastAngle(angle) {
-        const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: angle.toFixed(1) } });
-        window.dispatchEvent(angleEvent);
-    }
-    drawBackgroundGrid(scaleX) {
-        this.ctx.save();
-        const dpr = window.devicePixelRatio || 1;
-        this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
-        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50; 
-        const widthBound = this.canvas.width / this.transform.scale;
-        const heightBound = this.canvas.height / this.transform.scale;
-        const startX = Math.floor((-this.transform.offsetX * dpr / this.transform.scale) / gridSize) * gridSize - widthBound;
-        const endX = startX + (widthBound * 3);
-        const startY = Math.floor((-this.transform.offsetY * dpr / this.transform.scale) / gridSize) * gridSize - heightBound;
-        const endY = startY + (heightBound * 3);
-        for (let x = startX; x <= endX; x += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
-        }
-        for (let y = startY; y <= endY; y += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(startX, y); this.ctx.lineTo(endX, y); this.ctx.stroke();
-        }
-        this.ctx.restore();
-    }
-    drawInlineAngleArc(line1, line2, scaleX) {
-        if (!line1 || !line2) return;
-        const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
-        const a2 = Math.atan2((line2.end.y - line2.start.y), line2.end.x - line2.start.x);
-        const deg = this.getIntersectionAngle(line1, line2);
-        this.ctx.save();
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
-        const radius = (35 * scaleX) / this.transform.scale;
-        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
-        this.ctx.stroke();
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
-        this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        this.ctx.shadowBlur = 4;
-        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
-        this.ctx.restore();
-    }
-    render() {
-        if (!this.ctx || !this.canvas) return;
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.save();
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const dpr = window.devicePixelRatio || 1;
-        this.ctx.translate(this.transform.offsetX * dpr, this.transform.offsetY * dpr);
-        this.ctx.scale(this.transform.scale, this.transform.scale);
-        this.drawBackgroundGrid(scaleX);
-        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
-        this.ctx.strokeStyle = '#00FF66';
-        this.ctx.fillStyle = '#00FF66';
-        this.lines.forEach(line => this.drawSingleLine(line));
-        if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
-        } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
-        }
-        if (this.currentLine) {
-            this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.drawSingleLine(this.currentLine);
-        }
-        this.ctx.restore();
-    }
-    drawSingleLine(line) {
-        if (!line) return;
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x, line.start.y);
-        this.ctx.lineTo(line.end.x, line.end.y);
-        this.ctx.stroke();
-        const radius = (4 * scaleX) / this.transform.scale;
-        this.ctx.beginPath();
-        this.ctx.arc(line.start.x, line.start.y, radius, 0, 2 * Math.PI);
-        this.ctx.arc(line.end.x, line.end.y, radius, 0, 2 * Math.PI);
-        this.ctx.fill();
-    }
-}
-window.bowAnalyzer = new BowAnalyzer();
+    });
+});
