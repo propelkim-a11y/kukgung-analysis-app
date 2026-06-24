@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (시크릿모드 모드 스위칭 완전 보정)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본
  */
 
 window.bowAppNodes = {};
@@ -231,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
         
-        // 💡 영상 로드 시 기본 모드를 확대/이동(move) 상태로 강제 일치화
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
@@ -240,21 +239,19 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(resizeCanvasToDisplay, 100);
     });
 
-    // 💡 [시크릿모드 락 해제] 확대 버튼 클릭 시 윈도우 전역 분석기 인스턴스의 모드 변수를 'move'로 완전히 고정
     nodes.btnMove.addEventListener('click', () => {
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.setMode('move');
-            window.bowAnalyzer.render(); // 상태 동기화 즉시 주사
+            window.bowAnalyzer.render();
         }
     });
 
-    // 💡 [시크릿모드 락 해제] 선긋기 버튼 클릭 시 윈도우 전역 분석기 인스턴스의 모드 변수를 'draw'로 완전히 고정
     nodes.btnDraw.addEventListener('click', () => {
         setActiveMenu(nodes.btnDraw);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.setMode('draw');
-            window.bowAnalyzer.render(); // 상태 동기화 즉시 주사
+            window.bowAnalyzer.render();
         }
     });
 
