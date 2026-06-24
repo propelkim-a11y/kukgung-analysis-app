@@ -2,7 +2,7 @@
  * js/analyzer.js (Part 1/2)
  * 국궁 고각 분석 및 스타일러스 펜 제어 시스템 (4단계)
  * - 줌/이동 변환 행렬 역산 완벽 지원
- * - [지능형 동시 연동 엔진] 선긋기 모드 중 터치 픽셀 거리를 역산하여 실시간 이동/길이조절/회전/더블탭삭제 동시 통합 (2번 구조)
+ * - [각도 실시간 연동 교정] 편집 상태 드래그 중에도 각도가 실시간 변환되도록 연산 타겟 보정 완료
  */
 
 class BowAnalyzer {
@@ -152,7 +152,7 @@ class BowAnalyzer {
                 this.selectedLine.end.y = this.originalLineState.end.y + dy;
             }
             this.render();
-            this.calculateFinalAngle();
+            this.calculateFinalAngle(); // 드래그 중인 가변 좌표 실시간 피드백 연동
             return;
         }
 
@@ -236,17 +236,17 @@ class BowAnalyzer {
             const angle = this.getLineAngle(this.currentLine);
             this.broadcastAngle(angle, 'ELEVATION');
         } else if (this.lines.length === 1 && this.currentLine) {
-            const angle = this.getIntersectionAngle(this.lines, this.currentLine);
+            const angle = this.getIntersectionAngle(this.lines[0], this.currentLine);
             this.broadcastAngle(angle, 'INTERSECT');
         }
     }
 
     calculateFinalAngle() {
         if (this.lines.length === 2) {
-            const angle = this.getIntersectionAngle(this.lines, this.lines);
+            const angle = this.getIntersectionAngle(this.lines[0], this.lines[1]);
             this.broadcastAngle(angle, 'INTERSECT');
         } else if (this.lines.length === 1) {
-            const angle = this.getLineAngle(this.lines);
+            const angle = this.getLineAngle(this.lines[0]);
             this.broadcastAngle(angle, 'ELEVATION');
         } else {
             this.broadcastAngle(0, 'ANGLE');
@@ -254,6 +254,7 @@ class BowAnalyzer {
     }
 
     getLineAngle(line) {
+        if (!line) return 0;
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
 
@@ -266,6 +267,7 @@ class BowAnalyzer {
     }
 
     getIntersectionAngle(line1, line2) {
+        if (!line1 || !line2) return 0;
         const rect = this.canvas.getBoundingClientRect();
         const aspectCorrection = rect.height / rect.width;
 
