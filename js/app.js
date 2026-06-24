@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 2)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (녹화 싱크 최적화 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (하드웨어 가변 FPS 탑재 버전)
  */
 
 window.bowAppNodes = {};
@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
+    // 💡 사용자가 직접 변경 선택하는 타겟 목표 타겟 프레임 속도 (기본값: 30)
+    let selectedFPS = 30;
+
     // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
@@ -71,11 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gesture.applyTransform();
     });
 
-    nodes.mainVideo.addEventListener('loadedmetadata', () => {
-        nodes.videoSlider.max = nodes.mainVideo.duration;
-        resizeCanvasToDisplay();
-    });
-
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -99,12 +97,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     /**
-     * 후면 카메라 스트리밍 구동부
+     * 후면 카메라 스트리밍 구동부 (💡 선택된 가변 frameRate 주사율 실시간 동적 적용 마감)
      */
     async function startCamera() {
+        if (cameraStream) stopCamera(); // 기존 캡처 스트림 청소 후 재요청
         try {
             const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
-            let videoConstraints = { facingMode: { ideal: "environment" }, width: 1280, height: 720 };
+            
+            // 사용자가 선택한 프레임 바 숫자에 따라 하드웨어 스트림 요구조건 동적 세팅
+            let videoConstraints = { 
+                facingMode: { ideal: "environment" }, 
+                width: 1280, 
+                height: 720,
+                frameRate: { ideal: selectedFPS }
+            };
             if (isPC) {
                 videoConstraints = { width: 1280, height: 720 };
             }
@@ -114,9 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = '카메라 장치 연동 완료';
+            nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 인프라 바인딩 성공`;
         } catch (err) {
-            nodes.recordStatus.textContent = '카메라 장치를 로드할 수 없습니다. 분석 모드에서 [열기] 단추를 눌러 비디오를 불러오세요.';
+            nodes.recordStatus.textContent = '카메라 장치 로드 실패. 비디오를 직접 열어 분석을 시작하세요.';
             console.error(err);
         }
     }
@@ -129,6 +135,20 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.cameraPreview.srcObject = null;
     }
 
+    // 💡 [FPS 메뉴 바 이벤트 연동] 버튼을 누르는 순간 하드웨어 대역폭을 재배치하여 60fps~120fps 강제 전환
+    const fpsButtons = document.querySelectorAll('.fps-btn');
+    fpsButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (isRecording) return; // 녹화 도중 변환 차단
+            fpsButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedFPS = parseInt(btn.getAttribute('data-fps'), 10);
+            if (nodes.sceneRecord.classList.contains('active')) {
+                await startCamera(); // 카메라 하드웨어 즉시 재가동 락 해제
+            }
+        });
+    });
+
     // [촬영 화면 이탈 이동]
     nodes.btnGoRecord.addEventListener('click', async () => {
         nodes.mainVideo.pause();
@@ -136,14 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.sceneAnalyze.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         await startCamera();
-        
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
     });
 
-    // [분석 화면 진입 이동 공통 함수]
+    // [분석 화면 진입 이동]
     function transitToAnalyzeMode() {
         stopCamera();
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
@@ -203,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.btnRecordToggle.classList.remove('recording');
             };
             
-            // 💡 [레이턴시 병목 박멸] 1초(1000ms) 단위 실시간 청크 분할 축적으로 메모리 릭 및 무반응 프리징 완전 보정
             mediaRecorder.start(1000);
             isRecording = true;
             nodes.btnRecordToggle.textContent = '녹화종료/분석';
@@ -220,17 +238,30 @@ document.addEventListener('DOMContentLoaded', () => {
         activeBtn.classList.add('active');
     }
 
-    const FRAME_TIME = 1 / 30;
+    // 💡 [가변 60fps~960fps 역산 엔진 완비] 동적으로 세팅된 프레임수에 따라 타임라인 정밀 밀리초 거리 보정
+    let currentFrameTime = 1 / 30; 
+    
+    nodes.mainVideo.addEventListener('loadedmetadata', () => {
+        // 비디오 엘리먼트 내장 스펙 정보 혹은 우리가 선택했던 기기 캡처 FPS 수치 추적 매핑
+        const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
+        currentFrameTime = 1 / detectedFPS;
+        
+        nodes.videoSlider.max = nodes.mainVideo.duration;
+        resizeCanvasToDisplay();
+    });
+
     nodes.mainVideo.addEventListener('timeupdate', () => {
         if (!isNaN(nodes.mainVideo.currentTime)) {
             nodes.videoSlider.value = nodes.mainVideo.currentTime;
         }
     });
+    
     nodes.videoSlider.addEventListener('input', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
         nodes.mainVideo.currentTime = nodes.videoSlider.value;
     });
+    
     nodes.btnPlayPause.addEventListener('click', () => {
         if (nodes.mainVideo.paused) {
             nodes.mainVideo.play();
@@ -240,22 +271,25 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.btnPlayPause.textContent = '재생';
         }
     });
+    
     nodes.btnFramePrev.addEventListener('click', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - FRAME_TIME);
+        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
     });
+    
     nodes.btnFrameNext.addEventListener('click', () => {
         nodes.mainVideo.pause();
         nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime - FRAME_TIME);
+        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
     });
+    
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files;
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
@@ -298,18 +332,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.bowAppGesture) window.bowAppGesture.applyTransform();
         core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
     });
+    
     nodes.panelHandle.addEventListener('click', () => {
         core.state.isPanelOpen = !core.state.isPanelOpen;
         if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
         else nodes.unifiedPanel.classList.add('collapsed');
     });
+    
     window.addEventListener('bowAngleUpdate', (e) => {
         nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
         if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
+    
     window.addEventListener('bowGestureUndo', (e) => {
         core.saveCache('lastLines', e.detail.lines);
     });
+    
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
