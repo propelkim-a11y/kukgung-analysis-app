@@ -14,7 +14,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#050507">
 
-    <link rel="stylesheet" href="style.css?v=13.0">
+    <link rel="stylesheet" href="style.css?v=14.0">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
             <div class="panel-slider-handle-placeholder"></div>
             <div class="panel-content-wrapper">
                 <div class="apple-layout-sync-spacer"></div>
-                <div id="record-status" class="status-text">화면을 가볍게 터치하면 카메라와 수평계가 가동됩니다.</div>
+                <div id="record-status" class="status-text">화면을 가볍게 터치하면 카메라가 가동됩니다.</div>
                 <div class="control-row-center">
                     <button id="btn-record-toggle" class="action-btn-main">녹화시작</button>
                 </div>
@@ -88,21 +88,36 @@
 
     <input type="file" id="video-input" accept="video/*" style="display: none;">
 
-    <script src="js/sensor.js?v=13.0"></script>
-    <script src="js/analyzer.js?v=13.0"></script>
-    <script src="js/app_core.js?v=13.0"></script>
-    <script src="js/app_gesture.js?v=13.0"></script>
-    <script src="js/app.js?v=13.0"></script>
+    <!-- 💡 [하드웨어 격리 패치] 정적 태그를 제거하고 모바일 스마트폰 전용 동적 스크립트 인젝션 엔진 이식 -->
+    <script>
+        const isMobileDevice = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        
+        if (isMobileDevice) {
+            // 오직 모바일 기기일 때만 자이로 센서 스크립트를 서버에서 안전하게 호출
+            const script = document.createElement('script');
+            script.src = 'js/sensor.js?v=14.0';
+            document.body.appendChild(script);
+            console.log('[System] 모바일 하드웨어 감지: 자이로 센서 인프라 활성화');
+        } else {
+            console.log('[System] 데스크톱 PC 감지: 프리징 예방을 위해 자이로 센서 차단');
+            // 전역 스크립트 에러 방지용 가상 더미 객체 생성
+            window.bowGyroSensor = { start: () => {}, stop: () => {} };
+        }
+    </script>
 
-    <!-- 💡 [설치 활성화 패치] GitHub Pages 하위 폴더 경로(Repository Name) 바인딩 공식 적용 -->
+    <!-- 나머지 핵심 분석 코어 엔진 리스트 로드 -->
+    <script src="js/analyzer.js?v=14.0"></script>
+    <script src="js/app_core.js?v=14.0"></script>
+    <script src="js/app_gesture.js?v=14.0"></script>
+    <script src="js/app.js?v=14.0"></script>
+
+    <!-- 갤럭시/아이폰 앱 독립 구동용 서비스 워커 등록부 -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // 현재 웹사이트의 하위 폴더 경로를 자동으로 계산하여 서비스 워커의 통제 범위(scope)로 강제 지정합니다.
                 const repoPath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
-                
-                navigator.serviceWorker.register('sw.js?v=13.0', { scope: repoPath })
-                    .then(reg => console.log('[PWA] GitHub Pages 맞춤형 서비스 워커 가동:', reg.scope))
+                navigator.serviceWorker.register('sw.js?v=14.0', { scope: repoPath })
+                    .then(reg => console.log('[PWA] 서비스 워커 가동:', reg.scope))
                     .catch(err => console.error('[PWA] 서비스 워커 경로 에러:', err));
             });
         }
