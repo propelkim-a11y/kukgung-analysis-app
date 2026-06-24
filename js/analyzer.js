@@ -96,33 +96,45 @@ class BowAnalyzer {
 /**
  * js/analyzer.js (Part 2 of 2)
  */
-    handlePointerMove(event) {
+        handlePointerMove(event) {
         if (this.toolMode !== 'draw' || !this.currentLine) return;
+        
+        // 1. 브라우저의 화면 스크롤/확대 간섭을 원천 차단하여 부드러운 드로잉 선 획 확보
         event.preventDefault();
+
+        // 2. 확대 배율이 반영된 실시간 마우스/손가락 끝 좌표 역산
         const coords = this.getCanvasCoordinates(event);
         let targetX = coords.x;
         let targetY = coords.y;
+
         this.isSnapped = false;
-        const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
-        if (snapEndpoint) {
-            targetX = snapEndpoint.x;
-            targetY = snapEndpoint.y;
+
+        // 3. 기존 선들의 끝점 자석 기능은 완전히 제외 (단선 분석 집중)
+        // 4. [요청 반영] 오직 수평(0도)과 수직(90도)에서만 세련되게 달라붙는 스마트 스냅
+        // 스냅이 너무 강하게 튀지 않도록 감도 범위를 15에서 7 물리 픽셀로 슬림화
+        const tightThreshold = 7 / this.transform.scale;
+        
+        const dx = targetX - this.currentLine.start.x;
+        const dy = targetY - this.currentLine.start.y;
+        
+        if (Math.abs(dx) < tightThreshold) {
+            // 수직선(90도) 정렬 스냅 가동
+            targetX = this.currentLine.start.x;
             this.isSnapped = true;
-        } else {
-            const adjustedThreshold = this.snapThreshold / this.transform.scale;
-            const dx = targetX - this.currentLine.start.x;
-            const dy = targetY - this.currentLine.start.y;
-            if (Math.abs(dx) < adjustedThreshold) {
-                targetX = this.currentLine.start.x;
-                this.isSnapped = true;
-            } else if (Math.abs(dy) < adjustedThreshold) {
-                targetY = this.currentLine.start.y;
-                this.isSnapped = true;
-            }
+        } else if (Math.abs(dy) < tightThreshold) {
+            // 수평선(0도) 정렬 스냅 가동
+            targetY = this.currentLine.start.y;
+            this.isSnapped = true;
         }
+
+        // 5. 부드럽게 가공된 최종 좌표를 실시간 가이드선 끝점에 주입
         this.currentLine.end = { x: targetX, y: targetY };
+        
+        // 6. 끊김 없이 초당 60프레임 이상으로 주사하는 그래픽스 렌더링 파이프라인 가동
         this.render();
         this.calculateAnglesInline();
+    }
+
     }
     handlePointerUp(event) {
         if (event.pointerType === 'pen') {
