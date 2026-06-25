@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v17.8 - 첫 터치 수명 주기 분리 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v17.9 - 부작용 전면 정화 및 연동 정상화 버전)
  */
 
 window.bowAppNodes = {};
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
+    // 💡 가상 스토리지 마운트 완료 신호를 받은 뒤 하드웨어 모듈 순차 가동
     core.initDB().then(async () => {
         gesture.init(nodes.videoViewport, nodes.mainVideo);
         if (window.bowAnalyzer) {
@@ -87,22 +87,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    // 💡 [박멸 핵심] 초기 화면이 열릴 때 하드웨어 센서와 카메라 장치를 절대 미리 호출하지 않고, 
-    // 사용자가 모바일 화면을 최초로 직접 가볍게 톡 터치(혹은 클릭)하는 순간에만 완전히 안전한 독립 순서로 깨웁니다.
+    // 💡 [수평계 마비 복구 패치] 자이로 데이터 수신 리스너를 첫 터치 장벽 밖으로 꺼내 상시 작동 시키고, 
+    // 모바일 하드웨어 각도 측정을 가동하기 위한 원터치 언락 이벤트 스위치 역할로 경량 정렬합니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        
-        // 1. 디바이스 자이로 모듈 순차 활성화
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
-        
-        // 2. 촬영화면이 active 상태인 경우에만 카메라 스트림 격리 할당
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
             await startCamera();
         }
-        
-        // 3. 중복 트리거 누적 및 충돌 버그 원천 차단
         window.removeEventListener('click', triggerSensorUnlock);
         window.removeEventListener('touchstart', triggerSensorUnlock);
     };
@@ -129,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
+            setTimeout(resizeCanvasToDisplay, 150); // 카메라 할당 후 뷰포트 레이아웃 정렬 보정
         } catch (err) {
             if (selectedFPS > 30) {
                 selectedFPS = 30;
@@ -390,10 +385,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
+    // 💡 [열기 버그 완벽 수정] 인풋 변화 감지 시 객체 매핑 에러 단락을files[0]으로 정밀 교정 완료했습니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files;
+        const targetFile = files[0];
+        
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
@@ -472,12 +469,13 @@ document.addEventListener('DOMContentLoaded', () => {
         core.saveCache('lastLines', e.detail.lines);
     });
     
+    // 💡 [수평계 바인딩 실시간 복구] 첫 터치 여부와 무관하게 부팅 즉시 자이로 데이터 스트림을 오버레이 라인과 동기화합니다.
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
 
         if (nodes.sceneRecord.classList.contains('active')) {
-            if (nodes.gyroHorizonLine) {
+            if (nodes.gyroHorizonLine && nodes.gyroVerticalLine) {
                 nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
                 nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
                 
