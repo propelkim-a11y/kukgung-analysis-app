@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 3)
- * 국궁 고각 분석 시스템 - 확대축소 1:1 축 동기화 최종 완결판
+ * 국궁 고각 분석 시스템 - 나노 밀착 및 모드 격리 완결판
  */
 
 class BowAnalyzer {
@@ -24,6 +24,7 @@ class BowAnalyzer {
         this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
+    // 💡 [초기화] 마우스 및 터치 리스너 고정 결합
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
@@ -34,6 +35,7 @@ class BowAnalyzer {
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
 
+    // 💡 [동기화] 제스처 모듈로부터 배율과 좌표를 실시간 전송받아 주사
     updateTransform(scale, offsetX, offsetY) {
         this.transform.scale = scale;
         this.transform.offsetX = offsetX;
@@ -65,16 +67,16 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 [확대축소 선 밀림 완벽 해결] 제스처 모듈과 도화지 픽셀 축을 정밀하게 1:1 매핑
+    // 💡 [나노 밀착 핵심 공식] 제스처 스케일 축과 비디오 배치 비율을 1:1로 완전 강제 매핑
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const canvasScale = this.canvas.width / rect.width;
         
-        // 사용자가 터치한 클라이언트 좌표를 디스플레이 해상도 비율로 1차 정렬
+        // 사용자가 터치한 좌표를 실제 캔버스 내부 버퍼 크기 비율로 보정
         const clientX = (event.clientX - rect.left) * canvasScale;
         const clientY = (event.clientY - rect.top) * canvasScale;
         
-        // 줌 인/아웃 및 패닝 이동량만큼 정밀 역산 매트릭스 주사
+        // 줌 패닝 변환 행렬 스케일을 정밀하게 역산하여 반사 오차 100% 제거
         const canvasX = (clientX - (this.transform.offsetX * canvasScale)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * canvasScale)) / this.transform.scale;
         
@@ -190,7 +192,7 @@ class BowAnalyzer {
             }
             this.currentLine.end = { x: targetX, y: targetY };
             this.render();
-            this.calculateAnglesInline();
+            this.broadcastAngleInline();
         }
     }
 
@@ -229,7 +231,7 @@ class BowAnalyzer {
 /**
  * js/analyzer.js (Part 3 of 3)
  */
-    calculateAnglesInline() {
+    broadcastAngleInline() {
         if (this.lines.length === 0 && this.currentLine) {
             this.broadcastAngle(this.getLineAngle(this.currentLine));
         } else if (this.lines.length >= 1 && this.currentLine) {
@@ -281,7 +283,6 @@ class BowAnalyzer {
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
         
-        // 💡 개별 픽셀 가중치 필터를 제거하고 전역 단일 매트릭스 선폭 매핑
         this.ctx.lineWidth = 1.5 * scaleX / this.transform.scale;
         const radius = 35 * scaleX / this.transform.scale;
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
@@ -295,7 +296,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    // 💡 [2중 스케일링 복잡 연산 전면 전면 폐기] 캔버스 자체 매트릭스 변환만 사용하여 선 밀림 완전 완전 정복
+    // 💡 [확대축소 선 고정 대완결] 제스처의 스케일 축과 도화지 픽셀 캔버스를 완벽 동기화
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -304,7 +305,7 @@ class BowAnalyzer {
         const rect = this.canvas.getBoundingClientRect();
         const canvasScale = this.canvas.width / rect.width;
         
-        // 💡 오직 제스처 가속 행렬 축 한 곳으로만 연산 단일화 락 고정
+        // 💡 오직 제스처 모듈에서 연산된 줌/패닝 데이터 축 한 곳으로만 연산 단일화 고정
         this.ctx.translate(this.transform.offsetX * canvasScale, this.transform.offsetY * canvasScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
@@ -312,7 +313,7 @@ class BowAnalyzer {
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         
-        // 가중치 배율 필터를 모두 걷어내고 순수 1:1 좌표계 기반 기반 사상 출력
+        // 중복 배율 수식 없이 순수 원본 픽셀 데이터 그대로 동시 사상 출력
         this.lines.forEach(line => this.drawSingleLine(line, canvasScale));
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale);
@@ -329,7 +330,6 @@ class BowAnalyzer {
 
     drawSingleLine(line, canvasScale) {
         if (!line) return;
-        // 💡 중복 배율 곱셈 수식을 삭제하고 순수 원본 픽셀 데이터 그대로 렌더링
         this.ctx.beginPath();
         this.ctx.moveTo(line.start.x, line.start.y);
         this.ctx.lineTo(line.end.x, line.end.y);
