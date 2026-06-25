@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v17.9 - 부작용 전면 정화 및 연동 정상화 버전)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.3 - 부팅 순서 직관적 정렬 완결판)
  */
 
 window.bowAppNodes = {};
@@ -61,21 +61,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 가상 스토리지 마운트 완료 신호를 받은 뒤 하드웨어 모듈 순차 가동
-    core.initDB().then(async () => {
-        gesture.init(nodes.videoViewport, nodes.mainVideo);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.init(nodes.drawCanvas);
-        }
+    // 💡 [7번 지침 기본 충실 패치] 간헐적 프리징 레이스 컨디션을 완전히 박멸하기 위해 
+    // IndexedDB 비동기 신호를 기다리지 않고 앱 기동 즉시 하드웨어 엔진들과 UI 캔버스를 최우선 순위로 결합합니다.
+    gesture.init(nodes.videoViewport, nodes.mainVideo);
+    if (window.bowAnalyzer) {
+        window.bowAnalyzer.init(nodes.drawCanvas);
+    }
+    
+    resizeCanvasToDisplay();
+    gesture.applyTransform();
 
+    // UI 인프라 결합이 완벽히 끝난 후 스토리지 코어를 비동기로 가동하여 과거 세션을 안전하게 노출합니다.
+    core.initDB().then(async () => {
         try {
             await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
         } catch (e) {
             console.warn('[System] 시크릿 안전 부팅 보호막 가동 완료');
         }
-
-        resizeCanvasToDisplay();
-        gesture.applyTransform();
 
         if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
             nodes.videoSlider.max = nodes.mainVideo.duration;
@@ -87,8 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    // 💡 [수평계 마비 복구 패치] 자이로 데이터 수신 리스너를 첫 터치 장벽 밖으로 꺼내 상시 작동 시키고, 
-    // 모바일 하드웨어 각도 측정을 가동하기 위한 원터치 언락 이벤트 스위치 역할로 경량 정렬합니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             nodes.cameraPreview.srcObject = cameraStream;
             nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
-            setTimeout(resizeCanvasToDisplay, 150); // 카메라 할당 후 뷰포트 레이아웃 정렬 보정
+            setTimeout(resizeCanvasToDisplay, 150);
         } catch (err) {
             if (selectedFPS > 30) {
                 selectedFPS = 30;
@@ -385,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
-    // 💡 [열기 버그 완벽 수정] 인풋 변화 감지 시 객체 매핑 에러 단락을files[0]으로 정밀 교정 완료했습니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -469,7 +468,6 @@ document.addEventListener('DOMContentLoaded', () => {
         core.saveCache('lastLines', e.detail.lines);
     });
     
-    // 💡 [수평계 바인딩 실시간 복구] 첫 터치 여부와 무관하게 부팅 즉시 자이로 데이터 스트림을 오버레이 라인과 동기화합니다.
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
