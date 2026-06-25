@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (시크릿 탭 무조건 락 해제 판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (화면 회전 좌표 축 완전 고정 판)
  */
 
 window.bowAppNodes = {};
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
+    // 2. 뷰포트 해상도와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -59,11 +59,29 @@ document.addEventListener('DOMContentLoaded', () => {
             window.bowAnalyzer.render();
         }
     }
-    window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
+    // 💡 [화면 회전 보정 엔진 이식] 가로/세로 전환 시 변환 행렬 축을 소수점 단위 재계측 강제 보정
+    const triggerRotationLayoutSync = () => {
+        setTimeout(() => {
+            resizeCanvasToDisplay();
+            if (window.bowAppGesture) {
+                window.bowAppGesture.applyTransform(); // 드로잉 매트릭스 실시간 강제 재사상
+            }
+        }, 150); // 스마트폰 화면 회전 렌더링 애니메이션 종료 대기 딜레이타임 주입
+    };
+    
+    window.addEventListener('resize', triggerRotationLayoutSync);
+    window.addEventListener('orientationchange', triggerRotationLayoutSync);
+    resizeCanvasToDisplay();
+
+    // 3. 제스처 및 드로잉 분석 모듈 초기 가동
+    gesture.init(nodes.videoViewport, nodes.mainVideo);
+    if (window.bowAnalyzer) {
+        window.bowAnalyzer.init(nodes.drawCanvas);
+    }
+
+    // 4. 대용량 IndexedDB 캐시 인프라 로드 및 동기화
     core.initDB().then(async () => {
-        // 객체 참조 무결성을 위해 하드웨어 엔진 모듈들을 안전하게 순차 기동
         gesture.init(nodes.videoViewport, nodes.mainVideo);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.init(nodes.drawCanvas);
@@ -72,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
         } catch (e) {
-            console.warn('[System] 시크릿 안전 부팅 보호막 가동 완료');
+            console.warn('[System] 시크릿 보호막 부팅 완료');
         }
 
         resizeCanvasToDisplay();
@@ -195,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.sceneAnalyze.classList.add('active');
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
-        setTimeout(resizeCanvasToDisplay, 100);
+        setTimeout(triggerRotationLayoutSync, 100); // 💡 분석 화면 전환 시에도 즉시 종횡비 동기화 렌더러 주사
     }
 
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
@@ -245,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.bowAnalyzer.clearLines();
                     window.bowAnalyzer.setMode('move');
                 }
-                setTimeout(resizeCanvasToDisplay, 100);
+                setTimeout(triggerRotationLayoutSync, 100); // 💡 녹화 종료 진입 시 즉시 종횡비 동기화 렌더러 주사
                 nodes.btnRecordToggle.textContent = '녹화시작';
                 nodes.btnRecordToggle.classList.remove('recording');
             };
@@ -326,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.videoSlider.step = 0.0001;
         }
         
-        resizeCanvasToDisplay();
+        triggerRotationLayoutSync(); // 💡 메타데이터 수립 직후 화면 배율 즉시 자동 동기화
     });
 
     nodes.mainVideo.addEventListener('timeupdate', () => {
@@ -411,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.mainVideo.addEventListener('loadeddata', () => {
             nodes.videoSlider.max = nodes.mainVideo.duration;
             nodes.videoSlider.step = 0.0001;
-            resizeCanvasToDisplay();
+            triggerRotationLayoutSync(); // 💡 파일 수동 강제 로드 완료 시 즉시 종횡비 동기화 재출력
         }, { once: true });
 
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
@@ -422,7 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
             window.bowAnalyzer.clearLines();
             window.bowAnalyzer.setMode('move');
         }
-        setTimeout(resizeCanvasToDisplay, 100);
     });
 
     nodes.btnMove.addEventListener('click', () => {
