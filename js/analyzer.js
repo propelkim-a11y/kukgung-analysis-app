@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 of 4)
- * 국궁 고각 분석 시스템 - 락 프리 대완결판 (화면 회전 일치 에디션)
+ * js/analyzer.js (Part 1 of 3)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (그리드 제거 및 회전 고정 본)
  */
 
 class BowAnalyzer {
@@ -65,7 +65,7 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 [선 이탈 완전 해결] 비디오 object-fit: cover 여백 오차 정밀 좌표 역산 파싱
+    // 💡 [회전 오차 완벽 상쇄] object-fit: cover에 의해 잘려 나간 상하좌우 숨은 여백 오차 정밀 좌표 역산
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const mainVideo = document.getElementById('main-video');
@@ -99,7 +99,7 @@ class BowAnalyzer {
         return { x: canvasX / scale, y: canvasY / scale };
     }
 /**
- * js/analyzer.js (Part 2 of 4)
+ * js/analyzer.js (Part 2 of 3)
  */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
@@ -245,7 +245,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 3 of 4)
+ * js/analyzer.js (Part 3 of 3)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -290,29 +290,6 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    drawBackgroundGrid(scaleX, xOff, yOff) {
-        this.ctx.save();
-        this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
-        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50; 
-        const wBound = this.canvas.width / this.transform.scale;
-        const hBound = this.canvas.height / this.transform.scale;
-        const startX = Math.floor(((-this.transform.offsetX * scaleX - xOff) / this.transform.scale) / gridSize) * gridSize - wBound;
-        const endX = startX + (wBound * 3);
-        const startY = Math.floor(((-this.transform.offsetY * scaleX - yOff) / this.transform.scale) / gridSize) * gridSize - hBound;
-        const endY = startY + (hBound * 3);
-        
-        for (let x = startX; x <= endX; x += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
-        }
-        for (let y = startY; y <= endY; y += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(startX, y); this.ctx.lineTo(endX, y); this.ctx.stroke();
-        }
-        this.ctx.restore();
-    }
-/**
- * js/analyzer.js (Part 4 of 4)
- */
     drawInlineAngleArc(line1, line2, scaleX, vScale) {
         if (!line1 || !line2) return;
         const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
@@ -322,21 +299,20 @@ class BowAnalyzer {
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
         
-        // 💡 [중복 스케일링 완전 소멸] 전역 컨텍스트 스케일 안에서 노출되므로 개별 픽셀 가중치 제거
         this.ctx.lineWidth = 1.5 * scaleX / this.transform.scale;
         const radius = 35 * scaleX / this.transform.scale;
-        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
+        this.ctx.arc(line1.end.x * vScale, line1.end.y * vScale, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
         
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 4;
-        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
+        this.ctx.fillText(`${deg.toFixed(1)}°`, (line1.end.x * vScale) + (15 / this.transform.scale), (line1.end.y * vScale) - (15 / this.transform.scale));
         this.ctx.restore();
     }
 
-    // 💡 [화면 회전 선 이탈 버그 대완결] CSS 렌더 여백과 캔버스 하드웨어 매트릭스 단일 채널 결합
+    // 💡 [그리드 완전 제거 및 화면 회전 고정] 꼬임 현상을 유발하던 모눈종이 코드를 전면 걷어내고 영상 동기화에 집중
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -365,42 +341,36 @@ class BowAnalyzer {
 
         const canvasScale = this.canvas.width / rect.width;
         
-        // 💡 [핵심 연산 대통합] 자르기 여백 가중치(vScale)를 전역 공간 행렬에 단 1번만 곱하도록 구조 재편성
-        const globalScale = this.transform.scale * vScale;
+        // 💡 비디오 위치 크롭 여백과 줌 패닝 행렬을 단방향 파이프라인으로 일체화
+        this.ctx.translate((this.transform.offsetX * canvasScale) + xOffset * canvasScale, (this.transform.offsetY * canvasScale) + yOffset * canvasScale);
         
-        this.ctx.translate(
-            (this.transform.offsetX * canvasScale) + (xOffset * canvasScale), 
-            (this.transform.offsetY * canvasScale) + (yOffset * canvasScale)
-        );
-        this.ctx.scale(globalScale, globalScale);
-        
-        // 고정 모눈 크기로 배경 그리드 투사
-        this.drawBackgroundGrid(canvasScale / vScale, (xOffset * canvasScale) / vScale, (yOffset * canvasScale) / vScale);
+        // 캔버스 자체 확대배율 주사
+        this.ctx.scale(this.transform.scale, this.transform.scale);
         
         this.ctx.lineWidth = (2 * canvasScale) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         
-        this.lines.forEach(line => this.drawSingleLine(line, canvasScale));
+        // 개별 요소 그리기 단계 진입
+        this.lines.forEach(line => this.drawSingleLine(line, canvasScale, vScale));
         if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, 1);
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, vScale);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale, 1);
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, canvasScale, vScale);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
             this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.drawSingleLine(this.currentLine, canvasScale);
+            this.drawSingleLine(this.currentLine, canvasScale, vScale);
         }
         this.ctx.restore();
     }
 
-    drawSingleLine(line, canvasScale) {
+    drawSingleLine(line, canvasScale, vScale) {
         if (!line) return;
-        // 💡 [이중 스케일링 완전 제거] 좌표 자체에 개별 변조를 주지 않고 순수 원본 픽셀 데이터 렌더링
         this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x, line.start.y);
-        this.ctx.lineTo(line.end.x, line.end.y);
+        this.ctx.moveTo(line.start.x * vScale, line.start.y * vScale);
+        this.ctx.lineTo(line.end.x * vScale, line.end.y * vScale);
         this.ctx.stroke();
 
         const pinSize = (8 * canvasScale) / this.transform.scale;
@@ -408,17 +378,17 @@ class BowAnalyzer {
         this.ctx.lineWidth = (1.0 * canvasScale) / this.transform.scale;
 
         this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
-        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
-        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
-        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
+        this.ctx.moveTo((line.start.x * vScale) - pinSize, line.start.y * vScale);
+        this.ctx.lineTo((line.start.x * vScale) + pinSize, line.start.y * vScale);
+        this.ctx.moveTo(line.start.x * vScale, (line.start.y * vScale) - pinSize);
+        this.ctx.lineTo(line.start.x * vScale, (line.start.y * vScale) + pinSize);
         this.ctx.stroke();
 
         this.ctx.beginPath();
-        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
-        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
-        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
-        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
+        this.ctx.moveTo((line.end.x * vScale) - pinSize, line.end.y * vScale);
+        this.ctx.lineTo((line.end.x * vScale) + pinSize, line.end.y * vScale);
+        this.ctx.moveTo(line.end.x * vScale, (line.end.y * vScale) - pinSize);
+        this.ctx.lineTo(line.end.x * vScale, (line.end.y * vScale) + pinSize);
         this.ctx.stroke();
 
         this.ctx.restore();
