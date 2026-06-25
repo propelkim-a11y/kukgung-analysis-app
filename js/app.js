@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes.videoInput.addEventListener('change', async (e) => {
             const files = e.target.files;
             if (!files || files.length === 0) return;
-            const file = files[0];
+            const file = files;
 
             nodes.mainVideo.pause();
             nodes.btnPlayPause.textContent = '재생';
