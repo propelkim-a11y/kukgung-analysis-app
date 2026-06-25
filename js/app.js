@@ -95,20 +95,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💡 미션 반영: 갤럭시 S펜 리모트 버튼 누름 감지 및 원격 카메라 셔터 인터락 연동
+    // 💡 미션 완결판: 갤럭시 S펜 하드웨어 파편화 신호(볼륨 및 미디어 키) 전대역 역추적 에뮬레이터 이식
     window.addEventListener('keydown', (event) => {
-        // S펜 버튼 원격 클릭 시 전송되는 키 코드 매핑 가로채기
-        if (event.key === 'MediaPlayPause' || event.keyCode === 179) {
-            // 현재 활성화된 UI 스크린이 '촬영 모드'일 때만 조건부 정밀 개입
-            if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
+        // 현재 활성화된 화면이 무조건 '촬영 모드'일 때만 전용 원격 셔터 록 해제 파이프라인 가동
+        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
+            const sPenKeys = [
+                'MediaPlayPause', 'VolumeUp', 'VolumeDown', 
+                'TrackNext', 'TrackPrevious', 'MediaFastForward', 'MediaRewind'
+            ];
+            const sPenKeyCodes =;
+
+            if (sPenKeys.includes(event.key) || sPenKeyCodes.includes(event.keyCode)) {
+                // S펜 하드웨어 신호 캡처 시 안드로이드 시스템 고유 볼륨 바 팝업 간섭 현상을 완벽 원천 차단
                 event.preventDefault();
+                event.stopPropagation();
                 event.stopImmediatePropagation();
+                
                 if (nodes.btnRecordToggle) {
-                    nodes.btnRecordToggle.click(); // 가상 클릭을 트리거하여 물리 녹화 파이프라인 시동
+                    nodes.btnRecordToggle.click(); // 물리 녹화 스위칭 모듈 강제 가상 트리거
                 }
             }
         }
-    });
+    }, true); // 캡처링 단계에서 최선순위 가로채기 차단막 구성
 
     let cameraStream = null;
     let mediaRecorder = null;
