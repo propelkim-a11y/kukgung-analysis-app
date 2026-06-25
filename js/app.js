@@ -95,29 +95,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💡 구문오류 정화 버전: S펜 리모콘 클릭 파편화 신호 가로채기 캡처 커널 인터락 완결 바인딩
+    // 💡 S펜 리모콘 하드웨어 무선 신호 총결산 정밀 가로채기 파이프라인 (2026 안정화 버전)
+    const handleRemoteShutterSignal = (event) => {
+        // 현재 화면이 명확히 '촬영 모드' 상태일 때만 원격 제어 커널 필터 작동
+        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            
+            if (nodes.btnRecordToggle) {
+                nodes.btnRecordToggle.click(); // 물리 녹화 스위칭 메인 스위치 강제 동기화 가상 트리거
+            }
+        }
+    };
+
+    // 패턴 1: S펜 하드웨어 버튼 클릭이 일반 미디어/볼륨 하이브리드 주파수로 인입되는 전대역 차단막
     window.addEventListener('keydown', (event) => {
-        // 현재 활성화된 UI 뷰가 명확히 '촬영 모드'일 때만 조건부 무선 셔터 모듈 기동
         if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
             const sPenKeys = [
                 'MediaPlayPause', 'VolumeUp', 'VolumeDown', 
                 'TrackNext', 'TrackPrevious', 'MediaFastForward', 'MediaRewind'
             ];
-            // 구문 정지 크래시를 유발하던 무효 기호를 정제하고 안드로이드 물리 하드웨어 키코드값 완전 결합
             const sPenKeyCodes =;
 
             if (sPenKeys.includes(event.key) || sPenKeyCodes.includes(event.keyCode)) {
-                // S펜 하드웨어 무선 신호 조작 시 스마트폰 본체의 OS 미디어 볼륨 팝업 간섭을 차단
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
-                
-                if (nodes.btnRecordToggle) {
-                    nodes.btnRecordToggle.click(); // 물리 레코딩 원격 제어 스위치 가상 기동
-                }
+                handleRemoteShutterSignal(event);
             }
         }
-    }, true); // 캡처링 모드 최우선 순위 격리막 가동
+    }, true);
+
+    // 패턴 2: 💡 [최종 락 해제 핵심] 갤럭시 모바일 크롬/삼성 인터넷 고유의 S펜 가상 마우스 우측 메뉴 팝업 신호 원천 가로채기
+    window.addEventListener('contextmenu', (event) => {
+        // 갤럭시 S펜의 하드웨어 버튼을 누른 채 조작할 때 발생하는 contextmenu 입력을 정밀 필터링
+        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
+            handleRemoteShutterSignal(event);
+        }
+    }, true);
 
     let cameraStream = null;
     let mediaRecorder = null;
@@ -137,7 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     window.addEventListener('click', triggerSensorUnlock);
     window.addEventListener('touchstart', triggerSensorUnlock);
-
+/**
+ * js/app.js (Part 3 of 4)
+ */
     async function startCamera() {
         if (cameraStream) stopCamera();
         try {
@@ -181,9 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         nodes.cameraPreview.srcObject = null;
     }
-/**
- * js/app.js (Part 3 of 4)
- */
+
     const fpsButtons = document.querySelectorAll('.fps-btn');
     
     fpsButtons.forEach(btn => {
