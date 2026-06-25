@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 제스처 줌 패닝 엔진 (상대 오프셋 완전 교정판)
+ * 국궁 자세 분석 시스템 - 제스처 줌 패닝 엔진 (확대 후 패닝 무빙 보정판)
  */
 
 class BowAppGesture {
@@ -21,6 +21,7 @@ class BowAppGesture {
         this.touchStartDist = 0;
         this.touchStartScale = 1;
         this.lastTouchTime = 0;
+
         this.isTransformPending = false;
     }
 
@@ -73,7 +74,7 @@ class BowAppGesture {
 
             this.isDragging = true;
             
-            // 💡 [순간이동 튐 버그 완전 청소] 화면 전체 기준이 아닌, 비디오 박스 영역 테두리 오프셋을 직접 차감 연산
+            // 💡 [원천 박멸] 터치하는 순간 뷰포트 테두리 여백을 완전히 걷어내고 순수 상대 픽셀만 추적
             const rect = this.viewport.getBoundingClientRect();
             this.startX = e.clientX - rect.left;
             this.startY = e.clientY - rect.top;
@@ -88,16 +89,18 @@ class BowAppGesture {
             if (!this.isDragging) return;
             if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
-            // 💡 터치 이동점에서도 박스 시작점을 정확히 빼주어 순수 변화량만 축출
             const rect = this.viewport.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
 
+            // 내 손가락이 움직인 아날로그 물리 픽셀 거리 계산
             const deltaX = currentX - this.startX;
             const deltaY = currentY - this.startY;
             
-            this.offsetX = this.baseOffsetX + deltaX;
-            this.offsetY = this.baseOffsetY + deltaY;
+            // 💡 [진종결 수식] 확대 공간 스케일 배율에 반비례하도록 델타 변위를 나누어 역산 적용!
+            // 이 처리가 수립되어야만 확대 상태에서 손을 대거나 밀어도 껑충 뛰지 않고 자석처럼 손가락에 결합함
+            this.offsetX = this.baseOffsetX + (deltaX / this.scale);
+            this.offsetY = this.baseOffsetY + (deltaY / this.scale);
             this.applyTransform();
         });
 
@@ -134,10 +137,9 @@ class BowAppGesture {
                     const factor = dist / this.touchStartDist;
                     const nextScale = Math.min(5, Math.max(0.8, this.touchStartScale * factor));
                     
-                    // 두 손가락 핀치 제스처 시에도 박스 고유 좌표계 기준으로 정확히 중심점 사상
                     const rect = this.viewport.getBoundingClientRect();
-                    const centerX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
-                    const centerY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
+                    const centerX = ((e.touches.clientX + e.touches.clientX) / 2) - rect.left;
+                    const centerY = ((e.touches.clientY + e.touches.clientY) / 2) - rect.top;
                     
                     this.offsetX = centerX - (centerX - this.baseOffsetX) * (nextScale / this.touchStartScale);
                     this.offsetY = centerY - (centerY - this.baseOffsetY) * (nextScale / this.touchStartScale);
