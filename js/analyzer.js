@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 3)
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (화면 회전 종횡비 완전 보정 에디션)
+ * 국궁 자세 분석 시스템 - 크로스헤어 핀 & 실시간 화면 회전 여백 완벽 동기화 판
  */
 
 class BowAnalyzer {
@@ -65,20 +65,43 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 [회전 왜곡 박멸 핵심부 1] 회전된 화면 상태의 실시간 캔버스 실제 크기 비율을 매번 역산
+    // 💡 [회전 왜곡 대수술 1] 비디오 object-fit: cover에 의해 잘려 나간 상하좌우 숨은 여백 오차 역산 공식
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
+        const mainVideo = document.getElementById('main-video');
         
-        // 가로/세로 모드 변환에 따라 유동적으로 출렁이는 분할 해상도 비율을 소수점 단위 추적
-        const canvasScaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
-        const canvasScaleY = rect.height > 0 ? (this.canvas.height / rect.height) : 1;
+        // 비디오 재생 규격 껍데기가 완벽히 준비되었는지 스캔
+        const vW = (mainVideo && mainVideo.videoWidth) ? mainVideo.videoWidth : 1280;
+        const vH = (mainVideo && mainVideo.videoHeight) ? mainVideo.videoHeight : 720;
         
-        const cX = (event.clientX - rect.left) * canvasScaleX;
-        const cY = (event.clientY - rect.top) * canvasScaleY;
+        // CSS object-fit: cover 픽셀 매트릭스 변환 배율 역산 추적
+        const screenRatio = rect.width / rect.height;
+        const videoRatio = vW / vH;
         
-        const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
-        const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
-        return { x: canvasX, y: canvasY };
+        let scale = 1;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        if (screenRatio > videoRatio) {
+            // 화면이 비디오보다 더 넓은 상태 (가로 모드: 위아래 상하가 잘려 나감)
+            scale = rect.width / vW;
+            yOffset = (rect.height - (vH * scale)) / 2;
+        } else {
+            // 화면이 비디오보다 더 좁은 상태 (세로 모드: 양옆 좌우가 잘려 나감)
+            scale = rect.height / vH;
+            xOffset = (rect.width - (vW * scale)) / 2;
+        }
+
+        // 실제 도화지 캔버스 픽셀 스케일과 제스처 변환 매트릭스 결합
+        const canvasScale = this.canvas.width / rect.width;
+        
+        const clientX = (event.clientX - rect.left - xOffset) * canvasScale;
+        const clientY = (event.clientY - rect.top - yOffset) * canvasScale;
+        
+        const canvasX = (clientX - (this.transform.offsetX * canvasScale)) / this.transform.scale;
+        const canvasY = (clientY - (this.transform.offsetY * canvasScale)) / this.transform.scale;
+        
+        return { x: canvasX / scale, y: canvasY / scale };
     }
 /**
  * js/analyzer.js (Part 2 of 3)
@@ -249,7 +272,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line[0] : line;
+        const singleLine = Array.isArray(line) ? line : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -272,17 +295,17 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    drawBackgroundGrid(scaleX, canvasScaleY) {
+    drawBackgroundGrid(scaleX, vScale, xOff, yOff) {
         this.ctx.save();
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50; 
-        const widthBound = this.canvas.width / this.transform.scale;
-        const heightBound = this.canvas.height / this.transform.scale;
-        const startX = Math.floor((-this.transform.offsetX * scaleX / this.transform.scale) / gridSize) * gridSize - widthBound;
-        const endX = startX + (widthBound * 3);
-        const startY = Math.floor((-this.transform.offsetY * canvasScaleY / this.transform.scale) / gridSize) * gridSize - heightBound;
-        const endY = startY + (heightBound * 3);
+        const gridSize = 50 * vScale; 
+        const wBound = this.canvas.width / this.transform.scale;
+        const hBound = this.canvas.height / this.transform.scale;
+        const startX = Math.floor(((-this.transform.offsetX * scaleX - xOff) / this.transform.scale) / gridSize) * gridSize - wBound;
+        const endX = startX + (wBound * 3);
+        const startY = Math.floor(((-this.transform.offsetY * scaleX - yOff) / this.transform.scale) / gridSize) * gridSize - hBound;
+        const endY = startY + (hBound * 3);
         for (let x = startX; x <= endX; x += gridSize) {
             this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
         }
@@ -292,7 +315,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    drawInlineAngleArc(line1, line2, scaleX) {
+    drawInlineAngleArc(line1, line2, scaleX, vScale) {
         if (!line1 || !line2) return;
         const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
         const a2 = Math.atan2((line2.end.y - line2.start.y), line2.end.x - line2.start.x);
@@ -300,76 +323,93 @@ class BowAnalyzer {
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
-        const radius = (35 * scaleX) / this.transform.scale;
-        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
+        this.ctx.lineWidth = (1.5 * scaleX * vScale) / this.transform.scale;
+        const radius = (35 * scaleX * vScale) / this.transform.scale;
+        this.ctx.arc(line1.end.x * vScale, line1.end.y * vScale, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
         this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.font = `bold ${Math.max(12, (13 * scaleX * vScale) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 4;
-        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
+        this.ctx.fillText(`${deg.toFixed(1)}°`, (line1.end.x * vScale) + (15 / this.transform.scale), (line1.end.y * vScale) - (15 / this.transform.scale));
         this.ctx.restore();
     }
 
-    // 💡 [회전 왜곡 박멸 핵심부 2] 화면 회전 시 실시간 기하학 매트릭스 재동기화 렌더러
+    // 💡 [회전 왜곡 대수술 2] CSS Object-Fit 여백 오차를 실시간 행렬에 주사하여 자석 정렬 마감
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
         
-        // 회전 후 넓어진/좁아진 최신 상태의 뷰포트 비율을 획득하여 실시간 강제 보정
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
-        const canvasScaleY = rect.height > 0 ? (this.canvas.height / rect.height) : 1;
+        const mainVideo = document.getElementById('main-video');
         
-        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
+        const vW = (mainVideo && mainVideo.videoWidth) ? mainVideo.videoWidth : 1280;
+        const vH = (mainVideo && mainVideo.videoHeight) ? mainVideo.videoHeight : 720;
+        
+        const screenRatio = rect.width / rect.height;
+        const videoRatio = vW / vH;
+        
+        let vScale = 1;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        if (screenRatio > videoRatio) {
+            vScale = rect.width / vW;
+            yOffset = (rect.height - (vH * vScale)) / 2;
+        } else {
+            vScale = rect.height / vH;
+            xOffset = (rect.width - (vW * vScale)) / 2;
+        }
+
+        const canvasScale = this.canvas.width / rect.width;
+        
+        // 캔버스 자체 매트릭스 변환부와 CSS의 크롭 여백 행렬을 정밀 1:1 결합
+        this.ctx.translate((this.transform.offsetX * canvasScale) + xOffset * canvasScale, (this.transform.offsetY * canvasScale) + yOffset * canvasScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        this.drawBackgroundGrid(scaleX, canvasScaleY);
-        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
+        this.drawBackgroundGrid(canvasScale, vScale, xOffset * canvasScale, yOffset * canvasScale);
+        this.ctx.lineWidth = (2 * canvasScale * vScale) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
-        this.lines.forEach(line => this.drawSingleLine(line));
+        
+        this.lines.forEach(line => this.drawSingleLine(line, canvasScale, vScale));
         if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, vScale);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale, vScale);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
             this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.drawSingleLine(this.currentLine);
+            this.drawSingleLine(this.currentLine, canvasScale, vScale);
         }
         this.ctx.restore();
     }
 
-    drawSingleLine(line) {
+    drawSingleLine(line, canvasScale, vScale) {
         if (!line) return;
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
-
         this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x, line.start.y);
-        this.ctx.lineTo(line.end.x, line.end.y);
+        this.ctx.moveTo(line.start.x * vScale, line.start.y * vScale);
+        this.ctx.lineTo(line.end.x * vScale, line.end.y * vScale);
         this.ctx.stroke();
 
-        const pinSize = (8 * scaleX) / this.transform.scale;
+        const pinSize = (8 * canvasScale * vScale) / this.transform.scale;
         this.ctx.save();
-        this.ctx.lineWidth = (1.0 * scaleX) / this.transform.scale;
+        this.ctx.lineWidth = (1.0 * canvasScale * vScale) / this.transform.scale;
 
         this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
-        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
-        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
-        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
+        this.ctx.moveTo((line.start.x * vScale) - pinSize, line.start.y * vScale);
+        this.ctx.lineTo((line.start.x * vScale) + pinSize, line.start.y * vScale);
+        this.ctx.moveTo(line.start.x * vScale, (line.start.y * vScale) - pinSize);
+        this.ctx.lineTo(line.start.x * vScale, (line.start.y * vScale) + pinSize);
         this.ctx.stroke();
 
         this.ctx.beginPath();
-        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
-        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
-        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
-        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
+        this.ctx.moveTo((line.end.x * vScale) - pinSize, line.end.y * vScale);
+        this.ctx.lineTo((line.end.x * vScale) + pinSize, line.end.y * vScale);
+        this.ctx.moveTo(line.end.x * vScale, (line.end.y * vScale) - pinSize);
+        this.ctx.lineTo(line.end.x * vScale, (line.end.y * vScale) + pinSize);
         this.ctx.stroke();
 
         this.ctx.restore();
