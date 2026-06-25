@@ -1,6 +1,6 @@
 /**
- * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (시크릿 탭 무조건 락 해제 판)
+ * js/app.js
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v17.8 - 첫 터치 수명 주기 분리 완결판)
  */
 
 window.bowAppNodes = {};
@@ -63,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 💡 [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
     core.initDB().then(async () => {
-        // 객체 참조 무결성을 위해 하드웨어 엔진 모듈들을 안전하게 순차 기동
         gesture.init(nodes.videoViewport, nodes.mainVideo);
         if (window.bowAnalyzer) {
             window.bowAnalyzer.init(nodes.drawCanvas);
@@ -88,17 +87,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-/**
- * js/app.js (Part 2 of 3)
- */
+    // 💡 [박멸 핵심] 초기 화면이 열릴 때 하드웨어 센서와 카메라 장치를 절대 미리 호출하지 않고, 
+    // 사용자가 모바일 화면을 최초로 직접 가볍게 톡 터치(혹은 클릭)하는 순간에만 완전히 안전한 독립 순서로 깨웁니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        
+        // 1. 디바이스 자이로 모듈 순차 활성화
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
+        
+        // 2. 촬영화면이 active 상태인 경우에만 카메라 스트림 격리 할당
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
             await startCamera();
         }
+        
+        // 3. 중복 트리거 누적 및 충돌 버그 원천 차단
         window.removeEventListener('click', triggerSensorUnlock);
         window.removeEventListener('touchstart', triggerSensorUnlock);
     };
@@ -206,63 +210,50 @@ document.addEventListener('DOMContentLoaded', () => {
             window.bowGyroSensor.start();
         }
         if (!cameraStream) return;
+        
         if (!isRecording) {
             recordedChunks = [];
             let options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp8' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' };
-
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm;codecs=vp8' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/mp4' };
+                }
+            }
+            
             try {
                 mediaRecorder = new MediaRecorder(cameraStream, options);
-            } catch (e) {
-                mediaRecorder = new MediaRecorder(cameraStream);
-            }
-
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.onstop = async () => {
-                nodes.recordStatus.textContent = '저장 중...';
-                const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
-                
-                try {
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+                };
+                mediaRecorder.onstop = async () => {
+                    const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                    const videoURL = URL.createObjectURL(videoBlob);
+                    nodes.mainVideo.src = videoURL;
+                    
                     await core.saveCache('lastVideoBlob', videoBlob);
-                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType || 'video/webm');
-                } catch(err) {
-                    console.error('[Storage] 복원 데이터 제한 조킹 완료');
-                }
-
-                const videoURL = URL.createObjectURL(videoBlob);
-                nodes.mainVideo.src = videoURL;
-                nodes.mainVideo.load();
-                stopCamera();
-                if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
-                    window.bowGyroSensor.stop();
-                }
-                nodes.sceneRecord.classList.remove('active');
-                nodes.sceneAnalyze.classList.add('active');
-                setActiveMenu(nodes.btnOpen);
-                if (window.bowAnalyzer) {
-                    window.bowAnalyzer.clearLines();
-                    window.bowAnalyzer.setMode('move');
-                }
-                setTimeout(resizeCanvasToDisplay, 100);
-                nodes.btnRecordToggle.textContent = '녹화시작';
-                nodes.btnRecordToggle.classList.remove('recording');
-            };
-            
-            mediaRecorder.start(1000);
-            isRecording = true;
-            nodes.btnRecordToggle.textContent = '녹화종료/분석';
-            nodes.btnRecordToggle.classList.add('recording');
-            nodes.recordStatus.textContent = '촬영 중...';
+                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
+                    
+                    transitToAnalyzeMode();
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                nodes.btnRecordToggle.textContent = '녹화중지';
+                nodes.btnRecordToggle.classList.add('recording');
+                nodes.recordStatus.textContent = '고해상도 프레임 캡처 진행 중...';
+            } catch (e) {
+                console.error('녹화 시동 오류:', e);
+            }
         } else {
-            mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
             isRecording = false;
+            nodes.btnRecordToggle.textContent = '녹화시작';
+            nodes.btnRecordToggle.classList.remove('recording');
         }
     });
-/**
- * js/app.js (Part 3 of 3)
- */
     function setActiveMenu(activeBtn) {
         [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
             if (btn) btn.classList.remove('active');
@@ -402,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files;
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
@@ -441,16 +432,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    nodes.btnReset.addEventListener('click', () => {
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            core.saveCache('lastLines', []);
-        }
+    nodes.btnReset.addEventListener('click', async () => {
+        nodes.mainVideo.pause();
+        nodes.mainVideo.removeAttribute('src');
+        nodes.mainVideo.load();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.videoSlider.value = 0;
+        nodes.videoSlider.max = 100;
+
+        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+        
         core.state.scale = 1;
         core.state.offsetX = 0;
         core.state.offsetY = 0;
         if (window.bowAppGesture) window.bowAppGesture.applyTransform();
-        core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+
+        await core.saveCache('lastLines', []);
+        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+        await core.saveCache('lastVideoBlob', null);
+        await core.saveCache('lastRecordedMime', null);
+
+        nodes.angleReport.textContent = "ANGLE 0.0°";
+        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
+        setTimeout(resizeCanvasToDisplay, 100);
     });
     
     nodes.panelHandle.addEventListener('click', () => {
@@ -460,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
+        nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
         if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
     
@@ -474,15 +478,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (nodes.sceneRecord.classList.contains('active')) {
             if (nodes.gyroHorizonLine) {
-                nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
-                nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
-                if (isLevel) nodes.gyroHorizonLine.classList.add('perfect-level');
-                else nodes.gyroHorizonLine.classList.remove('perfect-level');
-            }
-            if (nodes.gyroVerticalLine) {
-                nodes.gyroVerticalLine.style.transform = `translateX(-50%) rotate(${-roll}deg)`;
-                if (isLevel) nodes.gyroVerticalLine.classList.add('perfect-level');
-                else nodes.gyroVerticalLine.classList.remove('perfect-level');
+                nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
+                nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
+                
+                if (isLevel) {
+                    nodes.gyroHorizonLine.classList.add('perfect-level');
+                    nodes.gyroVerticalLine.classList.add('perfect-level');
+                } else {
+                    nodes.gyroHorizonLine.classList.remove('perfect-level');
+                    nodes.gyroVerticalLine.classList.remove('perfect-level');
+                }
             }
         }
     });
