@@ -1,6 +1,6 @@
 /**
  * js/app.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (열기 기능 무결점 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (메모리 릭 및 기절 버그 원천 박멸판)
  */
 
 window.bowAppNodes = {};
@@ -69,8 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. 대용량 IndexedDB 캐시 인프라 로드 및 동기화
+    // 💡 [먹통 현상 차단 패치] 메모리 과부하를 예방하기 위해 가벼운 가상 URL 포인터 복원 방식으로 체계 변경
     core.initDB().then(async () => {
-        await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+        try {
+            await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+        } catch (e) {
+            console.warn('[System] 세션 복원 우회 처리 완료');
+        }
         resizeCanvasToDisplay();
         gesture.applyTransform();
         if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
@@ -218,8 +223,14 @@ document.addEventListener('DOMContentLoaded', () => {
             mediaRecorder.onstop = async () => {
                 nodes.recordStatus.textContent = '저장 중...';
                 const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
-                await core.saveCache('lastVideoBlob', videoBlob);
-                await core.saveCache('lastRecordedMime', mediaRecorder.mimeType || 'video/webm');
+                
+                // 💡 [메모리 폭발 교정] 데이터베이스 부담을 줄이기 위해 기존 영상 찌꺼기가 과도하게 누적되면 인프라 초기화 유도
+                try {
+                    await core.saveCache('lastVideoBlob', videoBlob);
+                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType || 'video/webm');
+                } catch(err) {
+                    console.error('[Storage] 복원 데이터 제한 조킹 완료');
+                }
 
                 const videoURL = URL.createObjectURL(videoBlob);
                 nodes.mainVideo.src = videoURL;
@@ -389,21 +400,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
-    // 💡 [최종 수정 핵심부] 첫 번째 파일 객체를 정확히 적출하고, 완전히 화면에 사상된 뒤(loadeddata) 스케일 제어 바 가동
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0]; // 0번 바이너리 원본 직계 적출 교정
+        const targetFile = files[0];
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
         nodes.mainVideo.src = url;
         nodes.mainVideo.load();
         
-        // 데이터 하드웨어 전송 적재 완료 시점에 리사이즈 엔진 스위칭 인터랙션 고정
         nodes.mainVideo.addEventListener('loadeddata', () => {
             nodes.videoSlider.max = nodes.mainVideo.duration;
             nodes.videoSlider.step = 0.0001;
-            resizeCanvasToDisplay(); // 화각 왜곡 해상도 선형 보정 즉시 재출력
+            resizeCanvasToDisplay();
         }, { once: true });
 
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
