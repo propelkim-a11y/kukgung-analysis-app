@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 3)
- * 국궁 고각 분석 시스템 - 나노 밀착 및 모드 격리 완결판
+ * 국궁 자세 분석 시스템 - 확대축소 1:1 축 동기화 마스터 완결판
  */
 
 class BowAnalyzer {
@@ -24,7 +24,6 @@ class BowAnalyzer {
         this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
-    // 💡 [초기화] 마우스 및 터치 리스너 고정 결합
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
@@ -35,7 +34,7 @@ class BowAnalyzer {
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
 
-    // 💡 [동기화] 제스처 모듈로부터 배율과 좌표를 실시간 전송받아 주사
+    // 💡 제스처 엔진으로부터 갱신된 변환 배율과 좌표를 실시간 전송받아 주사
     updateTransform(scale, offsetX, offsetY) {
         this.transform.scale = scale;
         this.transform.offsetX = offsetX;
@@ -67,16 +66,16 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 [나노 밀착 핵심 공식] 제스처 스케일 축과 비디오 배치 비율을 1:1로 완전 강제 매핑
+    // 💡 제스처 모듈과 도화지 픽셀 축을 정밀하게 1:1 매핑하는 역산 공식
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const canvasScale = this.canvas.width / rect.width;
         
-        // 사용자가 터치한 좌표를 실제 캔버스 내부 버퍼 크기 비율로 보정
+        // 사용자가 터치한 클라이언트 좌표를 디스플레이 해상도 비율로 1차 정렬
         const clientX = (event.clientX - rect.left) * canvasScale;
         const clientY = (event.clientY - rect.top) * canvasScale;
         
-        // 줌 패닝 변환 행렬 스케일을 정밀하게 역산하여 반사 오차 100% 제거
+        // 줌 인/아웃 및 패닝 이동량만큼 정밀 역산 매트릭스 주사
         const canvasX = (clientX - (this.transform.offsetX * canvasScale)) / this.transform.scale;
         const canvasY = (clientY - (this.transform.offsetY * canvasScale)) / this.transform.scale;
         
@@ -296,7 +295,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    // 💡 [확대축소 선 고정 대완결] 제스처의 스케일 축과 도화지 픽셀 캔버스를 완벽 동기화
+    // 💡 [확대축소 선 고정 대완결] 제스처 스케일 배율과 도화지 픽셀 매트릭스를 1:1 최종 병합
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -318,7 +317,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, canvasScale);
+            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
