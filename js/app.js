@@ -95,43 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💡 S펜 리모콘 하드웨어 무선 신호 총결산 정밀 가로채기 파이프라인 (2026 안정화 버전)
-    const handleRemoteShutterSignal = (event) => {
-        // 현재 화면이 명확히 '촬영 모드' 상태일 때만 원격 제어 커널 필터 작동
-        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            
-            if (nodes.btnRecordToggle) {
-                nodes.btnRecordToggle.click(); // 물리 녹화 스위칭 메인 스위치 강제 동기화 가상 트리거
-            }
-        }
-    };
-
-    // 패턴 1: S펜 하드웨어 버튼 클릭이 일반 미디어/볼륨 하이브리드 주파수로 인입되는 전대역 차단막
-    window.addEventListener('keydown', (event) => {
-        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
-            const sPenKeys = [
-                'MediaPlayPause', 'VolumeUp', 'VolumeDown', 
-                'TrackNext', 'TrackPrevious', 'MediaFastForward', 'MediaRewind'
-            ];
-            const sPenKeyCodes =;
-
-            if (sPenKeys.includes(event.key) || sPenKeyCodes.includes(event.keyCode)) {
-                handleRemoteShutterSignal(event);
-            }
-        }
-    }, true);
-
-    // 패턴 2: 💡 [최종 락 해제 핵심] 갤럭시 모바일 크롬/삼성 인터넷 고유의 S펜 가상 마우스 우측 메뉴 팝업 신호 원천 가로채기
-    window.addEventListener('contextmenu', (event) => {
-        // 갤럭시 S펜의 하드웨어 버튼을 누른 채 조작할 때 발생하는 contextmenu 입력을 정밀 필터링
-        if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
-            handleRemoteShutterSignal(event);
-        }
-    }, true);
-
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -150,9 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     window.addEventListener('click', triggerSensorUnlock);
     window.addEventListener('touchstart', triggerSensorUnlock);
-/**
- * js/app.js (Part 3 of 4)
- */
+
     async function startCamera() {
         if (cameraStream) stopCamera();
         try {
@@ -196,7 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         nodes.cameraPreview.srcObject = null;
     }
-
+/**
+ * js/app.js (Part 3 of 4)
+ */
     const fpsButtons = document.querySelectorAll('.fps-btn');
     
     fpsButtons.forEach(btn => {
