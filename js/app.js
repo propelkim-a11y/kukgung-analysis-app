@@ -42,7 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    let selectedFPS = 30;
+    // 💡 미션 반영: 기기 성능 감지 후 기본 세팅값을 고속 촬영 규격(120 FPS)으로 강제 상향 리비전
+    const cpuCores = navigator.hardwareConcurrency || 4;
+    let selectedFPS = cpuCores > 4 ? 120 : 30;
 
     // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 선 오차 즉시 박멸
     function resizeCanvasToDisplay() {
@@ -116,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 frameRate: { ideal: selectedFPS }
             };
             if (isPC) {
-                videoConstraints = { width: 1280, height: 720 };
+                videoConstraints = { width: 1280, height: 720, frameRate: { ideal: selectedFPS } };
             }
 
             cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -150,17 +152,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const fpsButtons = document.querySelectorAll('.fps-btn');
-    const cpuCores = navigator.hardwareConcurrency || 4;
     
-    if (cpuCores <= 4) {
-        fpsButtons.forEach(btn => {
-            const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
-            if (fpsVal >= 120) {
-                btn.style.opacity = '0.25';
-                btn.style.pointerEvents = 'none';
-            }
-        });
-    }
+    // 💡 고속 촬영 주파수 차단 마크업 제어 및 초기 활성화 단추 정밀 동기화
+    fpsButtons.forEach(btn => {
+        const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
+        
+        // 저사양 하드웨어 프리징 이슈 원천 격리 규칙 유지
+        if (cpuCores <= 4 && fpsVal >= 120) {
+            btn.style.opacity = '0.25';
+            btn.style.pointerEvents = 'none';
+        }
+        
+        // 💡 120FPS 설정값에 맞춰 하단 텍스트 바 선택 마커 UI 클래스 동적 재정렬
+        if (fpsVal === selectedFPS) {
+            fpsButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+    });
 
     fpsButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -197,7 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
         setTimeout(resizeCanvasToDisplay, 100);
     }
-
+/**
+ * js/app.js (Part 3 of 3)
+ */
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
 
     nodes.btnRecordToggle.addEventListener('click', () => {
@@ -260,9 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isRecording = false;
         }
     });
-/**
- * js/app.js (Part 3 of 3)
- */
+
     function setActiveMenu(activeBtn) {
         [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
             if (btn) btn.classList.remove('active');
@@ -396,94 +404,4 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pointercancel', clearFrameRepeat);
     nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
     nodes.btnFrameNext.addEventListener('pointerleave', clearFrameRepeat);
-    
-    nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
-    
-    nodes.videoInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const targetFile = files[0];
-        await core.saveCache('lastVideoBlob', targetFile);
-        const url = URL.createObjectURL(targetFile);
-        nodes.mainVideo.src = url;
-        nodes.mainVideo.load();
-        
-        nodes.mainVideo.addEventListener('loadeddata', () => {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-            resizeCanvasToDisplay();
-        }, { once: true });
-
-        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
-            window.bowGyroSensor.stop();
-        }
-        setActiveMenu(nodes.btnOpen);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            window.bowAnalyzer.setMode('move');
-        }
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
-
-    nodes.btnMove.addEventListener('click', () => {
-        setActiveMenu(nodes.btnMove);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('move');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnDraw.addEventListener('click', () => {
-        setActiveMenu(nodes.btnDraw);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('draw');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnReset.addEventListener('click', () => {
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            core.saveCache('lastLines', []);
-        }
-        core.state.scale = 1;
-        core.state.offsetX = 0;
-        core.state.offsetY = 0;
-        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
-        core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
-    });
-    
-    nodes.panelHandle.addEventListener('click', () => {
-        core.state.isPanelOpen = !core.state.isPanelOpen;
-        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
-        else nodes.unifiedPanel.classList.add('collapsed');
-    });
-    
-    window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE: ${e.detail.angle}°`;
-        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
-    });
-    
-    window.addEventListener('bowGestureUndo', (e) => {
-        core.saveCache('lastLines', e.detail.lines);
-    });
-    
-    window.addEventListener('bowGyroUpdate', (e) => {
-        const { roll, isLevel } = e.detail;
-        if (isNaN(roll)) return;
-
-        if (nodes.sceneRecord.classList.contains('active')) {
-            if (nodes.gyroHorizonLine) {
-                nodes.gyroHorizonLine.setAttribute('data-angle', `${Math.abs(roll).toFixed(1)}°`);
-                nodes.gyroHorizonLine.style.transform = `translateY(-50%) rotate(${-roll}deg)`;
-                if (isLevel) nodes.gyroHorizonLine.classList.add('perfect-level');
-                else nodes.gyroHorizonLine.classList.remove('perfect-level');
-            }
-            if (nodes.gyroVerticalLine) {
-                nodes.gyroVerticalLine.style.transform = `translateX(-50%) rotate(${-roll}deg)`;
-                if (isLevel) nodes.gyroVerticalLine.classList.add('perfect-level');
-                else nodes.gyroVerticalLine.classList.remove('perfect-level');
-            }
-        }
-    });
 });
