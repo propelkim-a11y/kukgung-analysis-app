@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.3 - 부팅 순서 직관적 정렬 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.4 - 수평선 정중앙 복원 보정판)
  */
 
 window.bowAppNodes = {};
@@ -61,8 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 [7번 지침 기본 충실 패치] 간헐적 프리징 레이스 컨디션을 완전히 박멸하기 위해 
-    // IndexedDB 비동기 신호를 기다리지 않고 앱 기동 즉시 하드웨어 엔진들과 UI 캔버스를 최우선 순위로 결합합니다.
+    // 💡 UI 인프라 및 제스처/분석 캔버스 하드웨어를 최우선 동기 결합하여 타이밍 락 프리징 원천 봉쇄
     gesture.init(nodes.videoViewport, nodes.mainVideo);
     if (window.bowAnalyzer) {
         window.bowAnalyzer.init(nodes.drawCanvas);
@@ -71,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvasToDisplay();
     gesture.applyTransform();
 
-    // UI 인프라 결합이 완벽히 끝난 후 스토리지 코어를 비동기로 가동하여 과거 세션을 안전하게 노출합니다.
+    // 완벽 안착 후 스토리지 코어를 연동하여 과거 세션 노출
     core.initDB().then(async () => {
         try {
             await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
@@ -422,69 +421,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nodes.btnDraw.addEventListener('click', () => {
         setActiveMenu(nodes.btnDraw);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('draw');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnReset.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.mainVideo.removeAttribute('src');
-        nodes.mainVideo.load();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.videoSlider.value = 0;
-        nodes.videoSlider.max = 100;
-
-        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
-        
-        core.state.scale = 1;
-        core.state.offsetX = 0;
-        core.state.offsetY = 0;
-        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
-
-        await core.saveCache('lastLines', []);
-        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
-        await core.saveCache('lastVideoBlob', null);
-        await core.saveCache('lastRecordedMime', null);
-
-        nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
-    
-    nodes.panelHandle.addEventListener('click', () => {
-        core.state.isPanelOpen = !core.state.isPanelOpen;
-        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
-        else nodes.unifiedPanel.classList.add('collapsed');
-    });
-    
-    window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
-        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
-    });
-    
-    window.addEventListener('bowGestureUndo', (e) => {
-        core.saveCache('lastLines', e.detail.lines);
-    });
-    
-    window.addEventListener('bowGyroUpdate', (e) => {
-        const { roll, isLevel } = e.detail;
-        if (isNaN(roll)) return;
-
-        if (nodes.sceneRecord.classList.contains('active')) {
-            if (nodes.gyroHorizonLine && nodes.gyroVerticalLine) {
-                nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
-                nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
-                
-                if (isLevel) {
-                    nodes.gyroHorizonLine.classList.add('perfect-level');
-                    nodes.gyroVerticalLine.classList.add('perfect-level');
-                } else {
-                    nodes.gyroHorizonLine.classList.remove('perfect-level');
-                    nodes.gyroVerticalLine.classList.remove('perfect-level');
-                }
-            }
-        }
-    });
-});
+        if (window.bow
