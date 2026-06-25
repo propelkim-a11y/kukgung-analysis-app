@@ -95,29 +95,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 💡 구문오류 완전 전방 정화 버전: S펜 리모콘 클릭 파편화 신호 가로채기 캡처 커널 인터락 수립
+    // 💡 구문오류 정화 버전: S펜 리모콘 클릭 파편화 신호 가로채기 캡처 커널 인터락 완결 바인딩
     window.addEventListener('keydown', (event) => {
-        // 현재 활성화된 UI 뷰가 '촬영 모드'일 때만 조건부 정밀 제어
+        // 현재 활성화된 UI 뷰가 명확히 '촬영 모드'일 때만 조건부 무선 셔터 모듈 기동
         if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
             const sPenKeys = [
                 'MediaPlayPause', 'VolumeUp', 'VolumeDown', 
                 'TrackNext', 'TrackPrevious', 'MediaFastForward', 'MediaRewind'
             ];
-            // 💡 치명적인 공백 정지 구문 에러를 박멸하고 실제 물리적 하드웨어 키코드값들을 고정 바인딩
+            // 구문 정지 크래시를 유발하던 무효 기호를 정제하고 안드로이드 물리 하드웨어 키코드값 완전 결합
             const sPenKeyCodes =;
 
             if (sPenKeys.includes(event.key) || sPenKeyCodes.includes(event.keyCode)) {
-                // S펜 하드웨어 무선 신호 도달 시 기기 자체의 미디어 볼륨 팝업 간섭을 완전 제어
+                // S펜 하드웨어 무선 신호 조작 시 스마트폰 본체의 OS 미디어 볼륨 팝업 간섭을 차단
                 event.preventDefault();
                 event.stopPropagation();
                 event.stopImmediatePropagation();
                 
                 if (nodes.btnRecordToggle) {
-                    nodes.btnRecordToggle.click(); // 손을 대지 않고 녹화 시작/종료 제어 가상 트리거
+                    nodes.btnRecordToggle.click(); // 물리 레코딩 원격 제어 스위치 가상 기동
                 }
             }
         }
-    }, true); // 최선순위 가로채기 캡처링 스위치 가동
+    }, true); // 캡처링 모드 최우선 순위 격리막 가동
 
     let cameraStream = null;
     let mediaRecorder = null;
