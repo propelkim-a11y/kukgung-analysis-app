@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 4)
- * 국궁 고각 분석 시스템 - 락 프리 대완결판 (그리드 왜곡 완벽 박멸 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 대완결판 (화면 회전 일치 에디션)
  */
 
 class BowAnalyzer {
@@ -65,6 +65,7 @@ class BowAnalyzer {
         return false;
     }
 
+    // 💡 [선 이탈 완전 해결] 비디오 object-fit: cover 여백 오차 정밀 좌표 역산 파싱
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const mainVideo = document.getElementById('main-video');
@@ -184,7 +185,7 @@ class BowAnalyzer {
             if (this.lines.length >= 2) {
                 this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
             } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines[0]));
+                this.broadcastAngle(this.getLineAngle(this.lines));
             }
         } 
         else if (this.currentLine) {
@@ -266,7 +267,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line[0] : line;
+        const singleLine = Array.isArray(line) ? line : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -320,18 +321,22 @@ class BowAnalyzer {
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-        this.ctx.lineWidth = (1.5 * scaleX * vScale) / this.transform.scale;
-        const radius = (35 * scaleX * vScale) / this.transform.scale;
-        this.ctx.arc(line1.end.x * vScale, line1.end.y * vScale, radius, -a1, -a2, a1 > a2);
+        
+        // 💡 [중복 스케일링 완전 소멸] 전역 컨텍스트 스케일 안에서 노출되므로 개별 픽셀 가중치 제거
+        this.ctx.lineWidth = 1.5 * scaleX / this.transform.scale;
+        const radius = 35 * scaleX / this.transform.scale;
+        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
+        
         this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = `bold ${Math.max(12, (13 * scaleX * vScale) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 4;
-        this.ctx.fillText(`${deg.toFixed(1)}°`, (line1.end.x * vScale) + (15 / this.transform.scale), (line1.end.y * vScale) - (15 / this.transform.scale));
+        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
         this.ctx.restore();
     }
 
+    // 💡 [화면 회전 선 이탈 버그 대완결] CSS 렌더 여백과 캔버스 하드웨어 매트릭스 단일 채널 결합
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -360,53 +365,60 @@ class BowAnalyzer {
 
         const canvasScale = this.canvas.width / rect.width;
         
-        this.ctx.translate((this.transform.offsetX * canvasScale) + xOffset * canvasScale, (this.transform.offsetY * canvasScale) + yOffset * canvasScale);
-        this.ctx.scale(this.transform.scale, this.transform.scale);
+        // 💡 [핵심 연산 대통합] 자르기 여백 가중치(vScale)를 전역 공간 행렬에 단 1번만 곱하도록 구조 재편성
+        const globalScale = this.transform.scale * vScale;
         
-        this.drawBackgroundGrid(canvasScale, xOffset * canvasScale, yOffset * canvasScale);
+        this.ctx.translate(
+            (this.transform.offsetX * canvasScale) + (xOffset * canvasScale), 
+            (this.transform.offsetY * canvasScale) + (yOffset * canvasScale)
+        );
+        this.ctx.scale(globalScale, globalScale);
         
-        this.ctx.lineWidth = (2 * canvasScale * vScale) / this.transform.scale; 
+        // 고정 모눈 크기로 배경 그리드 투사
+        this.drawBackgroundGrid(canvasScale / vScale, (xOffset * canvasScale) / vScale, (yOffset * canvasScale) / vScale);
+        
+        this.ctx.lineWidth = (2 * canvasScale) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         
-        this.lines.forEach(line => this.drawSingleLine(line, canvasScale, vScale));
+        this.lines.forEach(line => this.drawSingleLine(line, canvasScale));
         if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, vScale);
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, 1);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [그리드 왜곡 원천 박멸] lines 배열 원본 대신 첫 번째 단선 객체([0] 인덱스)를 정확히 명시하여 사상 처리 완료
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, canvasScale, vScale);
+            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale, 1);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
             this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.drawSingleLine(this.currentLine, canvasScale, vScale);
+            this.drawSingleLine(this.currentLine, canvasScale);
         }
         this.ctx.restore();
     }
 
-    drawSingleLine(line, canvasScale, vScale) {
+    drawSingleLine(line, canvasScale) {
         if (!line) return;
+        // 💡 [이중 스케일링 완전 제거] 좌표 자체에 개별 변조를 주지 않고 순수 원본 픽셀 데이터 렌더링
         this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x * vScale, line.start.y * vScale);
-        this.ctx.lineTo(line.end.x * vScale, line.end.y * vScale);
+        this.ctx.moveTo(line.start.x, line.start.y);
+        this.ctx.lineTo(line.end.x, line.end.y);
         this.ctx.stroke();
 
-        const pinSize = (8 * canvasScale * vScale) / this.transform.scale;
+        const pinSize = (8 * canvasScale) / this.transform.scale;
         this.ctx.save();
-        this.ctx.lineWidth = (1.0 * canvasScale * vScale) / this.transform.scale;
+        this.ctx.lineWidth = (1.0 * canvasScale) / this.transform.scale;
 
         this.ctx.beginPath();
-        this.ctx.moveTo((line.start.x * vScale) - pinSize, line.start.y * vScale);
-        this.ctx.lineTo((line.start.x * vScale) + pinSize, line.start.y * vScale);
-        this.ctx.moveTo(line.start.x * vScale, (line.start.y * vScale) - pinSize);
-        this.ctx.lineTo(line.start.x * vScale, (line.start.y * vScale) + pinSize);
+        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
+        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
+        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
+        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
         this.ctx.stroke();
 
         this.ctx.beginPath();
-        this.ctx.moveTo((line.end.x * vScale) - pinSize, line.end.y * vScale);
-        this.ctx.lineTo((line.end.x * vScale) + pinSize, line.end.y * vScale);
-        this.ctx.moveTo(line.end.x * vScale, (line.end.y * vScale) - pinSize);
-        this.ctx.lineTo(line.end.x * vScale, (line.end.y * vScale) + pinSize);
+        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
+        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
+        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
+        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
         this.ctx.stroke();
 
         this.ctx.restore();
