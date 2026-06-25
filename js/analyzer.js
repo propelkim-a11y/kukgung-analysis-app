@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 크로스헤어 핀 & 실시간 화면 회전 여백 완벽 동기화 판
+ * js/analyzer.js (Part 1 of 4)
+ * 국궁 고각 분석 시스템 - 락 프리 대완결판 (그리드 평형 동기화 버전)
  */
 
 class BowAnalyzer {
@@ -65,16 +65,13 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 [회전 왜곡 대수술 1] 비디오 object-fit: cover에 의해 잘려 나간 상하좌우 숨은 여백 오차 역산 공식
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
         const mainVideo = document.getElementById('main-video');
         
-        // 비디오 재생 규격 껍데기가 완벽히 준비되었는지 스캔
         const vW = (mainVideo && mainVideo.videoWidth) ? mainVideo.videoWidth : 1280;
         const vH = (mainVideo && mainVideo.videoHeight) ? mainVideo.videoHeight : 720;
         
-        // CSS object-fit: cover 픽셀 매트릭스 변환 배율 역산 추적
         const screenRatio = rect.width / rect.height;
         const videoRatio = vW / vH;
         
@@ -83,16 +80,13 @@ class BowAnalyzer {
         let yOffset = 0;
 
         if (screenRatio > videoRatio) {
-            // 화면이 비디오보다 더 넓은 상태 (가로 모드: 위아래 상하가 잘려 나감)
             scale = rect.width / vW;
             yOffset = (rect.height - (vH * scale)) / 2;
         } else {
-            // 화면이 비디오보다 더 좁은 상태 (세로 모드: 양옆 좌우가 잘려 나감)
             scale = rect.height / vH;
             xOffset = (rect.width - (vW * scale)) / 2;
         }
 
-        // 실제 도화지 캔버스 픽셀 스케일과 제스처 변환 매트릭스 결합
         const canvasScale = this.canvas.width / rect.width;
         
         const clientX = (event.clientX - rect.left - xOffset) * canvasScale;
@@ -104,7 +98,7 @@ class BowAnalyzer {
         return { x: canvasX / scale, y: canvasY / scale };
     }
 /**
- * js/analyzer.js (Part 2 of 3)
+ * js/analyzer.js (Part 2 of 4)
  */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
@@ -250,7 +244,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 3 of 3)
+ * js/analyzer.js (Part 3 of 4)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -295,17 +289,21 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    drawBackgroundGrid(scaleX, vScale, xOff, yOff) {
+    // 💡 [그리드 왜곡 박멸 핵심부 1] vScale 중복 곱 연산을 원천 차단하여 일정한 크기 격자 고정
+    drawBackgroundGrid(scaleX, xOff, yOff) {
         this.ctx.save();
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50 * vScale; 
+        
+        // 💡 화면 회전 배율 가중치를 전면 걷어내고 순수 절대 픽셀(50px) 간격으로 모눈 격자 규격 락 고정
+        const gridSize = 50; 
         const wBound = this.canvas.width / this.transform.scale;
         const hBound = this.canvas.height / this.transform.scale;
         const startX = Math.floor(((-this.transform.offsetX * scaleX - xOff) / this.transform.scale) / gridSize) * gridSize - wBound;
         const endX = startX + (wBound * 3);
         const startY = Math.floor(((-this.transform.offsetY * scaleX - yOff) / this.transform.scale) / gridSize) * gridSize - hBound;
         const endY = startY + (hBound * 3);
+        
         for (let x = startX; x <= endX; x += gridSize) {
             this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
         }
@@ -314,7 +312,9 @@ class BowAnalyzer {
         }
         this.ctx.restore();
     }
-
+/**
+ * js/analyzer.js (Part 4 of 4)
+ */
     drawInlineAngleArc(line1, line2, scaleX, vScale) {
         if (!line1 || !line2) return;
         const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
@@ -335,7 +335,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    // 💡 [회전 왜곡 대수술 2] CSS Object-Fit 여백 오차를 실시간 행렬에 주사하여 자석 정렬 마감
+    // 💡 [그리드 왜곡 박멸 핵심부 2] 렌더러 내부에서 drawBackgroundGrid 호출 시 vScale 인자를 안전하게 분리 제거
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -364,11 +364,12 @@ class BowAnalyzer {
 
         const canvasScale = this.canvas.width / rect.width;
         
-        // 캔버스 자체 매트릭스 변환부와 CSS의 크롭 여백 행렬을 정밀 1:1 결합
         this.ctx.translate((this.transform.offsetX * canvasScale) + xOffset * canvasScale, (this.transform.offsetY * canvasScale) + yOffset * canvasScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        this.drawBackgroundGrid(canvasScale, vScale, xOffset * canvasScale, yOffset * canvasScale);
+        // 💡 이중 곱 연산으로 크기가 비정상적으로 튀던 원인 제거 완료
+        this.drawBackgroundGrid(canvasScale, xOffset * canvasScale, yOffset * canvasScale);
+        
         this.ctx.lineWidth = (2 * canvasScale * vScale) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
