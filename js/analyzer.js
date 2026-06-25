@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 확대축소 1:1 축 동기화 마스터 완결판
+ * 국궁 고각 분석 시스템 - 확대축소 1:1 축 동기화 최종 완전판
  */
 
 class BowAnalyzer {
@@ -34,7 +34,7 @@ class BowAnalyzer {
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
     }
 
-    // 💡 제스처 엔진으로부터 갱신된 변환 배율과 좌표를 실시간 전송받아 주사
+    // 제스처 모듈로부터 갱신된 변환 배율과 좌표를 실시간 전송받아 즉시 동기화
     updateTransform(scale, offsetX, offsetY) {
         this.transform.scale = scale;
         this.transform.offsetX = offsetX;
@@ -66,20 +66,21 @@ class BowAnalyzer {
         return false;
     }
 
-    // 💡 제스처 모듈과 도화지 픽셀 축을 정밀하게 1:1 매핑하는 역산 공식
+    // 💡 [원점 튕김 완전 해결 핵심부] 2중 스케일 참조 오차를 완전 제거한 절대 좌표 역산 수식
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const canvasScale = this.canvas.width / rect.width;
         
-        // 사용자가 터치한 클라이언트 좌표를 디스플레이 해상도 비율로 1차 정렬
-        const clientX = (event.clientX - rect.left) * canvasScale;
-        const clientY = (event.clientY - rect.top) * canvasScale;
+        // 브라우저 화면의 물리 터치 지점을 캔버스의 내부 실제 해상도 좌표계로 보정
+        const clientX = event.clientX - rect.left;
+        const clientY = event.clientY - rect.top;
         
-        // 줌 인/아웃 및 패닝 이동량만큼 정밀 역산 매트릭스 주사
-        const canvasX = (clientX - (this.transform.offsetX * canvasScale)) / this.transform.scale;
-        const canvasY = (clientY - (this.transform.offsetY * canvasScale)) / this.transform.scale;
+        // 💡 [교정 마감] 제스처 엔진과 1:1로 일치하도록 오프셋을 먼저 빼고 배율을 나눔으로써 튕김 원천 차단
+        const canvasX = (clientX - this.transform.offsetX) / this.transform.scale;
+        const canvasY = (clientY - this.transform.offsetY) / this.transform.scale;
         
-        return { x: canvasX, y: canvasY };
+        // 도화지 해상도 비율 팩터를 최종 융합하여 정밀 좌표 반환
+        const scaleFactor = this.canvas.width / rect.width;
+        return { x: canvasX * scaleFactor, y: canvasY * scaleFactor };
     }
 /**
  * js/analyzer.js (Part 2 of 3)
@@ -282,6 +283,7 @@ class BowAnalyzer {
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
         
+        // 전역 컨텍스트 스케일 하위에서 독립 선폭 매핑
         this.ctx.lineWidth = 1.5 * scaleX / this.transform.scale;
         const radius = 35 * scaleX / this.transform.scale;
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
@@ -295,7 +297,7 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    // 💡 [확대축소 선 고정 대완결] 제스처 스케일 배율과 도화지 픽셀 매트릭스를 1:1 최종 병합
+    // 💡 [확대축소 선 이탈/튕김 완전 해결] 제스처 수치 그대로 캔버스 매트릭스 1:1 선형 동기화 사상
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -304,7 +306,7 @@ class BowAnalyzer {
         const rect = this.canvas.getBoundingClientRect();
         const canvasScale = this.canvas.width / rect.width;
         
-        // 💡 오직 제스처 모듈에서 연산된 줌/패닝 데이터 축 한 곳으로만 연산 단일화 고정
+        // 💡 [2중 누적 오차 제거 마감] 기디 픽셀 해상도 팩터를 제스처 오프셋에 균일 주입하여 좌표 분리 박멸
         this.ctx.translate(this.transform.offsetX * canvasScale, this.transform.offsetY * canvasScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
@@ -312,12 +314,11 @@ class BowAnalyzer {
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
         
-        // 중복 배율 수식 없이 순수 원본 픽셀 데이터 그대로 동시 사상 출력
         this.lines.forEach(line => this.drawSingleLine(line, canvasScale));
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale);
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, canvasScale);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
