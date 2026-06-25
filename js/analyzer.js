@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 / 3)
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판
+ * js/analyzer.js (Part 1 of 3)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (화면 회전 종횡비 완전 보정 에디션)
  */
 
 class BowAnalyzer {
@@ -16,7 +16,6 @@ class BowAnalyzer {
         this.lastTapTime = 0;
         this.tapThreshold = 300; 
 
-        // 선 편집 미세 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
 
@@ -25,7 +24,6 @@ class BowAnalyzer {
         this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
-    // 💡 [하드웨어 충돌 박멸] 리스너를 단 1번만 영구 결합하여 중복 누적 버그 차단
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
@@ -67,18 +65,23 @@ class BowAnalyzer {
         return false;
     }
 
+    // 💡 [회전 왜곡 박멸 핵심부 1] 회전된 화면 상태의 실시간 캔버스 실제 크기 비율을 매번 역산
     getCanvasCoordinates(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const canvasScaleX = this.canvas.width / rect.width;
-        const canvasScaleY = this.canvas.height / rect.height;
+        
+        // 가로/세로 모드 변환에 따라 유동적으로 출렁이는 분할 해상도 비율을 소수점 단위 추적
+        const canvasScaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
+        const canvasScaleY = rect.height > 0 ? (this.canvas.height / rect.height) : 1;
+        
         const cX = (event.clientX - rect.left) * canvasScaleX;
         const cY = (event.clientY - rect.top) * canvasScaleY;
+        
         const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
         const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
 /**
- * js/analyzer.js (Part 2 / 3)
+ * js/analyzer.js (Part 2 of 3)
  */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
@@ -164,7 +167,7 @@ class BowAnalyzer {
             if (this.lines.length >= 2) {
                 this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
             } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines[0]));
+                this.broadcastAngle(this.getLineAngle(this.lines));
             }
         } 
         else if (this.currentLine) {
@@ -224,7 +227,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 3 / 3)
+ * js/analyzer.js (Part 3 of 3)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -238,7 +241,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -309,13 +312,16 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
+    // 💡 [회전 왜곡 박멸 핵심부 2] 화면 회전 시 실시간 기하학 매트릭스 재동기화 렌더러
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
+        
+        // 회전 후 넓어진/좁아진 최신 상태의 뷰포트 비율을 획득하여 실시간 강제 보정
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const canvasScaleY = this.canvas.height / rect.height;
+        const scaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
+        const canvasScaleY = rect.height > 0 ? (this.canvas.height / rect.height) : 1;
         
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
@@ -328,7 +334,6 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [참조 크래시 완전 해결] lines 배열 원본 전체 대신 첫 번째 선 객체인 this.lines[0]을 명확하게 타겟팅
             this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
@@ -342,7 +347,7 @@ class BowAnalyzer {
     drawSingleLine(line) {
         if (!line) return;
         const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
+        const scaleX = rect.width > 0 ? (this.canvas.width / rect.width) : 1;
 
         this.ctx.beginPath();
         this.ctx.moveTo(line.start.x, line.start.y);
