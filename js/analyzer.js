@@ -1,5 +1,5 @@
 /**
- * js/analyzer.js (Part 1 / 3)
+ * js/analyzer.js (Part 1 of 3)
  * 국궁 고각 분석 시스템 - 락 프리 최종 완결판
  */
 
@@ -19,6 +19,9 @@ class BowAnalyzer {
         // 선 편집 미세 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
+
+        // 💡 미션 반영: 실시간 가상 격자 레이어 토글용 독립 상태 변수 마운트 (기본값: 활성화)
+        this.showGrid = true;
 
         this.handlePointerDown = this.handlePointerDown.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
@@ -46,6 +49,13 @@ class BowAnalyzer {
     setMode(mode) {
         this.toolMode = mode;
         this.render();
+    }
+
+    // 💡 미션 파이프라인: 다른 기능에 간섭 없이 오직 그리드 표시 여부만 온/오프 스위칭하는 격리 메서드
+    toggleGridVisibility() {
+        this.showGrid = !this.showGrid;
+        this.render(); // 캔버스 독립 단방향 재주사 트리거
+        return this.showGrid;
     }
 
     clearLines() {
@@ -78,7 +88,7 @@ class BowAnalyzer {
         return { x: canvasX, y: canvasY };
     }
 /**
- * js/analyzer.js (Part 2 / 3)
+ * js/analyzer.js (Part 2 of 3)
  */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
@@ -224,7 +234,7 @@ class BowAnalyzer {
         return null;
     }
 /**
- * js/analyzer.js (Part 3 / 3)
+ * js/analyzer.js (Part 3 of 3)
  */
     calculateAnglesInline() {
         if (this.lines.length === 0 && this.currentLine) {
@@ -270,6 +280,9 @@ class BowAnalyzer {
     }
 
     drawBackgroundGrid(scaleX, canvasScaleY) {
+        // 💡 미션 격리 반영: showGrid 마커 플래그가 거짓(false)이면 백그라운드 격자 그리기 연산을 완전 스킵
+        if (!this.showGrid) return;
+
         this.ctx.save();
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
@@ -328,7 +341,6 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [참조 크래시 완전 해결] lines 배열 원본 전체 대신 첫 번째 선 객체인 this.lines[0]을 명확하게 타겟팅
             this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
         if (this.currentLine) {
