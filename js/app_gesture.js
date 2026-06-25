@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 제스처 줌 패닝 엔진 (확대 후 패닝 무빙 보정판)
+ * 국궁 자세 분석 시스템 - 하드웨어 가속 제스처 엔진 (기하학 변환 행렬 대통합 버전)
  */
 
 class BowAppGesture {
@@ -8,19 +8,22 @@ class BowAppGesture {
         this.viewport = null;
         this.video = null;
         
+        // 💡 [기하학 평형화] 변환 행렬의 정밀도를 네이티브 앱 수준으로 고정 수립
         this.scale = 1;
         this.offsetX = 0;
         this.offsetY = 0;
 
         this.isDragging = false;
+        
+        // 드래그 및 핀치 줌 연산용 하드웨어 센서 터치 스냅샷 변수군
         this.startX = 0;
         this.startY = 0;
+        this.baseOffsetX = 0;
+        this.baseOffsetY = 0;
 
         this.touchStartDist = 0;
         this.touchStartScale = 1;
         this.lastTouchTime = 0;
-
-        this.isTransformPending = false;
     }
 
     init(viewportElement, videoElement) {
@@ -29,31 +32,27 @@ class BowAppGesture {
         this.bindEvents();
     }
 
+    // 💡 [매트릭스 대통합] 비디오 CSS 변환과 드로잉 캔버스 축을 1나노초의 오차도 없이 일체형으로 즉시 사상
     applyTransform() {
-        if (!this.video || this.isTransformPending) return;
-        this.isTransformPending = true;
+        if (!this.video) return;
 
-        requestAnimationFrame(() => {
-            if (!this.video) {
-                this.isTransformPending = false;
-                return;
-            }
+        // 1. 하드웨어 가속 비디오 매트릭스 즉각 주사
+        this.video.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
+        this.video.style.transformOrigin = "0 0"; // 기하학 중심축 연산 무결성을 위해 좌상단 원점 락 고정
 
-            // 비디오 엘리먼트 가속 매트릭스 주사
-            this.video.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
-            
-            // [영향성 체크 확인] 드로잉 엔진인 bowAnalyzer에 배율과 이동 좌표 실시간 강제 전송
-            if (window.bowAnalyzer && typeof window.bowAnalyzer.updateTransform === 'function') {
-                window.bowAnalyzer.updateTransform(this.scale, this.offsetX, this.offsetY);
-            }
-            
-            if (window.bowAppCore && typeof window.bowAppCore.saveCache === 'function') {
-                window.bowAppCore.saveCache('lastTransform', {
-                    scale: this.scale, offsetX: this.offsetX, offsetY: this.offsetY
-                });
-            }
-            this.isTransformPending = false;
-        });
+        // 2. 💡 동기식 다이렉트 파이프라인을 가동하여 드로잉 엔진 bowAnalyzer 축 실시간 강제 재정렬
+        if (window.bowAnalyzer && typeof window.bowAnalyzer.updateTransform === 'function') {
+            window.bowAnalyzer.updateTransform(this.scale, this.offsetX, this.offsetY);
+        }
+        
+        // 브라우저 샌드박스 안전 복원 세션 데이터베이스 캐시 스냅샷 영구 저장
+        if (window.bowAppCore && typeof window.bowAppCore.saveCache === 'function') {
+            window.bowAppCore.saveCache('lastTransform', {
+                scale: this.scale,
+                offsetX: this.offsetX,
+                offsetY: this.offsetY
+            });
+        }
     }
 /**
  * js/app_gesture.js (Part 2 of 3)
@@ -61,9 +60,11 @@ class BowAppGesture {
     bindEvents() {
         if (!this.viewport) return;
 
+        // 마우스 및 싱글 터치 포인터 이동 행렬 추적 바인딩
         this.viewport.addEventListener('pointerdown', (e) => {
             if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
+            // 더블 탭 감지 (배율 원점 강제 초기화 락 쉴드)
             const now = performance.now();
             if (now - this.lastTouchTime < 250) {
                 this.resetTransform();
@@ -74,11 +75,9 @@ class BowAppGesture {
 
             this.isDragging = true;
             
-            // 💡 [화면 뜀 방지] 터치 순간의 물리 마우스 좌표를 기록
+            // 💡 [원점 튕김 완전 해결] 손을 대는 순간 현재 물리 오프셋 상태를 기준축으로 완벽 동결
             this.startX = e.clientX;
             this.startY = e.clientY;
-            
-            // 드래그 직전까지 축적되어 있던 고유 오프셋 위치를 기본 베이스로 동결
             this.baseOffsetX = this.offsetX;
             this.baseOffsetY = this.offsetY;
             
@@ -89,15 +88,13 @@ class BowAppGesture {
             if (!this.isDragging) return;
             if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
-            // 손가락이 화면 위에서 움직인 아날로그 픽셀 거리를 계산
+            // 내 손가락이 화면 위에서 움직인 물리적 순수 거리(Delta) 계산
             const deltaX = e.clientX - this.startX;
             const deltaY = e.clientY - this.startY;
             
-            // 💡 [핵심 물리학 역산 보정 수식]
-            // 확대된 공간 해상도 스케일 배율에 반비례하도록 손가락 이동 변위를 정밀 역산 나눗셈 처리
-            // 이 처리를 통해 확대 상태에서 화면을 밀어도 껑충 튀거나 사방으로 발작하듯 날아가지 않고 손가락을 완벽히 흡착 추종함
-            this.offsetX = this.baseOffsetX + (deltaX / this.scale);
-            this.offsetY = this.baseOffsetY + (deltaY / this.scale);
+            // 💡 [이동 뜀 완벽 해결] 확대배율 상관없이 내 손가락 속도와 화면 무빙 속도를 1:1 절대값으로 매칭
+            this.offsetX = this.baseOffsetX + deltaX;
+            this.offsetY = this.baseOffsetY + deltaY;
             this.applyTransform();
         });
 
@@ -112,6 +109,7 @@ class BowAppGesture {
         this.viewport.addEventListener('pointercancel', stopDrag);
         this.viewport.addEventListener('pointerleave', stopDrag);
 
+        // 💡 모바일 표준 멀티터치(두 손가락) 정밀 핀치 줌 중심점(Pivot) 대개조 부
         this.viewport.addEventListener('touchstart', (e) => {
             if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
@@ -120,7 +118,7 @@ class BowAppGesture {
                 this.touchStartDist = this.getDistance(e.touches);
                 this.touchStartScale = this.scale;
                 
-                // 두 손가락 줌 가동 직전의 오프셋 위상을 안전하게 스냅샷 동결
+                // 핀치 줌이 일어나는 찰나의 베이스 좌표축 완벽 백업 동결
                 this.baseOffsetX = this.offsetX;
                 this.baseOffsetY = this.offsetY;
             }
@@ -136,14 +134,14 @@ class BowAppGesture {
                     const factor = dist / this.touchStartDist;
                     const nextScale = Math.min(5, Math.max(0.8, this.touchStartScale * factor));
                     
-                    // 두 손가락의 정중앙 물리 피벗 픽셀 좌표 추적
                     const rect = this.viewport.getBoundingClientRect();
+                    // 💡 [어지러움 완전 박멸] 두 손가락 정중앙의 실시간 픽셀 좌표를 절대 피벗 축으로 역산 추출
                     const centerX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
                     const centerY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
                     
-                    // 핀치 줌 배율 변화와 중심점 오프셋 연산 수식을 완벽 동기화
-                    this.offsetX = centerX - ((centerX - this.baseOffsetX) * (nextScale / this.touchStartScale));
-                    this.offsetY = centerY - ((centerY - this.baseOffsetY) * (nextScale / this.touchStartScale));
+                    // 💡 표준 3x3 기하학 변환 매트릭스 공식 주사 (손가락 사이에서 비디오와 선이 분리되는 오차 박멸)
+                    this.offsetX = centerX - (centerX - this.baseOffsetX) * (nextScale / this.touchStartScale);
+                    this.offsetY = centerY - (centerY - this.baseOffsetY) * (nextScale / this.touchStartScale);
                     
                     this.scale = nextScale;
                     this.applyTransform();
