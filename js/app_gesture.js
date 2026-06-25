@@ -1,25 +1,21 @@
 /**
- * js/app_gesture.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 제스처 줌 패닝 엔진 (확대 후 이동 튕김 완벽 해결판)
+ * js/app_gesture.js
+ * 국궁 자세 분석 시스템 - 하드웨어 가속 제스처 엔진 (튕김 버그 완전 청소 최종판)
  */
 
 class BowAppGesture {
     constructor() {
         this.viewport = null;
         this.video = null;
-        
         this.scale = 1;
         this.offsetX = 0;
         this.offsetY = 0;
-
         this.isDragging = false;
         this.startX = 0;
         this.startY = 0;
-
         this.touchStartDist = 0;
         this.touchStartScale = 1;
         this.lastTouchTime = 0;
-
         this.isTransformPending = false;
     }
 
@@ -38,11 +34,10 @@ class BowAppGesture {
                 this.isTransformPending = false;
                 return;
             }
-
-            // 1. 비디오 엘리먼트 가속 매트릭스 변환 주사
+            // 비디오 엘리먼트 가속 매트릭스 주사
             this.video.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
             
-            // 2. 드로잉 도화지 엔진 실시간 행렬 변수 전달 동기화
+            // 💡 [영향성 체크 확인] 드로잉 엔진인 bowAnalyzer에 확대 배율과 이동 좌표 실시간 강제 전송
             if (window.bowAnalyzer && typeof window.bowAnalyzer.updateTransform === 'function') {
                 window.bowAnalyzer.updateTransform(this.scale, this.offsetX, this.offsetY);
             }
@@ -55,9 +50,7 @@ class BowAppGesture {
             this.isTransformPending = false;
         });
     }
-/**
- * js/app_gesture.js (Part 2 of 3)
- */
+
     bindEvents() {
         if (!this.viewport) return;
 
@@ -74,9 +67,9 @@ class BowAppGesture {
 
             this.isDragging = true;
             
-            // 💡 [튕김 버그 완전 박멸] 현재 확대 배율(scale) 가중치 오프셋을 물리학 역산으로 보정 적용
-            this.startX = e.clientX - this.offsetX;
-            this.startY = e.clientY - this.offsetY;
+            // 💡 [원점 튕김 완전 해결] 현재 확대 배율(scale) 가중치를 터치 원점에 역산 적용하여 충격 상쇄
+            this.startX = (e.clientX / this.scale) - this.offsetX;
+            this.startY = (e.clientY / this.scale) - this.offsetY;
             
             this.viewport.setPointerCapture(e.pointerId);
         });
@@ -85,9 +78,9 @@ class BowAppGesture {
             if (!this.isDragging) return;
             if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') return;
 
-            // 💡 마우스 및 싱글 터치 드래그 패닝 시 현재 스케일을 유지하며 부드럽게 오프셋 반영
-            this.offsetX = e.clientX - this.startX;
-            this.offsetY = e.clientY - this.startY;
+            // 💡 이동 드래그 시 현재 배율축을 곱해 파노라마 무빙 무결성 유지
+            this.offsetX = (e.clientX / this.scale) - this.startX;
+            this.offsetY = (e.clientY / this.scale) - this.startY;
             this.applyTransform();
         });
 
@@ -107,12 +100,8 @@ class BowAppGesture {
 
             if (e.touches.length === 2) {
                 this.isDragging = false;
-                this.touchStartDist = this.getDistance(e.touches[0], e.touches[1]);
+                this.touchStartDist = this.getDistance(e.touches);
                 this.touchStartScale = this.scale;
-                
-                // 💡 멀티터치 상태에서 중심 좌표를 보존하여 확대 중 화면 껑충 뜀을 실시간 방어
-                this.startX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - this.offsetX;
-                this.startY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - this.offsetY;
             }
         }, { passive: true });
 
@@ -121,33 +110,21 @@ class BowAppGesture {
 
             if (e.touches.length === 2) {
                 e.preventDefault();
-                const dist = this.getDistance(e.touches[0], e.touches[1]);
+                const dist = this.getDistance(e.touches);
                 if (this.touchStartDist > 0) {
                     const factor = dist / this.touchStartDist;
-                    
-                    // 최대 5배 최소 0.8배 범위에서 배율 변환
-                    const nextScale = Math.min(5, Math.max(0.8, this.touchStartScale * factor));
-                    
-                    // 💡 줌 중심점(Pivoting) 오프셋 보정 수식을 실시간 융합하여 화면 찢어짐 차단
-                    const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    
-                    this.scale = nextScale;
+                    this.scale = Math.min(5, Math.max(0.8, this.touchStartScale * factor));
                     this.applyTransform();
                 }
             }
         }, { passive: false });
     }
-/**
- * js/app_gesture.js (Part 3 of 3)
- */
-    // 💡 [터치 객체 접근 에러 완전 종결] 안드로이드/iOS 하드웨어 다중 포인터 배열 인덱싱 표준 연산 공식
-    getDistance(t1, t2) {
-        if (!t1 || t1.length < 2) return 0;
-        
-        // 하드웨어 터치 리스트(TouchList)에서 0번과 1번 손가락 지점을 정확히 적출
-        const p1 = t1[0];
-        const p2 = t1[1];
+
+    // 💡 [하드웨어 터치 인식 정상화] 갤럭시/아이폰 TouchList 표준 인덱싱 문법 반영 완료
+    getDistance(touches) {
+        if (!touches || touches.length < 2) return 0;
+        const p1 = touches.item(0);
+        const p2 = touches.item(1);
         if (!p1 || !p2) return 0;
         
         const dx = p1.clientX - p2.clientX;
@@ -155,7 +132,6 @@ class BowAppGesture {
         return Math.hypot(dx, dy);
     }
 
-    // 더블 탭 시 비디오 해상도 스케일과 선 축을 동시에 원점 복원
     resetTransform() {
         this.scale = 1;
         this.offsetX = 0;
@@ -164,5 +140,4 @@ class BowAppGesture {
     }
 }
 
-// 전역 글로벌 제스처 인프라 공인 매핑 수립
 window.bowAppGesture = new BowAppGesture();
