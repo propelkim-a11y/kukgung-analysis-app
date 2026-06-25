@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
 
-    // 💡 미션 반영: 기기 성능 감지 후 기본 세팅값을 고속 촬영 규격(120 FPS)으로 강제 상향 리비전
+    // 기기 성능 감지 후 기본 세팅값을 고속 촬영 규격(120 FPS)으로 강제 상향 리비전
     const cpuCores = navigator.hardwareConcurrency || 4;
     let selectedFPS = cpuCores > 4 ? 120 : 30;
 
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
+    // [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
     core.initDB().then(async () => {
         // 객체 참조 무결성을 위해 하드웨어 엔진 모듈들을 안전하게 순차 기동
         gesture.init(nodes.videoViewport, nodes.mainVideo);
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fpsButtons = document.querySelectorAll('.fps-btn');
     
-    // 💡 고속 촬영 주파수 차단 마크업 제어 및 초기 활성화 단추 정밀 동기화
+    // 고속 촬영 주파수 차단 마크업 제어 및 초기 활성화 단추 정밀 동기화
     fpsButtons.forEach(btn => {
         const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
         
@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.style.pointerEvents = 'none';
         }
         
-        // 💡 120FPS 설정값에 맞춰 하단 텍스트 바 선택 마커 UI 클래스 동적 재정렬
+        // 120FPS 설정값에 맞춰 하단 텍스트 바 선택 마커 UI 클래스 동적 재정렬
         if (fpsVal === selectedFPS) {
             fpsButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -209,6 +209,45 @@ document.addEventListener('DOMContentLoaded', () => {
  * js/app.js (Part 3 of 3)
  */
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
+
+    // 💡 미션 반영 및 확장: [열기] 버튼 클릭 시 숨겨진 파일 셀렉터 강제 개방 리스너 바인딩
+    if (nodes.btnOpen) {
+        nodes.btnOpen.addEventListener('click', () => {
+            if (nodes.videoInput) nodes.videoInput.click();
+        });
+    }
+
+    // 💡 외부 비디오 업로드 파일 변경 감지 이벤트 엔지니어링 이식
+    if (nodes.videoInput) {
+        nodes.videoInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            nodes.mainVideo.pause();
+            nodes.btnPlayPause.textContent = '재생';
+
+            // 영속 스토리지 파이프라인에 외부 비디오 소스 가두기 보정
+            try {
+                await core.saveCache('lastVideoBlob', file);
+                await core.saveCache('lastRecordedMime', file.type || 'video/webm');
+            } catch (err) {
+                console.error('[Storage] 외부 파일 캐시 저장 예외 보호:', err);
+            }
+
+            // 비디오 엘리먼트 소스 교체 및 새로고침 로드 시동
+            const videoURL = URL.createObjectURL(file);
+            nodes.mainVideo.src = videoURL;
+            nodes.mainVideo.load();
+
+            // 새로운 영상 로드에 맞춰 기존 작도 데이터 리셋 및 뷰포트 정렬 동기화
+            if (window.bowAnalyzer) {
+                window.bowAnalyzer.clearLines();
+                window.bowAnalyzer.setMode('move');
+            }
+            setActiveMenu(nodes.btnMove);
+            setTimeout(resizeCanvasToDisplay, 100);
+        });
+    }
 
     nodes.btnRecordToggle.addEventListener('click', () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -387,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
+        nodes.btnPlayPause.textContent = '재gen';
         nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
         startFrameRepeat('prev');
     });
