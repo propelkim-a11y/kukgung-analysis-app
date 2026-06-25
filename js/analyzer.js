@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js (Part 1 of 4)
- * 국궁 고각 분석 시스템 - 락 프리 대완결판 (그리드 평형 동기화 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 대완결판 (그리드 왜곡 완벽 박멸 버전)
  */
 
 class BowAnalyzer {
@@ -184,7 +184,7 @@ class BowAnalyzer {
             if (this.lines.length >= 2) {
                 this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
             } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines));
+                this.broadcastAngle(this.getLineAngle(this.lines[0]));
             }
         } 
         else if (this.currentLine) {
@@ -266,7 +266,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line : line;
+        const singleLine = Array.isArray(line) ? line[0] : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -289,13 +289,10 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    // 💡 [그리드 왜곡 박멸 핵심부 1] vScale 중복 곱 연산을 원천 차단하여 일정한 크기 격자 고정
     drawBackgroundGrid(scaleX, xOff, yOff) {
         this.ctx.save();
         this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
         this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        
-        // 💡 화면 회전 배율 가중치를 전면 걷어내고 순수 절대 픽셀(50px) 간격으로 모눈 격자 규격 락 고정
         const gridSize = 50; 
         const wBound = this.canvas.width / this.transform.scale;
         const hBound = this.canvas.height / this.transform.scale;
@@ -335,7 +332,6 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
-    // 💡 [그리드 왜곡 박멸 핵심부 2] 렌더러 내부에서 drawBackgroundGrid 호출 시 vScale 인자를 안전하게 분리 제거
     render() {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -367,7 +363,6 @@ class BowAnalyzer {
         this.ctx.translate((this.transform.offsetX * canvasScale) + xOffset * canvasScale, (this.transform.offsetY * canvasScale) + yOffset * canvasScale);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        // 💡 이중 곱 연산으로 크기가 비정상적으로 튀던 원인 제거 완료
         this.drawBackgroundGrid(canvasScale, xOffset * canvasScale, yOffset * canvasScale);
         
         this.ctx.lineWidth = (2 * canvasScale * vScale) / this.transform.scale; 
@@ -378,7 +373,8 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], canvasScale, vScale);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, canvasScale, vScale);
+            // 💡 [그리드 왜곡 원천 박멸] lines 배열 원본 대신 첫 번째 단선 객체([0] 인덱스)를 정확히 명시하여 사상 처리 완료
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, canvasScale, vScale);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
