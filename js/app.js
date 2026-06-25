@@ -95,6 +95,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 💡 미션 반영: 갤럭시 S펜 리모트 버튼 누름 감지 및 원격 카메라 셔터 인터락 연동
+    window.addEventListener('keydown', (event) => {
+        // S펜 버튼 원격 클릭 시 전송되는 키 코드 매핑 가로채기
+        if (event.key === 'MediaPlayPause' || event.keyCode === 179) {
+            // 현재 활성화된 UI 스크린이 '촬영 모드'일 때만 조건부 정밀 개입
+            if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (nodes.btnRecordToggle) {
+                    nodes.btnRecordToggle.click(); // 가상 클릭을 트리거하여 물리 녹화 파이프라인 시동
+                }
+            }
+        }
+    });
+
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
