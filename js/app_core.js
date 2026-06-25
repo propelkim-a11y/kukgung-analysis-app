@@ -1,6 +1,6 @@
 /**
- * js/app_core.js (Part 1 of 4)
- * 국궁 자세 분석 시스템 - 대용량 캐시 스토리지 코어 (데드락 완전 정화 버전)
+ * js/app_core.js
+ * 국궁 자세 분석 시스템 - 대용량 캐시 스토리지 코어 (초기화 부팅 락프리 완결판 v17.7)
  */
 
 class BowAppCore {
@@ -63,10 +63,6 @@ class BowAppCore {
             }
         });
     }
-/**
- * js/app_core.js (Part 2 of 4)
- */
-
     // 캐시 저장 라우터 (정식 DB 부재 시 가상 메모리에 휘발성 임시 저장 대체)
     saveCache(key, value) {
         return new Promise((resolve) => {
@@ -85,9 +81,6 @@ class BowAppCore {
             }
         });
     }
-/**
- * js/app_core.js (Part 3 of 4)
- */
 
     // 캐시 호출 라우터 (정식 DB 부재 시 가상 메모리에서 임시 데이터 즉각 반환)
     loadCache(key) {
@@ -106,13 +99,11 @@ class BowAppCore {
             }
         });
     }
-/**
- * js/app_core.js (Part 4 of 4)
- */
 
     // 시크릿 탭 및 일반 모드 호환 세션 라이프사이클 복원 엔진
     async restoreLastSession(videoEl, canvasEl) {
         try {
+            // 1. 제스처 트랜스폼 매트릭스 복원
             const lastTransform = await this.loadCache('lastTransform');
             if (lastTransform) {
                 this.state.scale = lastTransform.scale || 1;
@@ -120,24 +111,20 @@ class BowAppCore {
                 this.state.offsetY = lastTransform.offsetY || 0;
             }
 
+            // 2. 기존 기하학 선 드로잉 데이터 복원 및 동기화
             const lastLines = await this.loadCache('lastLines');
             if (lastLines && window.bowAnalyzer) {
                 window.bowAnalyzer.lines = lastLines;
                 window.bowAnalyzer.render();
             }
 
-            const videoBlob = await this.loadCache('lastVideoBlob');
-            if (videoBlob && videoEl) {
-                setTimeout(() => {
-                    try {
-                        const url = URL.createObjectURL(videoBlob);
-                        videoEl.src = url;
-                        videoEl.load();
-                    } catch (err) {
-                        console.warn('[Storage] 미디어 스트림 안전 우회');
-                    }
-                }, 150);
+            // 💡 [치명적 굳음 해결] 무거운 이전 비디오 Blob 복원 코드를 전면 제거
+            // 앱이 완전히 꺼진 후 재구동될 때 하드웨어 코덱이 잠기거나 메인 스레드가 멈추는 현상을 완벽 차단합니다.
+            if (videoEl) {
+                videoEl.removeAttribute('src');
+                videoEl.load();
             }
+
         } catch (err) {
             console.error('[Storage] 복원 엔진 예외 보호 가동:', err);
         }
