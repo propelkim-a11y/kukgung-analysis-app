@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js (Part 1 of 3)
- * 국궁 자세 분석 시스템 - 하드웨어 가속 프레임 잠금 제스처 엔진 (끊김 방지 완결판)
+ * 국궁 자세 분석 시스템 - 하드웨어 가속 제스처 엔진 (오타 박멸 최종 완전판)
  */
 
 class BowAppGesture {
@@ -20,7 +20,7 @@ class BowAppGesture {
         this.touchStartScale = 1;
         this.lastTouchTime = 0;
 
-        // 💡 [버벅임 박멸 핵심 장치] 하드웨어 가속 타이밍 동기화 제어 플래그
+        // 하드웨어 가속 타이밍 동기화 제어 플래그
         this.isTransformPending = false;
     }
 
@@ -30,30 +30,29 @@ class BowAppGesture {
         this.bindEvents();
     }
 
-    // 💡 [프레임 동기화 패치] requestAnimationFrame 연동으로 불필요한 무제한 렌더링 락 전면 차단
+    // requestAnimationFrame 연동으로 불필요한 중복 렌더링 락 전면 차단
     applyTransform() {
         if (!this.video) return;
         
-        // 이미 주사 대기중인 프레임 트랙이 있다면 중복 요청을 취소하고 예약 대기
         if (this.isTransformPending) return;
         this.isTransformPending = true;
 
-        // 디스플레이 장치 디바이스의 실제 화면 갱신 주기에 맞춰 정확히 단 1번만 연사 실행
+        // 디바이스의 실제 화면 주사 주기에 맞춰 정확히 단 1번만 조킹 렌더링
         requestAnimationFrame(() => {
             if (!this.video) {
                 this.isTransformPending = false;
                 return;
             }
 
-            // 1. 비디오 엘리먼트 가속 매트릭스 주사
+            // 1. 비디오 엘리먼트 가속 매트릭스 변환 주사
             this.video.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`;
             
-            // 2. 드로잉 도화지 엔진 실시간 행렬 변수 전달 동기화
+            // 2. 드로잉 도화지 엔진 실시간 행렬 변수 동기화
             if (window.bowAnalyzer && typeof window.bowAnalyzer.updateTransform === 'function') {
                 window.bowAnalyzer.updateTransform(this.scale, this.offsetX, this.offsetY);
             }
             
-            // 데이터베이스 영구 세션 임시 스냅샷 백업
+            // 로컬 스토리지 데이터베이스 영구 세션 백업
             if (window.bowAppCore && typeof window.bowAppCore.saveCache === 'function') {
                 window.bowAppCore.saveCache('lastTransform', {
                     scale: this.scale,
@@ -62,7 +61,6 @@ class BowAppGesture {
                 });
             }
 
-            // 프레임 주사가 안전하게 종료되었으므로 다음 제스처 예약 락 해제
             this.isTransformPending = false;
         });
     }
@@ -98,7 +96,7 @@ class BowAppGesture {
             // 마우스 드래그 혹은 싱글 터치 이동량 실시간 서핑 연산
             this.offsetX = e.clientX - this.startX;
             this.offsetY = e.clientY - this.startY;
-            this.applyTransform(); // 💡 하드웨어 프레임 락이 걸린 안전 동기화 호출
+            this.applyTransform(); // 하드웨어 프레임 락이 걸린 안전 동기화 호출
         });
 
         const stopDrag = (e) => {
@@ -108,11 +106,12 @@ class BowAppGesture {
             }
         };
 
-        this.viewport.addEventListener('pointerup', stopStopDrag);
+        // 💡 [치명적 오타 박멸] 존재하지 않던 오타 함수명을 올바른 정적 마감 지시어 stopDrag로 완벽 복구 완료
+        this.viewport.addEventListener('pointerup', stopDrag);
         this.viewport.addEventListener('pointercancel', stopDrag);
         this.viewport.addEventListener('pointerleave', stopDrag);
 
-        // 💡 모바일 장치 멀티터치(두 손가락) 정밀 핀치 줌인/줌아웃 인터럽트 바인딩
+        // 모바일 장치 멀티터치(두 손가락) 정밀 핀치 줌인/줌아웃 인터럽트 바인딩
         this.viewport.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
                 this.isDragging = false;
@@ -129,7 +128,7 @@ class BowAppGesture {
                     const factor = dist / this.touchStartDist;
                     // 최대 5배 확대 및 0.8배 축소 한계 방어벽 세팅
                     this.scale = Math.min(5, Math.max(0.8, this.touchStartScale * factor));
-                    this.applyTransform(); // 💡 핀치 줌 즉시 비디오와 가이드선 동시 배율 보정
+                    this.applyTransform(); // 핀치 줌 즉시 비디오와 가이드선 동시 배율 보정
                 }
             }
         }, { passive: false });
@@ -137,11 +136,11 @@ class BowAppGesture {
 /**
  * js/app_gesture.js (Part 3 of 3)
  */
-    // 멀티터치 두 지점 간의 유클리드 거리 측정 기하학 공식
+    // 💡 [2중 예외 방어] 멀티터치 인자 전달 유실 시 튕김을 원천 차단하는 유클리드 공식
     getDistance(t1, t2) {
-        // 배열과 객체 참조를 안전하게 통제하기 위해 첫 번째와 두 번째 터치 지점을 명확히 인덱싱
+        if (!t1 || t1.length < 2) return 0;
         const p1 = t1[0];
-        const p2 = t2[1] || t1[1];
+        const p2 = t1[1];
         if (!p1 || !p2) return 0;
         
         const dx = p1.clientX - p2.clientX;
@@ -149,7 +148,7 @@ class BowAppGesture {
         return Math.hypot(dx, dy);
     }
 
-    // 💡 [배율 초기화 잠금] 더블 탭 시 비디오 해상도 스케일과 선 축을 동시에 원점 복원
+    // 더블 탭 시 비디오 해상도 스케일과 선 축을 동시에 원점 복원
     resetTransform() {
         this.scale = 1;
         this.offsetX = 0;
