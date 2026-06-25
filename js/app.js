@@ -210,18 +210,19 @@ document.addEventListener('DOMContentLoaded', () => {
  */
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
 
-    // 💡 미션 반영 및 확장: [열기] 버튼 클릭 시 숨겨진 파일 셀렉터 강제 개방 리스너 바인딩
+    // [열기] 버튼 클릭 시 숨겨진 파일 셀렉터 강제 개방 리스너 바인딩
     if (nodes.btnOpen) {
         nodes.btnOpen.addEventListener('click', () => {
             if (nodes.videoInput) nodes.videoInput.click();
         });
     }
 
-    // 💡 외부 비디오 업로드 파일 변경 감지 이벤트 엔지니어링 이식
+    // 💡 타 기능 영향도 격리 검토: FileList에서 명확히 첫 번째 파일 객체만 안전하게 타겟팅하여 참조 예외 차단
     if (nodes.videoInput) {
         nodes.videoInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            const file = files[0]; // 단수 파일 객체 추출로 미디어 엔진과 크래시 유발 방지
 
             nodes.mainVideo.pause();
             nodes.btnPlayPause.textContent = '재생';
@@ -426,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재gen';
+        nodes.btnPlayPause.textContent = '재생';
         nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
         startFrameRepeat('prev');
     });
