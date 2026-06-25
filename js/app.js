@@ -1,5 +1,5 @@
 /**
- * js/app.js (Part 1 of 3)
+ * js/app.js (Part 1 of 4)
  * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합본 (시크릿 탭 무조건 락 해제 판)
  */
 
@@ -62,7 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
-
+/**
+ * js/app.js (Part 2 of 4)
+ */
     // [치명적 타이밍 버그 해결] 가상 스토리지 마운트 완료 신호를 받은 뒤 순차 부팅 시동
     core.initDB().then(async () => {
         // 객체 참조 무결성을 위해 하드웨어 엔진 모듈들을 안전하게 순차 기동
@@ -86,13 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 동적 실시간 각도 리포트 UI 텍스트 동기화 리스너 영구 결합 (타 기능 영향 제로)
+    window.addEventListener('bowAngleUpdate', (e) => {
+        if (nodes.angleReport) {
+            nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
+        }
+    });
+
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-/**
- * js/app.js (Part 2 of 3)
- */
+
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -150,20 +157,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         nodes.cameraPreview.srcObject = null;
     }
-
+/**
+ * js/app.js (Part 3 of 4)
+ */
     const fpsButtons = document.querySelectorAll('.fps-btn');
     
-    // 고속 촬영 주파수 차단 마크업 제어 및 초기 활성화 단추 정밀 동기화
     fpsButtons.forEach(btn => {
         const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
         
-        // 저사양 하드웨어 프리징 이슈 원천 격리 규칙 유지
         if (cpuCores <= 4 && fpsVal >= 120) {
             btn.style.opacity = '0.25';
             btn.style.pointerEvents = 'none';
         }
         
-        // 120FPS 설정값에 맞춰 하단 텍스트 바 선택 마커 UI 클래스 동적 재정렬
         if (fpsVal === selectedFPS) {
             fpsButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -205,29 +211,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
         setTimeout(resizeCanvasToDisplay, 100);
     }
-/**
- * js/app.js (Part 3 of 3)
- */
+
     nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
 
-    // [열기] 버튼 클릭 시 숨겨진 파일 셀렉터 강제 개방 리스너 바인딩
     if (nodes.btnOpen) {
         nodes.btnOpen.addEventListener('click', () => {
             if (nodes.videoInput) nodes.videoInput.click();
         });
     }
 
-    // 💡 타 기능 영향도 격리 검토: FileList에서 명확히 첫 번째 파일 객체만 안전하게 타겟팅하여 참조 예외 차단
+    if (nodes.btnMove) {
+        nodes.btnMove.addEventListener('click', () => {
+            setActiveMenu(nodes.btnMove);
+            if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
+        });
+    }
+
+    if (nodes.btnDraw) {
+        nodes.btnDraw.addEventListener('click', () => {
+            setActiveMenu(nodes.btnDraw);
+            if (window.bowAnalyzer) window.bowAnalyzer.setMode('draw');
+        });
+    }
+
+    if (nodes.btnReset) {
+        nodes.btnReset.addEventListener('click', () => {
+            if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+            core.state.scale = 1;
+            core.state.offsetX = 0;
+            core.state.offsetY = 0;
+            gesture.applyTransform();
+        });
+    }
+/**
+ * js/app.js (Part 4 of 4)
+ */
     if (nodes.videoInput) {
         nodes.videoInput.addEventListener('change', async (e) => {
             const files = e.target.files;
             if (!files || files.length === 0) return;
-            const file = files[0]; // 단수 파일 객체 추출로 미디어 엔진과 크래시 유발 방지
+            const file = files[0];
 
             nodes.mainVideo.pause();
             nodes.btnPlayPause.textContent = '재생';
 
-            // 영속 스토리지 파이프라인에 외부 비디오 소스 가두기 보정
             try {
                 await core.saveCache('lastVideoBlob', file);
                 await core.saveCache('lastRecordedMime', file.type || 'video/webm');
@@ -235,12 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('[Storage] 외부 파일 캐시 저장 예외 보호:', err);
             }
 
-            // 비디오 엘리먼트 소스 교체 및 새로고침 로드 시동
             const videoURL = URL.createObjectURL(file);
             nodes.mainVideo.src = videoURL;
             nodes.mainVideo.load();
 
-            // 새로운 영상 로드에 맞춰 기존 작도 데이터 리셋 및 뷰포트 정렬 동기화
             if (window.bowAnalyzer) {
                 window.bowAnalyzer.clearLines();
                 window.bowAnalyzer.setMode('move');
