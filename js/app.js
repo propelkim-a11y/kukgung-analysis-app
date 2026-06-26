@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.4 - 수평선 정중앙 복원 보정판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.5 - 초기 부팅 프리징 완전 정화 및 수평계 정중앙 마스터 패치)
  */
 
 window.bowAppNodes = {};
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -61,16 +61,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 UI 인프라 및 제스처/분석 캔버스 하드웨어를 최우선 동기 결합하여 타이밍 락 프리징 원천 봉쇄
+    // 💡 하드웨어 기동 순서 매핑: 모듈 바인딩 및 뷰포트 레이아웃 정렬을 최우선 실행합니다.
     gesture.init(nodes.videoViewport, nodes.mainVideo);
     if (window.bowAnalyzer) {
         window.bowAnalyzer.init(nodes.drawCanvas);
     }
     
     resizeCanvasToDisplay();
-    gesture.applyTransform();
 
-    // 완벽 안착 후 스토리지 코어를 연동하여 과거 세션 노출
+    // 💡 [치명적 굳음 완전 박멸] 초기 구동 시 IndexedDB 상태 로드 전에 캔버스를 강제 가속 제어하던 
+    // gesture.applyTransform() 실행 구문을 이곳에서 완벽하게 제거하여 부팅 락을 원천 파괴했습니다.
     core.initDB().then(async () => {
         try {
             await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
@@ -88,6 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
+    // 💡 [첫 터치 안전 인터락 통합] 사용자가 스마트폰 화면을 터치하는 안전한 컨텍스트 환경에서만
+    // 센서 언락과 카메라 시동, 그리고 제스처 엔진의 최초 매트릭스 정렬(`applyTransform`)을 동시 수행시켜 프리징을 소멸시킵니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -96,6 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
             await startCamera();
         }
+        
+        // 터치 해제 후 제스처 엔진의 첫 중심축 행렬을 안전하게 주사
+        if (gesture && typeof gesture.applyTransform === 'function') {
+            gesture.applyTransform();
+        }
+        
         window.removeEventListener('click', triggerSensorUnlock);
         window.removeEventListener('touchstart', triggerSensorUnlock);
     };
@@ -405,20 +413,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setActiveMenu(nodes.btnOpen);
         if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            window.bowAnalyzer.setMode('move');
-        }
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
-
-    nodes.btnMove.addEventListener('click', () => {
-        setActiveMenu(nodes.btnMove);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('move');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnDraw.addEventListener('click', () => {
-        setActiveMenu(nodes.btnDraw);
-        if (window.bow
+            window.bowAnalyzer.
