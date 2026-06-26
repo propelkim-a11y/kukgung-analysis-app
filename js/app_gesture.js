@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js - [Part 1]
- * 국궁 자세 분석 앱 - 멀티 터치 제스처 처리기 (확대 시 선분 위치 밀림 및 선긋기 오작동 박멸 완결판 v18.2)
+ * 국궁 자세 분석 앱 - 멀티 터치 제스처 처리기 (영상 내 좌표 완전 고정 완결판 v18.5)
  */
 
 class BowAppGesture {
@@ -34,7 +34,6 @@ class BowAppGesture {
     }
 
     handlePointerDown(e) {
-        // 💡 [선긋기 모드 최우선 인터락] 선긋기 모드일 때는 제스처 엔진의 모든 추적 포인터를 강제 소거하고 제어권 양보
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') {
             this.activePointers.clear();
             if (this.core && this.core.state) {
@@ -55,8 +54,8 @@ class BowAppGesture {
         } else if (this.activePointers.size === 2) {
             state.isDragging = false;
             const pointers = Array.from(this.activePointers.values());
-            // 💡 [기하학 오타 치유 완료] pointers[0]과 pointers[1]의 인덱스를 정밀 삽입하여 실제 거리 연산 가동
-            this.initialDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
+            this.initialDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, 
+                                          pointers[0].clientY - pointers[1].clientY);
             this.initialScale = state.scale;
         }
     }
@@ -71,8 +70,8 @@ class BowAppGesture {
         
         if (this.activePointers.size === 2) {
             const pointers = Array.from(this.activePointers.values());
-            // 💡 [기하학 오타 치유 완료] 멀티 터치 줌팩터 연산 시 인덱스 무결성 싱크 정렬 완료
-            const currentDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
+            const currentDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, 
+                                           pointers[0].clientY - pointers[1].clientY);
             if (this.initialDist > 0) {
                 const factor = currentDist / this.initialDist;
                 this.applyZoom(this.initialScale * factor);
@@ -122,29 +121,31 @@ class BowAppGesture {
         this.applyTransform();
     }
 
-    // 💡 [무한 재귀 차단 패치 및 매트릭스 싱크 축 정렬 완료]
-    // 변환 행렬을 동기화할 때 캔버스 좌표계와 비디오의 변환 기준 중심축(Origin)을 좌상단으로 강제 통일하여 위치 밀림 완벽 박멸
+    // 💡 [동영상 좌표 락온 패치 마감]
+    // 비디오와 캔버스 엘리먼트의 transform 배율 및 원점 축을 1:1 완벽히 동조시켜 영상 확대이동 시 좌표 겉돎 현상 박멸
     applyTransform() {
         if (!this.core || !this.core.state) return;
         const state = this.core.state;
+        const transformStyle = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
         
         if (this.video) {
-            // 💡 [핵심 보정] 비디오의 CSS 변환 기준 중심축을 좌상단(top left)으로 확고히 매핑
             this.video.style.transformOrigin = 'top left';
-            this.video.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
+            this.video.style.transform = transformStyle;
         }
         
         const canvasEl = document.getElementById('draw-canvas');
         if (canvasEl) {
-            // 캔버스 자체의 엘리먼트 transform 변형을 방해 해제하여 비디오 좌표와 정렬 싱크 유지
-            canvasEl.style.transform = 'none';
+            // 💡 [핵심 보정] 캔버스 엘리먼트 자체에도 비디오와 완벽히 똑같은 원점 및 CSS transform 주입
+            canvasEl.style.transformOrigin = 'top left';
+            canvasEl.style.transform = transformStyle;
         }
         
-        // 대리 변수 업데이트 방식으로 결함 추적 차단하여 무한 프리징 원천 봉쇄
+        // 캔버스 자체 스케일과 변형 상태 업데이트 파이프라인
         if (window.bowAnalyzer && window.bowAnalyzer.transform) {
-            window.bowAnalyzer.transform.scale = state.scale;
-            window.bowAnalyzer.transform.offsetX = state.offsetX;
-            window.bowAnalyzer.transform.offsetY = state.offsetY;
+            // 엘리먼트가 직접 같이 커지고 움직이므로 내부 좌표 렌더링 역산 배율을 물리 싱크에 맞게 1로 보정 유도
+            window.bowAnalyzer.transform.scale = 1;
+            window.bowAnalyzer.transform.offsetX = 0;
+            window.bowAnalyzer.transform.offsetY = 0;
             
             // 상호 재귀가 발생하지 않는 독립 렌더 파이프라인 단방향 주사
             window.bowAnalyzer.render();
