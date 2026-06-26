@@ -1,17 +1,15 @@
 /**
- * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.6 - window.load 물리 렌더 안정 정렬판)
+ * js/app.js - [Part 1]
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
+ * (v27.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 1)
  */
 
 window.bowAppNodes = {};
 
-// 💡 [프리징 박멸 핵심] DOMContentLoaded의 성급한 하드웨어 접근을 차단하고,
-// 브라우저의 그래픽 가속 세션 및 미디어 인프라 렌더링이 100% 완료된 물리적 안전 타이밍에 시스템을 시동합니다.
 window.addEventListener('load', () => {
     const core = window.bowAppCore;
     const gesture = window.bowAppGesture;
 
-    // 1. 공용 DOM 핵심 노드 전역 인프라 매핑
     const nodes = window.bowAppNodes;
     nodes.sceneRecord = document.getElementById('scene-record');
     nodes.sceneAnalyze = document.getElementById('scene-analyze');
@@ -37,6 +35,7 @@ window.addEventListener('load', () => {
     nodes.videoInput = document.getElementById('video-input');
     
     nodes.btnDownloadVideo = document.getElementById('btn-download-video');
+    nodes.btnCapture = document.getElementById('btn-capture');
 
     nodes.videoSlider = document.getElementById('video-slider');
     nodes.btnFramePrev = document.getElementById('btn-frame-prev');
@@ -46,8 +45,8 @@ window.addEventListener('load', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
     function resizeCanvasToDisplay() {
+        if (!nodes.drawCanvas) return;
         const width = window.innerWidth;
         const height = window.innerHeight;
         const dpr = window.devicePixelRatio || 1;
@@ -63,39 +62,46 @@ window.addEventListener('load', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 하드웨어 그래픽 가속 레이어가 안전하게 개통된 상태에서 코어 모듈을 순차 기동합니다.
-    gesture.init(nodes.videoViewport, nodes.mainVideo);
-    if (window.bowAnalyzer) {
+    if (gesture && typeof gesture.init === 'function') {
+        gesture.init(nodes.videoViewport, nodes.mainVideo);
+    }
+    if (window.bowAnalyzer && typeof window.bowAnalyzer.init === 'function') {
         window.bowAnalyzer.init(nodes.drawCanvas);
     }
     
     resizeCanvasToDisplay();
-    gesture.applyTransform();
+    if (gesture && typeof gesture.applyTransform === 'function') {
+        gesture.applyTransform();
+    }
 
-    // UI 인프라 결합이 완벽히 끝난 후 스토리지를 비동기로 가동하여 교착을 원천 배제합니다.
-    core.initDB().then(async () => {
-        try {
-            await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
-        } catch (e) {
-            console.warn('[System] 시크릿 안전 부팅 보호막 가동 완료');
-        }
+    if (core && typeof core.initDB === 'function') {
+        core.initDB().then(async () => {
+            try {
+                if (typeof core.restoreLastSession === 'function') {
+                    await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+                }
+            } catch (e) {
+                console.warn('[System] 시크릿 안전 부팅 보호막 가동 완료');
+            }
 
-        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-        }
-    });
+            if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+                nodes.videoSlider.max = nodes.mainVideo.duration;
+                nodes.videoSlider.step = 0.0001;
+            }
+        });
+    }
 
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
+
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
             window.bowGyroSensor.start();
         }
-        if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
+        if (!cameraStream && nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
             await startCamera();
         }
         window.removeEventListener('click', triggerSensorUnlock);
@@ -105,6 +111,7 @@ window.addEventListener('load', () => {
     window.addEventListener('touchstart', triggerSensorUnlock);
 
     async function startCamera() {
+        if (!nodes.cameraPreview) return;
         if (cameraStream) stopCamera();
         try {
             const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -123,7 +130,9 @@ window.addEventListener('load', () => {
                 audio: false
             });
             nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
+            if (nodes.recordStatus) {
+                nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
+            }
             setTimeout(resizeCanvasToDisplay, 150);
         } catch (err) {
             if (selectedFPS > 30) {
@@ -135,7 +144,9 @@ window.addEventListener('load', () => {
                 }
                 await startCamera();
             } else {
-                nodes.recordStatus.textContent = '카메라 장치 로드 실패.';
+                if (nodes.recordStatus) {
+                    nodes.recordStatus.textContent = '카메라 장치 로드 실패.';
+                }
             }
             console.error(err);
         }
@@ -146,7 +157,9 @@ window.addEventListener('load', () => {
             cameraStream.getTracks().forEach(track => track.stop());
             cameraStream = null;
         }
-        nodes.cameraPreview.srcObject = null;
+        if (nodes.cameraPreview) {
+            nodes.cameraPreview.srcObject = null;
+        }
     }
 
     const fpsButtons = document.querySelectorAll('.fps-btn');
@@ -161,6 +174,11 @@ window.addEventListener('load', () => {
             }
         });
     }
+/**
+ * js/app.js - [Part 2]
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
+ * (v23.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 2)
+ */
 
     fpsButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -168,90 +186,106 @@ window.addEventListener('load', () => {
             fpsButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             selectedFPS = parseInt(btn.getAttribute('data-fps'), 10);
-            if (nodes.sceneRecord.classList.contains('active')) {
+            if (nodes.sceneRecord && nodes.sceneRecord.classList.contains('active')) {
                 await startCamera();
             }
         });
     });
 
-    nodes.btnGoRecord.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.sceneAnalyze.classList.remove('active');
-        nodes.sceneRecord.classList.add('active');
-        await startCamera();
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-            window.bowGyroSensor.start();
-        }
-    });
+    if (nodes.btnGoRecord) {
+        nodes.btnGoRecord.addEventListener('click', async () => {
+            if (nodes.mainVideo) nodes.mainVideo.pause();
+            if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+            if (nodes.sceneAnalyze) nodes.sceneAnalyze.classList.remove('active');
+            if (nodes.sceneRecord) nodes.sceneRecord.classList.add('active');
+            await startCamera();
+            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+            if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
+                window.bowGyroSensor.start();
+            }
+        });
+    }
 
     function transitToAnalyzeMode() {
         stopCamera();
         if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
             window.bowGyroSensor.stop();
         }
-        nodes.sceneRecord.classList.remove('active');
-        nodes.sceneAnalyze.classList.add('active');
+        if (nodes.sceneRecord) nodes.sceneRecord.classList.remove('active');
+        if (nodes.sceneAnalyze) nodes.sceneAnalyze.classList.add('active');
         setActiveMenu(nodes.btnMove);
         if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
         setTimeout(resizeCanvasToDisplay, 100);
     }
 
-    nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
+    if (nodes.btnGoAnalyze) {
+        nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
+    }
 
-    nodes.btnRecordToggle.addEventListener('click', () => {
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-            window.bowGyroSensor.start();
-        }
-        if (!cameraStream) return;
-        
-        if (!isRecording) {
-            recordedChunks = [];
-            let options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = { mimeType: 'video/webm;codecs=vp8' };
+    if (nodes.btnRecordToggle) {
+        nodes.btnRecordToggle.addEventListener('click', () => {
+            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+            if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
+                window.bowGyroSensor.start();
+            }
+            if (!cameraStream) return;
+            
+            if (!isRecording) {
+                recordedChunks = [];
+                // 💡 [iOS 사파리/모바일 호환성 전면 패치 완료]
+                // 아이폰 환경에서 무조건 깨지던 WebM 대신, iOS 네이티브 가속 코덱인 mp4 최우선 순위 정렬
+                let options = { mimeType: 'video/mp4;codecs=avc1' };
                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
                     options = { mimeType: 'video/mp4' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = { mimeType: 'video/webm;codecs=vp9' };
+                        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            options = { mimeType: 'video/webm;codecs=vp8' };
+                        }
+                    }
                 }
-            }
-            
-            try {
-                mediaRecorder = new MediaRecorder(cameraStream, options);
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-                };
-                mediaRecorder.onstop = async () => {
-                    const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-                    const videoURL = URL.createObjectURL(videoBlob);
-                    nodes.mainVideo.src = videoURL;
-                    
-                    await core.saveCache('lastVideoBlob', videoBlob);
-                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
-                    
-                    transitToAnalyzeMode();
-                };
                 
-                mediaRecorder.start();
-                isRecording = true;
-                nodes.btnRecordToggle.textContent = '녹화중지';
-                nodes.btnRecordToggle.classList.add('recording');
-                nodes.recordStatus.textContent = '고해상도 프레임 캡처 진행 중...';
-            } catch (e) {
-                console.error('녹화 시동 오류:', e);
+                try {
+                    mediaRecorder = new MediaRecorder(cameraStream, options);
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+                    };
+                    mediaRecorder.onstop = async () => {
+                        const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                        const videoURL = URL.createObjectURL(videoBlob);
+                        if (nodes.mainVideo) nodes.mainVideo.src = videoURL;
+                        
+                        if (core && typeof core.saveCache === 'function') {
+                            await core.saveCache('lastVideoBlob', videoBlob);
+                            await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
+                        }
+                        
+                        transitToAnalyzeMode();
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    nodes.btnRecordToggle.textContent = '녹화중지';
+                    nodes.btnRecordToggle.classList.add('recording');
+                    if (nodes.recordStatus) nodes.recordStatus.textContent = '고해상도 프레임 캡처 진행 중...';
+                } catch (e) {
+                    console.error('녹화 시동 오류:', e);
+                }
+            } else {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+                isRecording = false;
+                nodes.btnRecordToggle.textContent = '녹화시작';
+                nodes.btnRecordToggle.classList.remove('recording');
             }
-        } else {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            isRecording = false;
-            nodes.btnRecordToggle.textContent = '녹화시작';
-            nodes.btnRecordToggle.classList.remove('recording');
-        }
-    });
+        });
+    }
+
     function setActiveMenu(activeBtn) {
-        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
+        const menuButtons = [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, 
+                            nodes.btnDownloadVideo, nodes.btnCapture, nodes.btnReset];
+        menuButtons.forEach(btn => {
             if (btn) btn.classList.remove('active');
         });
         if (activeBtn) activeBtn.classList.add('active');
@@ -260,17 +294,17 @@ window.addEventListener('load', () => {
     if (nodes.btnDownloadVideo) {
         nodes.btnDownloadVideo.addEventListener('click', async () => {
             try {
+                if (!core || typeof core.loadCache !== 'function') return;
                 const savedBlob = await core.loadCache('lastVideoBlob');
                 if (!savedBlob) {
                     alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.');
                     return;
                 }
                 
-                const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm';
-                let fileExtension = '.webm';
-                
-                if (actualMime.includes('mp4')) {
-                    fileExtension = '.mp4';
+                const actualMime = await core.loadCache('lastRecordedMime') || 'video/mp4';
+                let fileExtension = '.mp4';
+                if (actualMime.includes('webm')) {
+                    fileExtension = '.webm';
                 }
 
                 const url = URL.createObjectURL(savedBlob);
@@ -294,49 +328,67 @@ window.addEventListener('load', () => {
 
     let currentFrameTime = 1 / 30; 
     
-    nodes.mainVideo.addEventListener('loadedmetadata', () => {
-        const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
-        currentFrameTime = 1 / detectedFPS;
+    if (nodes.mainVideo) {
+        nodes.mainVideo.addEventListener('loadedmetadata', () => {
+            const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
+            currentFrameTime = 1 / detectedFPS;
 
-        if (!isFinite(nodes.mainVideo.duration) || nodes.mainVideo.duration === 0 || isNaN(nodes.mainVideo.duration)) {
-            nodes.mainVideo.currentTime = 1e9;
-            nodes.mainVideo.addEventListener('timeupdate', function recoverDuration() {
-                if (nodes.mainVideo.duration && isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+            if (!isFinite(nodes.mainVideo.duration) || nodes.mainVideo.duration === 0 || isNaN(nodes.mainVideo.duration)) {
+                nodes.mainVideo.currentTime = 1e9;
+                nodes.mainVideo.addEventListener('timeupdate', function recoverDuration() {
+                    if (nodes.mainVideo.duration && isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+                        if (nodes.videoSlider) {
+                            nodes.videoSlider.max = nodes.mainVideo.duration;
+                            nodes.videoSlider.step = 0.0001;
+                        }
+                        nodes.mainVideo.currentTime = 0;
+                        nodes.mainVideo.removeEventListener('timeupdate', recoverDuration);
+                    }
+                });
+            } else {
+                if (nodes.videoSlider) {
                     nodes.videoSlider.max = nodes.mainVideo.duration;
                     nodes.videoSlider.step = 0.0001;
-                    nodes.mainVideo.currentTime = 0;
-                    nodes.mainVideo.removeEventListener('timeupdate', recoverDuration);
                 }
-            });
-        } else {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-        }
-        
-        resizeCanvasToDisplay();
-    });
+            }
+            
+            resizeCanvasToDisplay();
+        });
 
-    nodes.mainVideo.addEventListener('timeupdate', () => {
-        if (!isNaN(nodes.mainVideo.currentTime) && isFinite(nodes.mainVideo.duration)) {
-            nodes.videoSlider.value = nodes.mainVideo.currentTime;
-        }
-    });
+        nodes.mainVideo.addEventListener('timeupdate', () => {
+            if (nodes.videoSlider && !isNaN(nodes.mainVideo.currentTime) && isFinite(nodes.mainVideo.duration)) {
+                nodes.videoSlider.value = nodes.mainVideo.currentTime;
+            }
+        });
+    }
+/**
+ * js/app.js - [Part 3]
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
+ * (v23.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 3)
+ */
+
+    if (nodes.videoSlider) {
+        nodes.videoSlider.addEventListener('input', () => {
+            if (nodes.mainVideo) {
+                nodes.mainVideo.pause();
+                nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
+            }
+            if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+        });
+    }
     
-    nodes.videoSlider.addEventListener('input', () => {
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
-    });
-    
-    nodes.btnPlayPause.addEventListener('click', () => {
-        if (nodes.mainVideo.paused) {
-            nodes.mainVideo.play();
-            nodes.btnPlayPause.textContent = '일시정지';
-        } else {
-            nodes.mainVideo.pause();
-            nodes.btnPlayPause.textContent = '재생';
-        }
-    });
+    if (nodes.btnPlayPause) {
+        nodes.btnPlayPause.addEventListener('click', () => {
+            if (!nodes.mainVideo) return;
+            if (nodes.mainVideo.paused) {
+                nodes.mainVideo.play();
+                nodes.btnPlayPause.textContent = '일시정지';
+            } else {
+                nodes.mainVideo.pause();
+                nodes.btnPlayPause.textContent = '재생';
+            }
+        });
+    }
 
     let longPressTimer = null;
     let repeatInterval = null;
@@ -345,12 +397,19 @@ window.addEventListener('load', () => {
         clearFrameRepeat();
         longPressTimer = setTimeout(() => {
             repeatInterval = setInterval(() => {
+                if (!nodes.mainVideo) return;
                 nodes.mainVideo.pause();
-                nodes.btnPlayPause.textContent = '재생';
+                if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
                 if (direction === 'next') {
-                    nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
+                    nodes.mainVideo.currentTime = Math.min(
+                        nodes.mainVideo.duration, 
+                        nodes.mainVideo.currentTime + currentFrameTime
+                    );
                 } else {
-                    nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
+                    nodes.mainVideo.currentTime = Math.max(
+                        0, 
+                        nodes.mainVideo.currentTime - currentFrameTime
+                    );
                 }
             }, 60); 
         }, 300);
@@ -363,123 +422,246 @@ window.addEventListener('load', () => {
         repeatInterval = null;
     }
     
-    nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
-        startFrameRepeat('prev');
-    });
+    if (nodes.btnFramePrev) {
+        nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (nodes.mainVideo) {
+                nodes.mainVideo.pause();
+                nodes.mainVideo.currentTime = Math.max(
+                    0, 
+                    nodes.mainVideo.currentTime - currentFrameTime
+                );
+            }
+            if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+            startFrameRepeat('prev');
+        });
+        nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
+    }
     
-    nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
-        startFrameRepeat('next');
-    });
+    if (nodes.btnFrameNext) {
+        nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            if (nodes.mainVideo) {
+                nodes.mainVideo.pause();
+                nodes.mainVideo.currentTime = Math.min(
+                    nodes.mainVideo.duration, 
+                    nodes.mainVideo.currentTime + currentFrameTime
+                );
+            }
+            if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+            startFrameRepeat('next');
+        });
+        nodes.btnFrameNext.addEventListener('pointerleave', clearFrameRepeat);
+    }
 
     window.addEventListener('pointerup', clearFrameRepeat);
     window.addEventListener('pointercancel', clearFrameRepeat);
-    nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
-    nodes.btnFrameNext.addEventListener('pointerleave', clearFrameRepeat);
     
-    nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
+    if (nodes.btnOpen) {
+        nodes.btnOpen.addEventListener('click', () => {
+            if (nodes.videoInput) nodes.videoInput.click();
+        });
+    }
     
-    nodes.videoInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const targetFile = files[0];
-        
-        await core.saveCache('lastVideoBlob', targetFile);
-        const url = URL.createObjectURL(targetFile);
-        nodes.mainVideo.src = url;
-        nodes.mainVideo.load();
-        
-        nodes.mainVideo.addEventListener('loadeddata', () => {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-            resizeCanvasToDisplay();
-        }, { once: true });
+    if (nodes.videoInput) {
+        nodes.videoInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            const targetFile = files;
+            
+            if (core && typeof core.saveCache === 'function') {
+                await core.saveCache('lastVideoBlob', targetFile);
+            }
+            const url = URL.createObjectURL(targetFile);
+            if (nodes.mainVideo) {
+                nodes.mainVideo.src = url;
+                nodes.mainVideo.load();
+                
+                nodes.mainVideo.addEventListener('loadeddata', () => {
+                    if (nodes.videoSlider) {
+                        nodes.videoSlider.max = nodes.mainVideo.duration;
+                        nodes.videoSlider.step = 0.0001;
+                    }
+                    resizeCanvasToDisplay();
+                }, { once: true });
+            }
 
-        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
-            window.bowGyroSensor.stop();
-        }
-        setActiveMenu(nodes.btnOpen);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            window.bowAnalyzer.setMode('move');
-        }
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
+            if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
+                window.bowGyroSensor.stop();
+            }
+            setActiveMenu(nodes.btnOpen);
+            if (window.bowAnalyzer) {
+                window.bowAnalyzer.clearLines();
+                window.bowAnalyzer.setMode('move');
+            }
+            setTimeout(resizeCanvasToDisplay, 100);
+        });
+    }
 
-    nodes.btnMove.addEventListener('click', () => {
-        setActiveMenu(nodes.btnMove);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('move');
-            window.bowAnalyzer.render();
-        }
-    });
+    if (nodes.btnMove) {
+        nodes.btnMove.addEventListener('click', () => {
+            setActiveMenu(nodes.btnMove);
+            if (window.bowAnalyzer) {
+                window.bowAnalyzer.setMode('move');
+                window.bowAnalyzer.render();
+            }
+        });
+    }
 
-    nodes.btnDraw.addEventListener('click', () => {
-        setActiveMenu(nodes.btnDraw);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('draw');
-            window.bowAnalyzer.render();
-        }
-    });
+    if (nodes.btnDraw) {
+        nodes.btnDraw.addEventListener('click', () => {
+            setActiveMenu(nodes.btnDraw);
+            if (window.bowAnalyzer) {
+                window.bowAnalyzer.setMode('draw');
+                window.bowAnalyzer.render();
+            }
+        });
+    }
 
-    nodes.btnReset.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.mainVideo.removeAttribute('src');
-        nodes.mainVideo.load();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.videoSlider.value = 0;
-        nodes.videoSlider.max = 100;
+    if (nodes.btnCapture) {
+        nodes.btnCapture.addEventListener('click', () => {
+            if (!nodes.mainVideo || !nodes.drawCanvas) return;
+            setActiveMenu(nodes.btnCapture);
 
-        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
-        
-        core.state.scale = 1;
-        core.state.offsetX = 0;
-        core.state.offsetY = 0;
-        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
+            const vW = nodes.mainVideo.videoWidth;
+            const vH = nodes.mainVideo.videoHeight;
+            if (!vW || !vH) {
+                alert('캡처할 비디오 소스 자원이 로드되지 않았습니다.');
+                return;
+            }
 
-        await core.saveCache('lastLines', []);
-        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
-        await core.saveCache('lastVideoBlob', null);
-        await core.saveCache('lastRecordedMime', null);
+            const snapCanvas = document.createElement('canvas');
+            snapCanvas.width = vW;
+            snapCanvas.height = vH;
+            const snapCtx = snapCanvas.getContext('2d');
 
-        nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
+            snapCtx.drawImage(nodes.mainVideo, 0, 0, vW, vH);
+
+            const state = core.state || { scale: 1, offsetX: 0, offsetY: 0 };
+            snapCtx.save();
+            
+            const dpr = window.devicePixelRatio || 1;
+            const screenW = nodes.drawCanvas.width / dpr;
+            const ratioFactor = vW / screenW;
+            
+            snapCtx.translate(
+                state.offsetX * ratioFactor, 
+                state.offsetY * ratioFactor
+            );
+            snapCtx.scale(
+                state.scale * ratioFactor, 
+                state.scale * ratioFactor
+            );
+
+            snapCtx.drawImage(
+                nodes.drawCanvas, 
+                0, 
+                0, 
+                screenW, 
+                nodes.drawCanvas.height / dpr
+            );
+            snapCtx.restore();
+
+            try {
+                const imgURL = snapCanvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = imgURL;
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                a.download = `kukgung_snapshot_${dateStr}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                snapCanvas.width = 0;
+                snapCanvas.height = 0;
+            } catch (err) {
+                alert('보안 제약으로 비디오 캡처 처리가 거부되었습니다.');
+                console.error(err);
+            }
+        });
+    }
+
+    if (nodes.btnReset) {
+        nodes.btnReset.addEventListener('click', async () => {
+            if (nodes.mainVideo) {
+                nodes.mainVideo.pause();
+                nodes.mainVideo.removeAttribute('src');
+                nodes.mainVideo.load();
+            }
+            if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+            if (nodes.videoSlider) {
+                nodes.videoSlider.value = 0;
+                nodes.videoSlider.max = 100;
+            }
+
+            if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+            
+            if (core && core.state) {
+                core.state.scale = 1;
+                core.state.offsetX = 0;
+                core.state.offsetY = 0;
+            }
+            if (window.bowAppGesture && 
+                typeof window.bowAppGesture.applyTransform === 'function') {
+                window.bowAppGesture.applyTransform();
+            }
+
+            if (core && typeof core.saveCache === 'function') {
+                await core.saveCache('lastLines', []);
+                await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+                await core.saveCache('lastVideoBlob', null);
+                await core.saveCache('lastRecordedMime', null);
+            }
+
+            if (nodes.angleReport) nodes.angleReport.textContent = "ANGLE 0.0°";
+            alert('이전 분석 데이터가 완전히 초기화되었습니다.');
+            setTimeout(resizeCanvasToDisplay, 100);
+        });
+    }
     
-    nodes.panelHandle.addEventListener('click', () => {
-        core.state.isPanelOpen = !core.state.isPanelOpen;
-        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
-        else nodes.unifiedPanel.classList.add('collapsed');
-    });
+    if (nodes.panelHandle) {
+        nodes.panelHandle.addEventListener('click', () => {
+            if (!core || !core.state || !nodes.unifiedPanel) return;
+            core.state.isPanelOpen = !core.state.isPanelOpen;
+            if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
+            else nodes.unifiedPanel.classList.add('collapsed');
+        });
+    }
     
     window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
-        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
+        if (nodes.angleReport) nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
+        if (window.bowAnalyzer && core && typeof core.saveCache === 'function') {
+            core.saveCache('lastLines', window.bowAnalyzer.lines);
+        }
     });
     
     window.addEventListener('bowGestureUndo', (e) => {
-        core.saveCache('lastLines', e.detail.lines);
+        if (core && typeof core.saveCache === 'function') {
+/**
+ * js/app.js - [Part 3 추가 보완 최종 가둠 정렬판]
+ * (v27.1 - 박스 외곽 코드 유출 0% 전면 봉쇄 및 가로폭 줄바꿈 완결 버전)
+ */
+
+    window.addEventListener('bowGestureUndo', (e) => {
+        if (core && typeof core.saveCache === 'function') {
+            core.saveCache('lastLines', e.detail.lines);
+        }
     });
-    
-    // 💡 [정중앙 정렬 복구 패치 완료] CSS 초기화 픽셀(`top: 50%; left: 50%;`)과 오차가 나지 않도록 
-    // translate 기준 중심축 보정값을 단단히 결합하여 수평계 라인이 반쪽으로 잘리거나 쏠리던 연산 밀림을 원천 제거했습니다.
+
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
 
-        if (nodes.sceneRecord.classList.contains('active')) {
+        if (nodes.sceneRecord && 
+            nodes.sceneRecord.classList.contains('active')) {
             if (nodes.gyroHorizonLine && nodes.gyroVerticalLine) {
-                nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
-                nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
-                
+                nodes.gyroHorizonLine.style.transform = 
+                    `translate(-50%, -50%) rotate(${roll}deg)`;
+                nodes.gyroHorizonLine.setAttribute(
+                    'data-angle', 
+                    `${roll}°`
+                );
+
                 if (isLevel) {
                     nodes.gyroHorizonLine.classList.add('perfect-level');
                     nodes.gyroVerticalLine.classList.add('perfect-level');
@@ -491,3 +673,4 @@ window.addEventListener('load', () => {
         }
     });
 });
+
