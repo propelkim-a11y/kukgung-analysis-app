@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.8 - 기하 연산 오타 완전 소멸 및 선긋기 복구 완결판)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.9 - 이중 역연산 제거 및 복수 선 시야 복구 완결판)
  */
 
 class BowAnalyzer {
@@ -239,7 +239,6 @@ class BowAnalyzer {
             const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
             
-            // 스타일러스 미끄러짐 방지를 위해 미세 댐핑 수식 결합 (유동 계수: 0.55)
             if (isPen) {
                 targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
                 targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
@@ -380,7 +379,6 @@ class BowAnalyzer {
         return Number((angle % 180).toFixed(1));
     }
 
-    // 💡 [오타 완벽 소멸] 캔버스를 멈추게 만들던 line2.dbVersion 잔여 결함을 완전히 도려내고 복구했습니다.
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
@@ -395,6 +393,8 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
+    // 💡 [이중 스케일 역연산 교정] 전체 좌표계 컨텍스트 배율이 이미 확대 적용된 상태이므로,
+    // 나눗셈 역연산 결함을 걷어내고 순수 브라우저 해상도 계수(scaleX)만 다이렉트로 결합하여 시야를 복구합니다.
     drawSingleLineAbsoluteAngle(line, scaleX) {
         if (!line || !line.start || !line.end) return;
         const angleVal = this.getLineAngle(line);
@@ -403,7 +403,9 @@ class BowAnalyzer {
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
         this.ctx.shadowBlur = 4;
-        this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        
+        // 폰트 크기를 배율로 이중 분해하지 않고 동기화 고수
+        this.ctx.font = `bold ${12 * scaleX}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         
         const textX = line.start.x + (12 / this.transform.scale);
         const textY = line.start.y - (12 / this.transform.scale);
@@ -411,20 +413,27 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 
+    // 💡 [이중 스케일 역연산 교정] 사잇각 아크 크기와 텍스트의 크기 수식을 직관적으로 정립하여
+    // 화면이 확대되어도 두 번째 선과 사잇각 표기가 구도 밖으로 증발하지 않고 제 자리에 온전히 안착하게 만듭니다.
     drawInlineAngleArc(line1, line2, scaleX) {
         if (!line1 || !line2) return;
         const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
         const a2 = Math.atan2((line2.end.y - line2.start.y), line2.end.x - line2.start.x);
         const deg = this.getIntersectionAngle(line1, line2);
+        
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
-        const radius = (40 * scaleX) / this.transform.scale;
+        
+        // 선 굵기 및 아크 반지름 이중 연산 오차 박멸
+        this.ctx.lineWidth = 1.5 * scaleX;
+        const radius = 40 * scaleX;
+        
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
+        
         this.ctx.fillStyle = '#34C759'; 
-        this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.font = `bold ${14 * scaleX}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 5;
         this.ctx.fillText(`사잇각: ${deg.toFixed(1)}°`, line1.end.x + (20 / this.transform.scale), line1.end.y - (20 / this.transform.scale));
