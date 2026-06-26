@@ -1,11 +1,10 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.6 - window.load 물리 렌더 안정 정렬판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.10 - 동일 영상 재오픈 락프리 완결판)
  */
 
 window.bowAppNodes = {};
 
-// 💡 [프리징 박멸 핵심] DOMContentLoaded의 성급한 하드웨어 접근을 차단하고,
 // 브라우저의 그래픽 가속 세션 및 미디어 인프라 렌더링이 100% 완료된 물리적 안전 타이밍에 시스템을 시동합니다.
 window.addEventListener('load', () => {
     const core = window.bowAppCore;
@@ -449,8 +448,12 @@ window.addEventListener('load', () => {
         await core.saveCache('lastVideoBlob', null);
         await core.saveCache('lastRecordedMime', null);
 
+        // 💡 [버그 박멸 패치 완료] 파일 인풋 객체의 밸류 경로 메모리를 강제 완벽 소거합니다.
+        // 덕분에 이 버튼을 누른 직후 [열기]를 클릭해 방금 전 분석하던 '똑같은 동영상 파일'을 고르더라도 브라우저가 정상적으로 change 이벤트를 일으킵니다.
+        nodes.videoInput.value = '';
+
         nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
+        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 동일 영상을 다시 열거나 새 작업을 진행할 수 있습니다.');
         setTimeout(resizeCanvasToDisplay, 100);
     });
     
@@ -469,8 +472,6 @@ window.addEventListener('load', () => {
         core.saveCache('lastLines', e.detail.lines);
     });
     
-    // 💡 [정중앙 정렬 복구 패치 완료] CSS 초기화 픽셀(`top: 50%; left: 50%;`)과 오차가 나지 않도록 
-    // translate 기준 중심축 보정값을 단단히 결합하여 수평계 라인이 반쪽으로 잘리거나 쏠리던 연산 밀림을 원천 제거했습니다.
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
