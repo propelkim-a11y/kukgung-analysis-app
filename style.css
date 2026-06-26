@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v18.5 - 수평계 중심축 절대 정렬 규격)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v18.7 - 크리스탈 다크 패널 마감 버전)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -96,8 +96,8 @@ body, html {
     pointer-events: none;
     z-index: 5;
 }
-/* 5. 초정밀 실물 수평기 자이로 UI 및 실시간 각도 숫자 매핑 */
-/* 💡 [반쪽 정렬 오류 완벽 해결] left와 top 기준점을 모두 50%로 지정하고 CSS단에서 명확히 기본 translate 정렬을 주입하여 가로 폭 90%가 정중앙에 완전 대칭으로 렌더링되게 만듭니다. */
+
+/* 5. 초정밀 실물 수평계 자이로 UI 및 실시간 각도 숫자 매핑 */
 #gyro-horizon-line {
     position: absolute;
     top: 50%;
@@ -105,11 +105,10 @@ body, html {
     width: 90%;
     height: 1px;
     background-color: rgba(255, 59, 48, 0.8);
+    transform-origin: center;
     z-index: 6;
     pointer-events: none;
     transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
-    transform: translate(-50%, -50%);
-    transform-origin: center center;
 }
 
 /* 초정밀 실물 자이로 수직 가이드라인 UI 명세 */
@@ -146,7 +145,6 @@ body, html {
     color: #FFFFFF;
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
-
 /* 6. 우측 상단 플로팅 각도 리포트 */
 .floating-report {
     position: absolute;
@@ -161,7 +159,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 하단 패널 영역 (100% 완전 투명 크리스탈 마감 패치) */
+/* 7. 하단 패널 영역 (💡가시성 확보를 위한 크리스탈 다크 88% 글래스모피즘 마감 패치) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -170,9 +168,9 @@ body, html {
     height: 33.333vh; 
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-    background: transparent !important; 
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+    background: rgba(10, 10, 12, 0.88) !important; 
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
     border-top: 0.5px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 30px 30px 0 0 !important;
 }
