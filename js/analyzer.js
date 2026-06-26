@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.6 - 오타 전면 색출 및 기하 연산 정화 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.7 - 캔버스 트랜스폼 락 해제 및 줌 구도 사수 완결판)
  */
 
 class BowAnalyzer {
@@ -11,12 +11,12 @@ class BowAnalyzer {
         this.currentLine = null;
         this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
         this.toolMode = 'move'; 
-        this.snapThreshold = 18; // 스타일러스/손가락 터치 안정성 반경
+        this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
         
-        // 국궁 전통 표준 절대 고각 자석 제어용 상태 변수
+        // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
         this.isAngleSnapped = false;
-        this.angleSnapThreshold = 1.5; // 자석 스냅 각도 오차 범위 (±1.5°)
+        this.angleSnapThreshold = 1.5; // 자석처럼 들러붙을 각도 오차 범위 (±1.5°)
 
         // 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
         this.lastTapTime = 0;
@@ -57,6 +57,9 @@ class BowAnalyzer {
         this.render();
     }
 
+    // 💡 [스마트 분할 초기화 핵심 정화] 
+    // 기존에 존재하던 this.transform 초기화 라인을 과감히 삭제 파괴하여,
+    // 초기화 단추 클릭 시 확대/축소 배율 매트릭스는 그대로 고정 박제 사수하고 오직 선 데이터만 비워냅니다.
     clearLines() {
         this.lines = [];
         this.currentLine = null;
@@ -123,7 +126,7 @@ class BowAnalyzer {
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
         
-        // 스타일러스 펜 입력 시 히트박스 반경 가변 확장 (35px)
+        // 스타일러스 펜 입력 시 히트박스 영역을 35필셀로 가변 확장하여 조작 성공률 극대화
         const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
         const targetRadius = baseRadius / this.transform.scale;
         
@@ -134,7 +137,7 @@ class BowAnalyzer {
         this.editingVertexType = null;
         this.movingLineIndex = -1;
 
-        // 선분 몸통 더블 탭 개별 삭제 인터락
+        // 선분 몸통 영역 내 '더블 탭 개별 삭제' 디텍팅 인터락
         if (tapLength < this.tapThreshold && tapLength > 0) {
             const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, coords.y - this.lastTapCoords.y);
             if (distFromLastTap < targetRadius) {
@@ -159,7 +162,7 @@ class BowAnalyzer {
         this.lastTapCoords = coords;
         this.lastCoords = coords;
 
-        // 1순위: 정점(시작점/끝점) 터치 검사
+        // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드)
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i];
             if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
@@ -174,7 +177,7 @@ class BowAnalyzer {
             }
         }
 
-        // 2순위: 선분 몸통 터치 검사 (평행 이동)
+        // 2순위 분기: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 모드)
         if (this.editingLineIndex === -1) {
             for (let i = 0; i < this.lines.length; i++) {
                 if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
@@ -184,7 +187,7 @@ class BowAnalyzer {
             }
         }
 
-        // 3순위: 신규 선 스케칭 가동
+        // 3순위 분기: 아무것도 잡지 않은 허공이라면 신규 가이드라인 드로잉 가동
         if (this.editingLineIndex === -1 && this.movingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -193,7 +196,7 @@ class BowAnalyzer {
         }
     }
 
-    // 국궁 전통 52.21도 / 37.79도 절대 고각 자석 마그네틱 매핑 삼각 필터
+    // 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
     snapToAbsoluteAngles(basePt, targetX, targetY) {
         const dx = targetX - basePt.x;
         const dy = targetY - basePt.y;
@@ -232,12 +235,13 @@ class BowAnalyzer {
         const isPen = (event.pointerType === 'pen');
         const baseRadius = isPen ? 35 : this.snapThreshold;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 처리 (S펜 댐핑 완충 기술 탑재)
+        // 분기 A: 정점 개별 미세 편집 드래그 처리 (감도 완충 댐핑 필터)
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
             
+            // 스타일러스 미끄러짐 방지를 위해 미세 댐핑 수식 결합 (유동 계수: 0.55)
             if (isPen) {
                 targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
                 targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
@@ -261,7 +265,7 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         } 
-        // 분기 B: 선 전체 통째로 평행 이동 드래그 처리
+        // 분기 B: 선 전체 몸통 통째로 평행 이동 드래그 처리
         else if (this.movingLineIndex !== -1) {
             const line = this.lines[this.movingLineIndex];
             let deltaX = coords.x - this.lastCoords.x;
@@ -281,7 +285,7 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         }
-        // 분기 C: 실시간 신규 조준 가이드라인 드로우 트랙킹
+        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹
         else if (this.currentLine) {
             const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, targetX, targetY);
             targetX = angleSnappedPt.x;
@@ -361,7 +365,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -369,7 +373,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line[0] : line;
+        const singleLine = Array.isArray(line) ? line : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -378,7 +382,6 @@ class BowAnalyzer {
         return Number((angle % 180).toFixed(1));
     }
 
-    // 💡 [버그 소멸 핵심 패치] 기존 오타 라인을 완벽 분쇄하고 순수 아크탄젠트 수직축 사잇각 수식으로 복구 정화했습니다.
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
@@ -453,7 +456,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
 
         if (this.currentLine) {
