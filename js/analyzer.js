@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.1 - 개별 선 더블 탭 삭제 완결 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.2 - 국궁 표준 고각 자석 스냅 완결 버전)
  */
 
 class BowAnalyzer {
@@ -14,7 +14,11 @@ class BowAnalyzer {
         this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
         
-        // 💡 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
+        // 💡 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
+        this.isAngleSnapped = false;
+        this.angleSnapThreshold = 1.5; // 자석처럼 들러붙을 각도 오차 범위 (±1.5°)
+
+        // 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
         this.lastTapTime = 0;
         this.tapThreshold = 300; // 0.3초 이내 연속 터치 시 더블 탭 인정
         this.lastTapCoords = { x: 0, y: 0 };
@@ -59,6 +63,7 @@ class BowAnalyzer {
         this.editingLineIndex = -1;
         this.editingVertexType = null;
         this.movingLineIndex = -1;
+        this.isAngleSnapped = false;
         this.render();
         this.broadcastAngle(0);
     }
@@ -66,6 +71,7 @@ class BowAnalyzer {
     undoLastLine() {
         if (this.lines.length > 0) {
             this.lines.pop();
+            this.isAngleSnapped = false;
             this.render();
             this.calculateFinalAngle();
             return true;
@@ -125,39 +131,32 @@ class BowAnalyzer {
         this.editingVertexType = null;
         this.movingLineIndex = -1;
 
-        // 💡 [기능 보강 핵심 인터락] 선분 몸통 영역 내 '더블 탭 개별 삭제' 디텍팅 시동
+        // 선분 몸통 영역 내 '더블 탭 개별 삭제' 디텍팅 인터락
         if (tapLength < this.tapThreshold && tapLength > 0) {
-            // 더블 터치 중 손가락이 무리하게 튀지 않았는지 미세 오차 거리를 필터링 검증
             const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, coords.y - this.lastTapCoords.y);
             if (distFromLastTap < targetRadius) {
-                
-                // 터치 궤적 내에 존재하는 표적 가이드라인 탐색
                 for (let i = 0; i < this.lines.length; i++) {
                     if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
-                        // 락프리 표적 선 즉시 완전 파괴 소거
                         this.lines.splice(i, 1);
-                        
-                        this.lastTapTime = 0; // 더블 탭 카운터 인프라 원점 리셋
+                        this.lastTapTime = 0; 
                         this.currentLine = null;
-                        
+                        this.isAngleSnapped = false;
                         this.render();
                         this.calculateFinalAngle();
                         
-                        // 외부 스토리지 및 데이터 영속 허브에 삭제 내용 즉시 동기화 이벤트 송출
                         const deleteEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
                         window.dispatchEvent(deleteEvent);
-                        return; // 삭제 완료 즉시 드래그 및 드로잉 흐름 완전 차단 컷
+                        return; 
                     }
                 }
             }
         }
         
-        // 더블 탭이 아닐 경우 다음 비교를 위해 타임 스탬프 및 첫 터치 원점 좌표 기록
         this.lastTapTime = currentTime;
         this.lastTapCoords = coords;
         this.lastCoords = coords;
 
-        // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드 락)
+        // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드)
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i];
             if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
@@ -172,7 +171,7 @@ class BowAnalyzer {
             }
         }
 
-        // 2순위 분기: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 모드 락)
+        // 2순위 분기: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 모드)
         if (this.editingLineIndex === -1) {
             for (let i = 0; i < this.lines.length; i++) {
                 if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
@@ -191,6 +190,40 @@ class BowAnalyzer {
         }
     }
 
+    // 💡 [기본 충실 삼각 수학] 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
+    snapToAbsoluteAngles(basePt, targetX, targetY) {
+        const dx = targetX - basePt.x;
+        const dy = targetY - basePt.y;
+        const length = Math.hypot(dx, dy);
+        if (length === 0) return { x: targetX, y: targetY };
+
+        // 현재 마우스 드래그 기반 계산된 원시 아크탄젠트 고각 추출
+        let rawAngle = Math.atan2(-dy, dx) * (180 / Math.PI);
+        if (rawAngle < 0) rawAngle += 360;
+        const normalizedAngle = rawAngle % 180;
+
+        const targets = [37.79, 52.21];
+        this.isAngleSnapped = false;
+
+        for (let target of targets) {
+            if (Math.abs(normalizedAngle - target) < this.angleSnapThreshold) {
+                // 검출 성공 시 자석 상태 락 활성화
+                this.isAngleSnapped = true;
+                
+                // 원본 라디안 방향각 복원 연산
+                let targetRad = target * (Math.PI / 180);
+                if (rawAngle >= 180) targetRad = (target + 180) * (Math.PI / 180);
+                
+                // 삼각함수 공식 원형 보정을 통한 52.21도 / 37.79도 물리적 좌표 고정 강제 사수
+                return {
+                    x: basePt.x + length * Math.cos(targetRad),
+                    y: basePt.y - length * Math.sin(targetRad)
+                };
+            }
+        }
+        return { x: targetX, y: targetY };
+    }
+
     handlePointerMove(event) {
         if (this.toolMode !== 'draw') return;
         event.preventDefault();
@@ -199,27 +232,26 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 처리
+        // 분기 A: 정점 개별 미세 편집 드래그 처리 (절대각 자석 인터락 연동)
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
-            const adjustedThreshold = this.snapThreshold / this.transform.scale;
-            const dx = targetX - basePt.x;
-            const dy = targetY - basePt.y;
+            
+            // 💡 국궁 절대 고각 스냅 필터 선행 통과
+            const angleSnappedPt = this.snapToAbsoluteAngles(basePt, targetX, targetY);
+            targetX = angleSnappedPt.x;
+            targetY = angleSnappedPt.y;
 
-            if (Math.abs(dx) < adjustedThreshold) {
-                targetX = basePt.x;
-                this.isSnapped = true;
-            } else if (Math.abs(dy) < adjustedThreshold) {
-                targetY = basePt.y;
-                this.isSnapped = true;
+            if (!this.isAngleSnapped) {
+                const adjustedThreshold = this.snapThreshold / this.transform.scale;
+                const dx = targetX - basePt.x;
+                const dy = targetY - basePt.y;
+                if (Math.abs(dx) < adjustedThreshold) { targetX = basePt.x; this.isSnapped = true; }
+                else if (Math.abs(dy) < adjustedThreshold) { targetY = basePt.y; this.isSnapped = true; }
             }
 
-            if (this.editingVertexType === 'start') {
-                line.start = { x: targetX, y: targetY };
-            } else {
-                line.end = { x: targetX, y: targetY };
-            }
+            if (this.editingVertexType === 'start') { line.start = { x: targetX, y: targetY }; }
+            else { line.end = { x: targetX, y: targetY }; }
 
             this.render();
             this.calculateFinalAngle();
@@ -239,23 +271,23 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         }
-        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹
+        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹 (절대각 자석 인터락 연동)
         else if (this.currentLine) {
-            const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
-            if (snapEndpoint) {
-                targetX = snapEndpoint.x;
-                targetY = snapEndpoint.y;
-                this.isSnapped = true;
-            } else {
-                const adjustedThreshold = this.snapThreshold / this.transform.scale;
-                const dx = targetX - this.currentLine.start.x;
-                const dy = targetY - this.currentLine.start.y;
-                if (Math.abs(dx) < adjustedThreshold) {
-                    targetX = this.currentLine.start.x;
-                    this.isSnapped = true;
-                } else if (Math.abs(dy) < adjustedThreshold) {
-                    targetY = this.currentLine.start.y;
-                    this.isSnapped = true;
+            // 💡 국궁 절대 고각 스냅 필터 선행 통과
+            const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, targetX, targetY);
+            targetX = angleSnappedPt.x;
+            targetY = angleSnappedPt.y;
+
+            if (!this.isAngleSnapped) {
+                const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
+                if (snapEndpoint) {
+                    targetX = snapEndpoint.x; targetY = snapEndpoint.y; this.isSnapped = true;
+                } else {
+                    const adjustedThreshold = this.snapThreshold / this.transform.scale;
+                    const dx = targetX - this.currentLine.start.x;
+                    const dy = targetY - this.currentLine.start.y;
+                    if (Math.abs(dx) < adjustedThreshold) { targetX = this.currentLine.start.x; this.isSnapped = true; }
+                    else if (Math.abs(dy) < adjustedThreshold) { targetY = this.currentLine.start.y; this.isSnapped = true; }
                 }
             }
             this.currentLine.end = { x: targetX, y: targetY };
@@ -273,6 +305,7 @@ class BowAnalyzer {
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             this.editingLineIndex = -1;
             this.editingVertexType = null;
+            this.isAngleSnapped = false;
             this.render();
             this.calculateFinalAngle();
         } 
@@ -288,6 +321,7 @@ class BowAnalyzer {
             }
             this.currentLine = null;
             this.isSnapped = false;
+            this.isAngleSnapped = false;
             this.render();
             this.calculateFinalAngle();
         }
@@ -382,7 +416,7 @@ class BowAnalyzer {
         
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         
-        // 가이드라인 순회 드로우
+        // 기존 라인 가속 렌더링
         this.lines.forEach((line, idx) => {
             const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
             this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
@@ -396,9 +430,17 @@ class BowAnalyzer {
             this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
 
+        // 실시간 드로우 중인 타깃선 렌더링 규격 분기
         if (this.currentLine) {
-            this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
-            this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
+            // 💡 [테크니컬 디자인 마감] 52.21도 / 37.79도 자석 락 상태일 때는 매혹적인 '일렉트릭 블루 일렉트릭 블루(#007AFF)' 레이저 가이드 방출,
+            // 일반 물리 스냅 시에는 연두색(#34C759), 기본 상태는 백색(#FFFFFF)으로 발광 정렬합니다.
+            if (this.isAngleSnapped) {
+                this.ctx.strokeStyle = '#007AFF';
+                this.ctx.fillStyle = '#007AFF';
+            } else {
+                this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
+                this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
+            }
             this.drawSingleLine(this.currentLine);
         }
         this.ctx.restore();
