@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.3 - 멀티 앵글 가시성 극대화 완결 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.4 - 스타일러스 초정밀 조작감 최적화 완결 버전)
  */
 
 class BowAnalyzer {
@@ -11,7 +11,7 @@ class BowAnalyzer {
         this.currentLine = null;
         this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
         this.toolMode = 'move'; 
-        this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
+        this.snapThreshold = 18; // 손가락 터치 타겟팅 기본 반경
         this.isSnapped = false;
         
         // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
@@ -122,7 +122,10 @@ class BowAnalyzer {
         
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
-        const targetRadius = this.snapThreshold / this.transform.scale;
+        
+        // 💡 [조작감 개선 핵심 1] 스타일러스 펜 입력 시 히트박스 영역을 35픽셀로 가변 확장하여 조작 성공률 극대화
+        const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
+        const targetRadius = baseRadius / this.transform.scale;
         
         const currentTime = new Date().getTime();
         const tapLength = currentTime - this.lastTapTime;
@@ -226,17 +229,27 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 처리
+        const isPen = (event.pointerType === 'pen');
+        const baseRadius = isPen ? 35 : this.snapThreshold;
+
+        // 분기 A: 정점 개별 미세 편집 드래그 처리 (💡감도 완충 필터 레이어 추가)
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
+            const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
             
+            // 💡 [조작감 개선 핵심 2] 스타일러스 미끄러짐 방지를 위해 미세 댐핑 수식 결합 (유동 계수: 0.55)
+            if (isPen) {
+                targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
+                targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
+            }
+
             const angleSnappedPt = this.snapToAbsoluteAngles(basePt, targetX, targetY);
             targetX = angleSnappedPt.x;
             targetY = angleSnappedPt.y;
 
             if (!this.isAngleSnapped) {
-                const adjustedThreshold = this.snapThreshold / this.transform.scale;
+                const adjustedThreshold = baseRadius / this.transform.scale;
                 const dx = targetX - basePt.x;
                 const dy = targetY - basePt.y;
                 if (Math.abs(dx) < adjustedThreshold) { targetX = basePt.x; this.isSnapped = true; }
@@ -249,11 +262,17 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         } 
-        // 분기 B: 선 전체 몸통 통째로 평행 이동 드래그 처리
+        // 분기 B: 선 전체 몸통 통째로 평행 이동 드래그 처리 (💡감도 완충 필터 레이어 추가)
         else if (this.movingLineIndex !== -1) {
             const line = this.lines[this.movingLineIndex];
-            const deltaX = coords.x - this.lastCoords.x;
-            const deltaY = coords.y - this.lastCoords.y;
+            let deltaX = coords.x - this.lastCoords.x;
+            let deltaY = coords.y - this.lastCoords.y;
+
+            // 스타일러스 펜으로 선분 통째 드래그 이동 시 댐핑 제어
+            if (isPen) {
+                deltaX *= 0.55;
+                deltaY *= 0.55;
+            }
 
             line.start.x += deltaX;
             line.start.y += deltaY;
@@ -275,7 +294,7 @@ class BowAnalyzer {
                 if (snapEndpoint) {
                     targetX = snapEndpoint.x; targetY = snapEndpoint.y; this.isSnapped = true;
                 } else {
-                    const adjustedThreshold = this.snapThreshold / this.transform.scale;
+                    const adjustedThreshold = baseRadius / this.transform.scale;
                     const dx = targetX - this.currentLine.start.x;
                     const dy = targetY - this.currentLine.start.y;
                     if (Math.abs(dx) < adjustedThreshold) { targetX = this.currentLine.start.x; this.isSnapped = true; }
@@ -344,7 +363,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -352,7 +371,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line[0] : line;
+        const singleLine = Array.isArray(line) ? line : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -375,7 +394,6 @@ class BowAnalyzer {
         window.dispatchEvent(angleEvent);
     }
 
-    // 💡 [기본 충실 가시성 주입] 각 선마다 수평 지면 기준 절대 고각을 캔버스 본체에 실시간 명시하는 유틸리티 함수
     drawSingleLineAbsoluteAngle(line, scaleX) {
         if (!line || !line.start || !line.end) return;
         const angleVal = this.getLineAngle(line);
@@ -386,7 +404,6 @@ class BowAnalyzer {
         this.ctx.shadowBlur = 4;
         this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         
-        // 가이드라인 시작점(사수의 중심축) 우상단 쪽에 정렬 오버레이 주사
         const textX = line.start.x + (12 / this.transform.scale);
         const textY = line.start.y - (12 / this.transform.scale);
         this.ctx.fillText(`${angleVal}°`, textX, textY);
@@ -405,7 +422,7 @@ class BowAnalyzer {
         const radius = (40 * scaleX) / this.transform.scale;
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
-        this.ctx.fillStyle = '#34C759'; // 사잇각 수치는 럭셔리 네온 그린 컬러 매핑
+        this.ctx.fillStyle = '#34C759'; 
         this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 5;
@@ -426,25 +443,20 @@ class BowAnalyzer {
         
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         
-        // 1. 기존에 축적된 모든 가이드라인의 물리선 및 개별 지면 고각 동시 주사
         this.lines.forEach((line, idx) => {
             const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
             this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
             this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
             this.drawSingleLine(line);
-            
-            // 💡 [동시 주사 핵심] 각 선의 시작 단에 개별 수평 절대각을 텍스트 렌더링
             this.drawSingleLineAbsoluteAngle(line, scaleX);
         });
 
-        // 2. 💡 복수 선 성립 시(2개 이상) 교차 구간 사잇각 및 결합 호(Arc)를 중첩 표시
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
 
-        // 3. 실시간 신규 드로우 중인 타깃선 및 해당 선의 리얼타임 수평 절대각 매핑
         if (this.currentLine) {
             if (this.isAngleSnapped) {
                 this.ctx.strokeStyle = '#007AFF';
@@ -454,8 +466,6 @@ class BowAnalyzer {
                 this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
             }
             this.drawSingleLine(this.currentLine);
-            
-            // 💡 현재 드래그하며 새로 뻗어나가고 있는 선의 지면 고각도 리얼타임 노출
             this.drawSingleLineAbsoluteAngle(this.currentLine, scaleX);
         }
         this.ctx.restore();
