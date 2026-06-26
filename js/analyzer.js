@@ -1,6 +1,7 @@
 /**
- * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.4 - 스타일러스 초정밀 조작감 최적화 완결 버전)
+ * js/analyzer.js - [Part 1]
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 
+ * (v20.0 - 가로세로 3분할 박스 완전 가둠 완결 버전)
  */
 
 class BowAnalyzer {
@@ -16,7 +17,7 @@ class BowAnalyzer {
         
         // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
         this.isAngleSnapped = false;
-        this.angleSnapThreshold = 1.5; // 자석처럼 들러붙을 각도 오차 범위 (±1.5°)
+        this.angleSnapThreshold = 1.5; // 자석 각도 오차 범위 (±1.5°)
 
         // 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
         this.lastTapTime = 0;
@@ -80,18 +81,23 @@ class BowAnalyzer {
     }
 
     getCanvasCoordinates(event) {
+        if (!this.canvas) return { x: 0, y: 0 };
         const rect = this.canvas.getBoundingClientRect();
         const canvasScaleX = this.canvas.width / rect.width;
         const canvasScaleY = this.canvas.height / rect.height;
         const cX = (event.clientX - rect.left) * canvasScaleX;
         const cY = (event.clientY - rect.top) * canvasScaleY;
-        const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
-        const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
+        
+        const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) 
+                        / this.transform.scale;
+        const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) 
+                        / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
 
     // 점과 선분 사이의 최단거리 측정 기하 연산 함수
     getDistanceToLine(x, y, line) {
+        if (!line || !line.start || !line.end) return Infinity;
         const A = x - line.start.x;
         const B = y - line.start.y;
         const C = line.end.x - line.start.x;
@@ -111,6 +117,22 @@ class BowAnalyzer {
         }
         return Math.hypot(x - xx, y - yy);
     }
+
+    // 드로잉 시 주변 정점에 자석처럼 들러붙는 마감 함수
+    findCloseEndpoint(x, y) {
+        const baseRadius = window.isStylusActive ? 35 : this.snapThreshold;
+        const targetRadius = baseRadius / this.transform.scale;
+        for (let line of this.lines) {
+            if (Math.hypot(line.start.x - x, line.start.y - y) < targetRadius) {
+                return { x: line.start.x, y: line.start.y };
+            }
+            if (Math.hypot(line.end.x - x, line.end.y - y) < targetRadius) {
+                return { x: line.end.x, y: line.end.y };
+            }
+        }
+        return null;
+    }
+
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -123,7 +145,6 @@ class BowAnalyzer {
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
         
-        // 💡 [조작감 개선 핵심 1] 스타일러스 펜 입력 시 히트박스 영역을 35픽셀로 가변 확장하여 조작 성공률 극대화
         const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
         const targetRadius = baseRadius / this.transform.scale;
         
@@ -134,12 +155,13 @@ class BowAnalyzer {
         this.editingVertexType = null;
         this.movingLineIndex = -1;
 
-        // 선분 몸통 영역 내 '더블 탭 개별 삭제' 디텍팅 인터락
         if (tapLength < this.tapThreshold && tapLength > 0) {
-            const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, coords.y - this.lastTapCoords.y);
+            const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, 
+                                               coords.y - this.lastTapCoords.y);
             if (distFromLastTap < targetRadius) {
                 for (let i = 0; i < this.lines.length; i++) {
-                    if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
+                    if (this.getDistanceToLine(coords.x, coords.y, 
+                                               this.lines[i]) < targetRadius) {
                         this.lines.splice(i, 1);
                         this.lastTapTime = 0; 
                         this.currentLine = null;
@@ -147,7 +169,9 @@ class BowAnalyzer {
                         this.render();
                         this.calculateFinalAngle();
                         
-                        const deleteEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
+                        const deleteEvent = new CustomEvent('bowGestureUndo', { 
+                            detail: { lines: this.lines } 
+                        });
                         window.dispatchEvent(deleteEvent);
                         return; 
                     }
@@ -159,32 +183,32 @@ class BowAnalyzer {
         this.lastTapCoords = coords;
         this.lastCoords = coords;
 
-        // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드)
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i];
-            if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
+            if (Math.hypot(line.start.x - coords.x, 
+                           line.start.y - coords.y) < targetRadius) {
                 this.editingLineIndex = i;
                 this.editingVertexType = 'start';
                 break;
             }
-            if (Math.hypot(line.end.x - coords.x, line.end.y - coords.y) < targetRadius) {
+            if (Math.hypot(line.end.x - coords.x, 
+                           line.end.y - coords.y) < targetRadius) {
                 this.editingLineIndex = i;
                 this.editingVertexType = 'end';
                 break;
             }
         }
 
-        // 2순위 분기: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 모드)
         if (this.editingLineIndex === -1) {
             for (let i = 0; i < this.lines.length; i++) {
-                if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
+                if (this.getDistanceToLine(coords.x, coords.y, 
+                                           this.lines[i]) < targetRadius) {
                     this.movingLineIndex = i;
                     break;
                 }
             }
         }
 
-        // 3순위 분기: 아무것도 잡지 않은 허공이라면 신규 가이드라인 드로잉 가동
         if (this.editingLineIndex === -1 && this.movingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -192,8 +216,12 @@ class BowAnalyzer {
             this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
         }
     }
+/**
+ * js/analyzer.js - [Part 2]
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 
+ * (v20.0 - 가로세로 3분할 박스 완전 가둠 완결 버전)
+ */
 
-    // 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
     snapToAbsoluteAngles(basePt, targetX, targetY) {
         const dx = targetX - basePt.x;
         const dy = targetY - basePt.y;
@@ -232,13 +260,13 @@ class BowAnalyzer {
         const isPen = (event.pointerType === 'pen');
         const baseRadius = isPen ? 35 : this.snapThreshold;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 처리 (💡감도 완충 필터 레이어 추가)
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
-            const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
-            const basePt = this.editingVertexType === 'start' ? line.end : line.start;
+            const currentVertex = this.editingVertexType === 'start' ? 
+                                  line.start : line.end;
+            const basePt = this.editingVertexType === 'start' ? 
+                           line.end : line.start;
             
-            // 💡 [조작감 개선 핵심 2] 스타일러스 미끄러짐 방지를 위해 미세 댐핑 수식 결합 (유동 계수: 0.55)
             if (isPen) {
                 targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
                 targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
@@ -252,8 +280,11 @@ class BowAnalyzer {
                 const adjustedThreshold = baseRadius / this.transform.scale;
                 const dx = targetX - basePt.x;
                 const dy = targetY - basePt.y;
-                if (Math.abs(dx) < adjustedThreshold) { targetX = basePt.x; this.isSnapped = true; }
-                else if (Math.abs(dy) < adjustedThreshold) { targetY = basePt.y; this.isSnapped = true; }
+                if (Math.abs(dx) < adjustedThreshold) { 
+                    targetX = basePt.x; this.isSnapped = true; 
+                } else if (Math.abs(dy) < adjustedThreshold) { 
+                    targetY = basePt.y; this.isSnapped = true; 
+                }
             }
 
             if (this.editingVertexType === 'start') { line.start = { x: targetX, y: targetY }; }
@@ -262,13 +293,11 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         } 
-        // 분기 B: 선 전체 몸통 통째로 평행 이동 드래그 처리 (💡감도 완충 필터 레이어 추가)
         else if (this.movingLineIndex !== -1) {
             const line = this.lines[this.movingLineIndex];
             let deltaX = coords.x - this.lastCoords.x;
             let deltaY = coords.y - this.lastCoords.y;
 
-            // 스타일러스 펜으로 선분 통째 드래그 이동 시 댐핑 제어
             if (isPen) {
                 deltaX *= 0.55;
                 deltaY *= 0.55;
@@ -283,22 +312,26 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         }
-        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹
         else if (this.currentLine) {
-            const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, targetX, targetY);
+            const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, 
+                                                             targetX, targetY);
             targetX = angleSnappedPt.x;
             targetY = angleSnappedPt.y;
 
             if (!this.isAngleSnapped) {
                 const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
                 if (snapEndpoint) {
-                    targetX = snapEndpoint.x; targetY = snapEndpoint.y; this.isSnapped = true;
+                    targetX = snapEndpoint.x; targetY = snapEndpoint.y; 
+                    this.isSnapped = true;
                 } else {
                     const adjustedThreshold = baseRadius / this.transform.scale;
                     const dx = targetX - this.currentLine.start.x;
                     const dy = targetY - this.currentLine.start.y;
-                    if (Math.abs(dx) < adjustedThreshold) { targetX = this.currentLine.start.x; this.isSnapped = true; }
-                    else if (Math.abs(dy) < adjustedThreshold) { targetY = this.currentLine.start.y; this.isSnapped = true; }
+                    if (Math.abs(dx) < adjustedThreshold) { 
+                        targetX = this.currentLine.start.x; this.isSnapped = true; 
+                    } else if (Math.abs(dy) < adjustedThreshold) { 
+                        targetY = this.currentLine.start.y; this.isSnapped = true; 
+                    }
                 }
             }
             this.currentLine.end = { x: targetX, y: targetY };
@@ -316,52 +349,42 @@ class BowAnalyzer {
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             this.editingLineIndex = -1;
             this.editingVertexType = null;
-            this.isAngleSnapped = false;
-            this.render();
-            this.calculateFinalAngle();
-        } 
-        else if (this.movingLineIndex !== -1) {
+        } else if (this.movingLineIndex !== -1) {
             this.movingLineIndex = -1;
-            this.render();
-            this.calculateFinalAngle();
-        }
-        else if (this.currentLine) {
-            const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
-            if (dist > (8 / this.transform.scale)) {
+        } else if (this.currentLine) {
+            const dx = this.currentLine.end.x - this.currentLine.start.x;
+            const dy = this.currentLine.end.y - this.currentLine.start.y;
+            if (Math.hypot(dx, dy) > 8) {
                 this.lines.push(this.currentLine);
             }
             this.currentLine = null;
-            this.isSnapped = false;
-            this.isAngleSnapped = false;
-            this.render();
-            this.calculateFinalAngle();
         }
+        this.isAngleSnapped = false;
+        this.render();
+        this.calculateFinalAngle();
     }
-    findCloseEndpoint(x, y) {
-        const adjustedThreshold = this.snapThreshold / this.transform.scale;
-        for (let line of this.lines) {
-            if (Math.hypot(line.start.x - x, line.start.y - y) < adjustedThreshold) {
-                return { x: line.start.x, y: line.start.y };
-            }
-            if (Math.hypot(line.end.x - x, line.end.y - y) < adjustedThreshold) {
-                return { x: line.end.x, y: line.end.y };
-            }
-        }
-        return null;
-    }
+/**
+ * js/analyzer.js - [Part 3]
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 
+ * (v20.0 - 가로세로 3분할 박스 완전 가둠 완결 버전)
+ */
 
     calculateAnglesInline() {
         if (!this.currentLine) return;
         if (this.lines.length === 0) {
             this.broadcastAngle(this.getLineAngle(this.currentLine));
         } else {
-            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
+            this.broadcastAngle(this.getIntersectionAngle(
+                this.lines[this.lines.length - 1], this.currentLine
+            ));
         }
     }
 
     calculateFinalAngle() {
         if (this.lines.length >= 2) {
-            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
+            this.broadcastAngle(this.getIntersectionAngle(
+                this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]
+            ));
         } else if (this.lines.length === 1) {
             this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
@@ -370,27 +393,30 @@ class BowAnalyzer {
     }
 
     getLineAngle(line) {
-        if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line : line;
-        if (!singleLine || !singleLine.start || !singleLine.end) return 0;
-        const dx = singleLine.end.x - singleLine.start.x;
-        const dy = singleLine.end.y - singleLine.start.y;
+        if (!line || !line.start || !line.end) return 0;
+        const dx = line.end.x - line.start.x;
+        const dy = line.end.y - line.start.y;
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
         return Number((angle % 180).toFixed(1));
     }
 
     getIntersectionAngle(line1, line2) {
-        if (!line1 || !line2) return 0;
-        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        if (!line1 || !line2 || !line1.start || !line1.end || 
+            !line2.start || !line2.end) return 0;
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), 
+                                  line1.end.x - line1.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), 
+                                  line2.end.x - line2.start.x);
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
         return Number(Math.abs(diff).toFixed(1));
     }
 
     broadcastAngle(angle) {
-        const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: Number(angle).toFixed(1) } });
+        const angleEvent = new CustomEvent('bowAngleUpdate', { 
+            detail: { angle: Number(angle).toFixed(1) } 
+        });
         window.dispatchEvent(angleEvent);
     }
 
@@ -402,7 +428,8 @@ class BowAnalyzer {
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
         this.ctx.shadowBlur = 4;
-        this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px 
+                        -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         
         const textX = line.start.x + (12 / this.transform.scale);
         const textY = line.start.y - (12 / this.transform.scale);
@@ -412,21 +439,30 @@ class BowAnalyzer {
 
     drawInlineAngleArc(line1, line2, scaleX) {
         if (!line1 || !line2) return;
-        const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
-        const a2 = Math.atan2((line2.end.y - line2.start.y), line2.end.x - line2.start.x);
-        const deg = this.getIntersectionAngle(line1, line2);
+        
+        const l1 = Array.isArray(line1) ? line1[line1.length - 1] : line1;
+        const l2 = Array.isArray(line2) ? line2[line2.length - 1] : line2;
+        if (!l1 || !l2 || !l1.start || !l1.end || !l2.start || !l2.end) return;
+
+        const a1 = Math.atan2((l1.start.y - l1.end.y), l1.start.x - l1.end.x);
+        const a2 = Math.atan2((l2.end.y - l2.start.y), l2.end.x - l2.start.x);
+        const deg = this.getIntersectionAngle(l1, l2);
+        
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
         this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
         const radius = (40 * scaleX) / this.transform.scale;
-        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
+        this.ctx.arc(l1.end.x, l1.end.y, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
         this.ctx.fillStyle = '#34C759'; 
-        this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px 
+                        -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
         this.ctx.shadowBlur = 5;
-        this.ctx.fillText(`사잇각: ${deg.toFixed(1)}°`, line1.end.x + (20 / this.transform.scale), line1.end.y - (20 / this.transform.scale));
+        this.ctx.fillText(`사잇각: ${deg.toFixed(1)}°`, 
+                           l1.end.x + (20 / this.transform.scale), 
+                           l1.end.y - (20 / this.transform.scale));
         this.ctx.restore();
     }
 
@@ -438,13 +474,14 @@ class BowAnalyzer {
         const scaleX = this.canvas.width / rect.width;
         const canvasScaleY = this.canvas.height / rect.height;
         
-        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
+        this.ctx.translate(this.transform.offsetX * scaleX, 
+                           this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
-        
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         
         this.lines.forEach((line, idx) => {
-            const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
+            const isEditing = (idx === this.editingLineIndex || 
+                               idx === this.movingLineIndex);
             this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
             this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
             this.drawSingleLine(line);
@@ -452,7 +489,8 @@ class BowAnalyzer {
         });
 
         if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], 
+                                    this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
             this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
@@ -472,7 +510,7 @@ class BowAnalyzer {
     }
 
     drawSingleLine(line) {
-        if (!line) return;
+        if (!line || !line.start || !line.end) return;
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
 
