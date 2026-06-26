@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.12 - 스마트 분할 초기화 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.13 - 파일 열기 파이프라인 무결성 완결판)
  */
 
 window.bowAppNodes = {};
@@ -456,10 +456,11 @@ window.addEventListener('load', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
+    // 💡 [열기 에러 완벽 수정] FileList 배열 포인터를 files[0] 단일 타깃으로 명밀 교정 완료했습니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files;
+        const targetFile = files[0];
         
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
@@ -499,9 +500,6 @@ window.addEventListener('load', () => {
         }
     });
 
-    // 💡 [스마트 분할 초기화 핵심 이식 완료]
-    // 뼈대를 뜯어고치는 과도한 예외 없이 기존 원점 복귀 트랜스폼 라인만 깔끔히 도려내어,
-    // 정밀하게 맞춰둔 '현재 화면의 확대 구도(배율/좌표)'를 철저하게 고정 사수합니다.
     nodes.btnReset.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.mainVideo.removeAttribute('src');
@@ -510,10 +508,8 @@ window.addEventListener('load', () => {
         nodes.videoSlider.value = 0;
         nodes.videoSlider.max = 100;
 
-        // 고각 선 스케치만 단독 청소 가동
         if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
-
-        // 💡 core.state.scale 복귀 코드를 전면 소거하여 현재 줌 배율 매트릭스를 영속 유지합니다.
+        
         await core.saveCache('lastLines', []);
         await core.saveCache('lastVideoBlob', null);
         await core.saveCache('lastRecordedMime', null);
