@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.2 - 국궁 표준 고각 자석 스냅 완결 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.3 - 멀티 앵글 가시성 극대화 완결 버전)
  */
 
 class BowAnalyzer {
@@ -14,7 +14,7 @@ class BowAnalyzer {
         this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
         
-        // 💡 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
+        // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
         this.isAngleSnapped = false;
         this.angleSnapThreshold = 1.5; // 자석처럼 들러붙을 각도 오차 범위 (±1.5°)
 
@@ -190,14 +190,13 @@ class BowAnalyzer {
         }
     }
 
-    // 💡 [기본 충실 삼각 수학] 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
+    // 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
     snapToAbsoluteAngles(basePt, targetX, targetY) {
         const dx = targetX - basePt.x;
         const dy = targetY - basePt.y;
         const length = Math.hypot(dx, dy);
         if (length === 0) return { x: targetX, y: targetY };
 
-        // 현재 마우스 드래그 기반 계산된 원시 아크탄젠트 고각 추출
         let rawAngle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (rawAngle < 0) rawAngle += 360;
         const normalizedAngle = rawAngle % 180;
@@ -207,14 +206,9 @@ class BowAnalyzer {
 
         for (let target of targets) {
             if (Math.abs(normalizedAngle - target) < this.angleSnapThreshold) {
-                // 검출 성공 시 자석 상태 락 활성화
                 this.isAngleSnapped = true;
-                
-                // 원본 라디안 방향각 복원 연산
                 let targetRad = target * (Math.PI / 180);
                 if (rawAngle >= 180) targetRad = (target + 180) * (Math.PI / 180);
-                
-                // 삼각함수 공식 원형 보정을 통한 52.21도 / 37.79도 물리적 좌표 고정 강제 사수
                 return {
                     x: basePt.x + length * Math.cos(targetRad),
                     y: basePt.y - length * Math.sin(targetRad)
@@ -232,12 +226,11 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 처리 (절대각 자석 인터락 연동)
+        // 분기 A: 정점 개별 미세 편집 드래그 처리
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
             
-            // 💡 국궁 절대 고각 스냅 필터 선행 통과
             const angleSnappedPt = this.snapToAbsoluteAngles(basePt, targetX, targetY);
             targetX = angleSnappedPt.x;
             targetY = angleSnappedPt.y;
@@ -271,9 +264,8 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         }
-        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹 (절대각 자석 인터락 연동)
+        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹
         else if (this.currentLine) {
-            // 💡 국궁 절대 고각 스냅 필터 선행 통과
             const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, targetX, targetY);
             targetX = angleSnappedPt.x;
             targetY = angleSnappedPt.y;
@@ -352,7 +344,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines));
+            this.broadcastAngle(this.getLineAngle(this.lines[0]));
         } else {
             this.broadcastAngle(0);
         }
@@ -360,13 +352,13 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line : line;
+        const singleLine = Array.isArray(line) ? line[0] : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
         let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
         if (angle < 0) angle += 360;
-        return angle % 180;
+        return Number((angle % 180).toFixed(1));
     }
 
     getIntersectionAngle(line1, line2) {
@@ -375,12 +367,30 @@ class BowAnalyzer {
         const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
-        return diff;
+        return Number(Math.abs(diff).toFixed(1));
     }
 
     broadcastAngle(angle) {
         const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: Number(angle).toFixed(1) } });
         window.dispatchEvent(angleEvent);
+    }
+
+    // 💡 [기본 충실 가시성 주입] 각 선마다 수평 지면 기준 절대 고각을 캔버스 본체에 실시간 명시하는 유틸리티 함수
+    drawSingleLineAbsoluteAngle(line, scaleX) {
+        if (!line || !line.start || !line.end) return;
+        const angleVal = this.getLineAngle(line);
+        
+        this.ctx.save();
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.shadowBlur = 4;
+        this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        
+        // 가이드라인 시작점(사수의 중심축) 우상단 쪽에 정렬 오버레이 주사
+        const textX = line.start.x + (12 / this.transform.scale);
+        const textY = line.start.y - (12 / this.transform.scale);
+        this.ctx.fillText(`${angleVal}°`, textX, textY);
+        this.ctx.restore();
     }
 
     drawInlineAngleArc(line1, line2, scaleX) {
@@ -390,16 +400,16 @@ class BowAnalyzer {
         const deg = this.getIntersectionAngle(line1, line2);
         this.ctx.save();
         this.ctx.beginPath();
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
         this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
-        const radius = (35 * scaleX) / this.transform.scale;
+        const radius = (40 * scaleX) / this.transform.scale;
         this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
         this.ctx.stroke();
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = `bold ${Math.max(12, (13 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.fillStyle = '#34C759'; // 사잇각 수치는 럭셔리 네온 그린 컬러 매핑
+        this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
         this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        this.ctx.shadowBlur = 4;
-        this.ctx.fillText(`${deg.toFixed(1)}°`, line1.end.x + (15 / this.transform.scale), line1.end.y - (15 / this.transform.scale));
+        this.ctx.shadowBlur = 5;
+        this.ctx.fillText(`사잇각: ${deg.toFixed(1)}°`, line1.end.x + (20 / this.transform.scale), line1.end.y - (20 / this.transform.scale));
         this.ctx.restore();
     }
 
@@ -416,24 +426,26 @@ class BowAnalyzer {
         
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         
-        // 기존 라인 가속 렌더링
+        // 1. 기존에 축적된 모든 가이드라인의 물리선 및 개별 지면 고각 동시 주사
         this.lines.forEach((line, idx) => {
             const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
             this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
             this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
             this.drawSingleLine(line);
+            
+            // 💡 [동시 주사 핵심] 각 선의 시작 단에 개별 수평 절대각을 텍스트 렌더링
+            this.drawSingleLineAbsoluteAngle(line, scaleX);
         });
 
+        // 2. 💡 복수 선 성립 시(2개 이상) 교차 구간 사잇각 및 결합 호(Arc)를 중첩 표시
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
         }
 
-        // 실시간 드로우 중인 타깃선 렌더링 규격 분기
+        // 3. 실시간 신규 드로우 중인 타깃선 및 해당 선의 리얼타임 수평 절대각 매핑
         if (this.currentLine) {
-            // 💡 [테크니컬 디자인 마감] 52.21도 / 37.79도 자석 락 상태일 때는 매혹적인 '일렉트릭 블루 일렉트릭 블루(#007AFF)' 레이저 가이드 방출,
-            // 일반 물리 스냅 시에는 연두색(#34C759), 기본 상태는 백색(#FFFFFF)으로 발광 정렬합니다.
             if (this.isAngleSnapped) {
                 this.ctx.strokeStyle = '#007AFF';
                 this.ctx.fillStyle = '#007AFF';
@@ -442,6 +454,9 @@ class BowAnalyzer {
                 this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
             }
             this.drawSingleLine(this.currentLine);
+            
+            // 💡 현재 드래그하며 새로 뻗어나가고 있는 선의 지면 고각도 리얼타임 노출
+            this.drawSingleLineAbsoluteAngle(this.currentLine, scaleX);
         }
         this.ctx.restore();
     }
