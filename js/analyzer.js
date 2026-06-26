@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v20.0 - 실시간 돋보기 조준경 완결판)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.4 - 기하 연산 정화 및 S펜 댐핑 완결 버전)
  */
 
 class BowAnalyzer {
@@ -11,7 +11,7 @@ class BowAnalyzer {
         this.currentLine = null;
         this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
         this.toolMode = 'move'; 
-        this.snapThreshold = 18; // 손가락 터치 타겟팅 기본 반경
+        this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
         
         // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
@@ -29,15 +29,12 @@ class BowAnalyzer {
         this.movingLineIndex = -1;
         this.lastCoords = { x: 0, y: 0 };
 
-        // 💡 [초정밀 돋보기 인터락] 실시간 돋보기 조준경 렌더링용 마우스 위치 추적 변수
-        this.pointerPos = { clientX: 0, clientY: 0, showLens: false };
-
         this.handlePointerDown = this.handlePointerDown.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerUp = this.handlePointerUp.bind(this);
     }
 
-    // 💡 [하드웨어 충돌 박멸] 리스너를 단 1번만 영구 결합하여 중복 누적 버그 차단
+    // [하드웨어 충돌 박멸] 리스너를 단 1번만 영구 결합하여 중복 누적 버그 차단
     init(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
@@ -68,7 +65,6 @@ class BowAnalyzer {
         this.editingVertexType = null;
         this.movingLineIndex = -1;
         this.isAngleSnapped = false;
-        this.pointerPos.showLens = false;
         this.render();
         this.broadcastAngle(0);
     }
@@ -77,7 +73,6 @@ class BowAnalyzer {
         if (this.lines.length > 0) {
             this.lines.pop();
             this.isAngleSnapped = false;
-            this.pointerPos.showLens = false;
             this.render();
             this.calculateFinalAngle();
             return true;
@@ -129,7 +124,7 @@ class BowAnalyzer {
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
         
-        // 스타일러스 펜 입력 시 히트박스 영역을 35픽셀로 가변 확장하여 조작 성공률 극대화
+        // [조작감 개선 핵심 1] 스타일러스 펜 입력 시 히트박스 영역을 35픽셀로 가변 확장하여 조작 성공률 극대화
         const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
         const targetRadius = baseRadius / this.transform.scale;
         
@@ -150,7 +145,6 @@ class BowAnalyzer {
                         this.lastTapTime = 0; 
                         this.currentLine = null;
                         this.isAngleSnapped = false;
-                        this.pointerPos.showLens = false;
                         this.render();
                         this.calculateFinalAngle();
                         
@@ -165,11 +159,6 @@ class BowAnalyzer {
         this.lastTapTime = currentTime;
         this.lastTapCoords = coords;
         this.lastCoords = coords;
-
-        // 💡 펜/손가락이 최초 다운되어 화면을 터치하는 순간 돋보기 렌더러 플래그 기동 준비
-        this.pointerPos.clientX = event.clientX;
-        this.pointerPos.clientY = event.clientY;
-        this.pointerPos.showLens = true;
 
         // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드)
         for (let i = 0; i < this.lines.length; i++) {
@@ -203,7 +192,6 @@ class BowAnalyzer {
             if (snappedPt) startPt = snappedPt;
             this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
         }
-        this.render();
     }
 
     // 국궁 사법 고유 타깃 절대 각도 자석 매핑 핵심 필터링 함수
@@ -245,17 +233,13 @@ class BowAnalyzer {
         const isPen = (event.pointerType === 'pen');
         const baseRadius = isPen ? 35 : this.snapThreshold;
 
-        // 💡 드래그 이동 중 손가락 끝 실시간 뷰포트 좌표 데이터 연속 동기화 및 돋보기 활성화
-        this.pointerPos.clientX = event.clientX;
-        this.pointerPos.clientY = event.clientY;
-        this.pointerPos.showLens = true;
-
-        // 분기 A: 정점 개별 미세 편집 드래그 처리
+        // 분기 A: 정점 개별 미세 편집 드래그 처리 (감도 완충 댐핑 필터)
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
             
+            // [조작감 개선 핵심 2] 스타일러스 미끄러짐 방지를 위해 미세 댐핑 수식 결합 (유동 계수: 0.55)
             if (isPen) {
                 targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
                 targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
@@ -327,10 +311,6 @@ class BowAnalyzer {
         if (event.pointerType === 'pen') {
             setTimeout(() => { window.isStylusActive = false; }, 500);
         }
-        
-        // 💡 [캡처 무결성 수호] 손가락/펜을 화면에서 떼는 순간 돋보기 UI 그래픽은 즉시 완벽 소거 폐기합니다.
-        this.pointerPos.showLens = false;
-
         if (this.toolMode !== 'draw') return;
 
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
@@ -357,3 +337,177 @@ class BowAnalyzer {
             this.calculateFinalAngle();
         }
     }
+    findCloseEndpoint(x, y) {
+        const adjustedThreshold = this.snapThreshold / this.transform.scale;
+        for (let line of this.lines) {
+            if (Math.hypot(line.start.x - x, line.start.y - y) < adjustedThreshold) {
+                return { x: line.start.x, y: line.start.y };
+            }
+            if (Math.hypot(line.end.x - x, line.end.y - y) < adjustedThreshold) {
+                return { x: line.end.x, y: line.end.y };
+            }
+        }
+        return null;
+    }
+
+    calculateAnglesInline() {
+        if (!this.currentLine) return;
+        if (this.lines.length === 0) {
+            this.broadcastAngle(this.getLineAngle(this.currentLine));
+        } else {
+            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
+        }
+    }
+
+    calculateFinalAngle() {
+        if (this.lines.length >= 2) {
+            this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
+        } else if (this.lines.length === 1) {
+            this.broadcastAngle(this.getLineAngle(this.lines));
+        } else {
+            this.broadcastAngle(0);
+        }
+    }
+
+    getLineAngle(line) {
+        if (!line) return 0;
+        const singleLine = Array.isArray(line) ? line : line;
+        if (!singleLine || !singleLine.start || !singleLine.end) return 0;
+        const dx = singleLine.end.x - singleLine.start.x;
+        const dy = singleLine.end.y - singleLine.start.y;
+        let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
+        if (angle < 0) angle += 360;
+        return Number((angle % 180).toFixed(1));
+    }
+
+    // 💡 [정화 복구] 엉킨 중복 연산 구조를 지워내고 순수한 Y축 변화량 기하 수식으로 완전히 복구했습니다.
+    getIntersectionAngle(line1, line2) {
+        if (!line1 || !line2) return 0;
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
+        if (diff > 180) diff = 360 - diff;
+        return Number(Math.abs(diff).toFixed(1));
+    }
+
+    broadcastAngle(angle) {
+        const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: Number(angle).toFixed(1) } });
+        window.dispatchEvent(angleEvent);
+    }
+
+    // 💡 [정화 복구] 줌 가속 매트릭스 내부의 중복 나눗셈 결함을 완전 비워내서 글자 시야를 복구했습니다.
+    drawSingleLineAbsoluteAngle(line, scaleX) {
+        if (!line || !line.start || !line.end) return;
+        const angleVal = this.getLineAngle(line);
+        
+        this.ctx.save();
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.shadowBlur = 4;
+        
+        this.ctx.font = `bold ${12 * scaleX}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        
+        const textX = line.start.x + (12 / this.transform.scale);
+        const textY = line.start.y - (12 / this.transform.scale);
+        this.ctx.fillText(`${angleVal}°`, textX, textY);
+        this.ctx.restore();
+    }
+
+    // 💡 [정화 복구] 이중 스케일 역연산 오차식을 박멸하여, 화면 확대 시에도 복수 선과 아크가 유실되지 않게 고수합니다.
+    drawInlineAngleArc(line1, line2, scaleX) {
+        if (!line1 || !line2) return;
+        const a1 = Math.atan2((line1.start.y - line1.end.y), line1.start.x - line1.end.x);
+        const a2 = Math.atan2((line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        const deg = this.getIntersectionAngle(line1, line2);
+        
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+        
+        this.ctx.lineWidth = 1.5 * scaleX;
+        const radius = 40 * scaleX;
+        
+        this.ctx.arc(line1.end.x, line1.end.y, radius, -a1, -a2, a1 > a2);
+        this.ctx.stroke();
+        
+        this.ctx.fillStyle = '#34C759'; 
+        this.ctx.font = `bold ${14 * scaleX}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
+        this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        this.ctx.shadowBlur = 5;
+        this.ctx.fillText(`사잇각: ${deg.toFixed(1)}°`, line1.end.x + (20 / this.transform.scale), line1.end.y - (20 / this.transform.scale));
+        this.ctx.restore();
+    }
+
+    render() {
+        if (!this.ctx || !this.canvas) return;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.save();
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const canvasScaleY = this.canvas.height / rect.height;
+        
+        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
+        this.ctx.scale(this.transform.scale, this.transform.scale);
+        
+        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
+        
+        this.lines.forEach((line, idx) => {
+            const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
+            this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
+            this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
+            this.drawSingleLine(line);
+            this.drawSingleLineAbsoluteAngle(line, scaleX);
+        });
+
+        if (this.lines.length >= 2) {
+            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
+        } else if (this.lines.length === 1 && this.currentLine) {
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
+        }
+
+        if (this.currentLine) {
+            if (this.isAngleSnapped) {
+                this.ctx.strokeStyle = '#007AFF';
+                this.ctx.fillStyle = '#007AFF';
+            } else {
+                this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
+                this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
+            }
+            this.drawSingleLine(this.currentLine);
+            this.drawSingleLineAbsoluteAngle(this.currentLine, scaleX);
+        }
+        this.ctx.restore();
+    }
+
+    drawSingleLine(line) {
+        if (!line) return;
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(line.start.x, line.start.y);
+        this.ctx.lineTo(line.end.x, line.end.y);
+        this.ctx.stroke();
+
+        const pinSize = (8 * scaleX) / this.transform.scale;
+        this.ctx.save();
+        this.ctx.lineWidth = (1.0 * scaleX) / this.transform.scale;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
+        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
+        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
+        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
+        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
+        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
+        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
+        this.ctx.stroke();
+
+        this.ctx.restore();
+    }
+}
+window.bowAnalyzer = new BowAnalyzer();
