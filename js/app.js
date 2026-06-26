@@ -261,7 +261,7 @@ window.addEventListener('load', () => {
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    // 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
+    // 일시정지된 영상 프레임과 S펜으로 정렬해 둔 각도 오버레이 레이어를 결합하는 고화질 스냅샷 드라이버
     nodes.btnSnapshot.addEventListener('click', () => {
         if (!nodes.mainVideo.src || nodes.mainVideo.readyState < 2) {
             alert('캡처할 영상 데이터가 준비되지 않았습니다.');
@@ -447,6 +447,7 @@ window.addEventListener('load', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
+    // 💡 단일 파일 참조 인덱스를 명확하게 files으로 안착시켜 영상 로딩 파이프라인을 사수합니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -490,17 +491,14 @@ window.addEventListener('load', () => {
         }
     });
 
-    // 💡 [초미니멀 분할 초기화 대수술 완료]
-    // 영상을 증발시키던 무리한 파괴 코드 3줄(removeAttribute, load, videoInput.value)을 완벽히 청소했습니다.
-    // 이제 초기화 버튼을 누르는 순간, 화면의 동영상과 확대 줌인 구도는 그 자리 그대로 안전하게 '박제'되고,
-    // 오직 캔버스 표면 위의 초록색 분석 선 데이터 배열만 완벽하게 싹 소거 지워집니다.
+    // 💡 [스마트 분할 초기화 완결 마감] 
+    // 화면을 지우던 소스 파괴 구문을 깨끗이 도려내어 동영상 화면과 정밀 줌인 배율 구도는 완벽히 보존하고,
+    // 오직 캔버스 위의 분석 초록선만 싹 클리어 지워주는 기본 충실 아키텍처를 사수했습니다.
     nodes.btnReset.addEventListener('click', async () => {
-        // 오직 고각 선 스케치 인스턴스만 단독 클리어
         if (window.bowAnalyzer) {
             window.bowAnalyzer.clearLines();
         }
         
-        // 데이터 영속소 캐시 내부 선 배열만 빈 값으로 소거 동기화
         await core.saveCache('lastLines', []);
 
         nodes.angleReport.textContent = "ANGLE 0.0°";
