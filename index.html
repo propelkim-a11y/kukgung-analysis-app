@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#050507">
-    <link rel="stylesheet" href="style.css?v=18.11">
+    <link rel="stylesheet" href="style.css?v=17.0">
 </head>
 <body>
 
@@ -45,6 +45,7 @@
             </div>
         </div>
     </div>
+
     <!-- ================================================================= -->
     <!-- [SCENE 2] 분석 모드 화면 -->
     <!-- ================================================================= -->
@@ -61,12 +62,11 @@
             </div>
 
             <div class="panel-content-wrapper">
-                <!-- 💡 [기능 확장 이식] 텍스트 메뉴 바 내 저장 왼쪽 자리에 프리미엄 크리스탈 [캡처] 버튼 추가 배치 -->
+                <!-- 💡 [기능 확장] 분석 모드 메뉴 바 우측 끝에 크리스탈 [저장] 버튼 추가 이식 -->
                 <nav class="text-menu-bar">
                     <button id="btn-open" class="menu-btn">열기</button>
                     <button id="btn-move" class="menu-btn">확대</button>
                     <button id="btn-draw" class="menu-btn">선긋기</button>
-                    <button id="btn-snapshot" class="menu-btn" style="color:#007AFF;">캡처</button>
                     <button id="btn-download-video" class="menu-btn" style="color:#34C759;">저장</button>
                     <button id="btn-reset" class="menu-btn">초기화</button>
                 </nav>
@@ -90,17 +90,17 @@
 
     <input type="file" id="video-input" accept="video/*" style="display: none;">
 
-    <script src="js/sensor.js?v=18.11"></script>
-    <script src="js/analyzer.js?v=18.11"></script>
-    <script src="js/app_core.js?v=18.11"></script>
-    <script src="js/app_gesture.js?v=18.11"></script>
-    <script src="js/app.js?v=18.11"></script>
+    <script src="js/sensor.js?v=17.0"></script>
+    <script src="js/analyzer.js?v=17.0"></script>
+    <script src="js/app_core.js?v=17.0"></script>
+    <script src="js/app_gesture.js?v=17.0"></script>
+    <script src="js/app.js?v=17.0"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const repoPath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
-                navigator.serviceWorker.register('sw.js?v=18.11', { scope: repoPath })
+                navigator.serviceWorker.register('sw.js?v=17.0', { scope: repoPath })
                     .then(reg => console.log('[PWA] 서비스 워커 가동:', reg.scope))
                     .catch(err => console.error('[PWA] 서비스 워커 경로 에러:', err));
             });
