@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
  * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
- * (v27.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 1)
+ * (v30.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 1)
  */
 
 window.bowAppNodes = {};
@@ -177,7 +177,7 @@ window.addEventListener('load', () => {
 /**
  * js/app.js - [Part 2]
  * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
- * (v23.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 2)
+ * (v30.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 2)
  */
 
     fpsButtons.forEach(btn => {
@@ -232,15 +232,13 @@ window.addEventListener('load', () => {
             
             if (!isRecording) {
                 recordedChunks = [];
-                // 💡 [iOS 사파리/모바일 호환성 전면 패치 완료]
-                // 아이폰 환경에서 무조건 깨지던 WebM 대신, iOS 네이티브 가속 코덱인 mp4 최우선 순위 정렬
-                let options = { mimeType: 'video/mp4;codecs=avc1' };
+                let options = { mimeType: 'video/mp4' };
                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options = { mimeType: 'video/mp4' };
+                    options = { mimeType: 'video/webm;codecs=vp9' };
                     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                        options = { mimeType: 'video/webm;codecs=vp9' };
+                        options = { mimeType: 'video/webm;codecs=vp8' };
                         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                            options = { mimeType: 'video/webm;codecs=vp8' };
+                            options = { mimeType: '' }; 
                         }
                     }
                 }
@@ -259,6 +257,23 @@ window.addEventListener('load', () => {
                             await core.saveCache('lastVideoBlob', videoBlob);
                             await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
                         }
+
+                        try {
+                            const actualMime = mediaRecorder.mimeType || 'video/mp4';
+                            let fileExtension = '.mp4';
+                            if (actualMime.includes('webm')) {
+                                fileExtension = '.webm';
+                            }
+                            const a = document.createElement('a');
+                            a.href = videoURL;
+                            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                            a.download = `kukgung_auto_${dateStr}${fileExtension}`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        } catch (downloadErr) {
+                            console.error('자동 저장 실패:', downloadErr);
+                        }
                         
                         transitToAnalyzeMode();
                     };
@@ -270,6 +285,10 @@ window.addEventListener('load', () => {
                     if (nodes.recordStatus) nodes.recordStatus.textContent = '고해상도 프레임 캡처 진행 중...';
                 } catch (e) {
                     console.error('녹화 시동 오류:', e);
+                    isRecording = false;
+                    nodes.btnRecordToggle.textContent = '녹화시작';
+                    nodes.btnRecordToggle.classList.remove('recording');
+                    alert('현재 장치 환경이 지정된 MP4 녹화 기능을 지원하지 않습니다.');
                 }
             } else {
                 if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -364,7 +383,7 @@ window.addEventListener('load', () => {
 /**
  * js/app.js - [Part 3]
  * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 
- * (v23.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 3)
+ * (v30.0 - 물리적 200라인 한계치 밀착 분할 구조판 / Part 3)
  */
 
     if (nodes.videoSlider) {
@@ -639,7 +658,7 @@ window.addEventListener('load', () => {
         if (core && typeof core.saveCache === 'function') {
 /**
  * js/app.js - [Part 3 추가 보완 최종 가둠 정렬판]
- * (v27.1 - 박스 외곽 코드 유출 0% 전면 봉쇄 및 가로폭 줄바꿈 완결 버전)
+ * (v30.1 - 박스 외곽 코드 유출 0% 전면 봉쇄 및 가로폭 줄바꿈 완결 버전)
  */
 
     window.addEventListener('bowGestureUndo', (e) => {
@@ -673,4 +692,3 @@ window.addEventListener('load', () => {
         }
     });
 });
-
