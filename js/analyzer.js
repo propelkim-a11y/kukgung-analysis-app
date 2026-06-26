@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.0 - 선/정점 인터랙티브 미세 편집 완결 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.1 - 개별 선 더블 탭 삭제 완결 버전)
  */
 
 class BowAnalyzer {
@@ -11,10 +11,13 @@ class BowAnalyzer {
         this.currentLine = null;
         this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
         this.toolMode = 'move'; 
-        this.snapThreshold = 18; // 💡 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
+        this.snapThreshold = 18; // 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
+        
+        // 💡 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
         this.lastTapTime = 0;
-        this.tapThreshold = 300; 
+        this.tapThreshold = 300; // 0.3초 이내 연속 터치 시 더블 탭 인정
+        this.lastTapCoords = { x: 0, y: 0 };
 
         // 선/정점 편집 미세 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
@@ -81,7 +84,7 @@ class BowAnalyzer {
         return { x: canvasX, y: canvasY };
     }
 
-    // 💡 [기본 충실 수학 공식] 선 전체 이동 판정을 위한 점과 선분 사이의 최단거리 측정 함수
+    // 점과 선분 사이의 최단거리 측정 기하 연산 함수
     getDistanceToLine(x, y, line) {
         const A = x - line.start.x;
         const B = y - line.start.y;
@@ -110,32 +113,51 @@ class BowAnalyzer {
             return; 
         }
         event.preventDefault();
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - this.lastTapTime;
-        this.lastTapTime = currentTime;
-        if (tapLength < this.tapThreshold && tapLength > 0) {
-            this.currentLine = null;
-            this.editingLineIndex = -1;
-            this.editingVertexType = null;
-            this.movingLineIndex = -1;
-            const hasUndone = this.undoLastLine();
-            if (hasUndone) {
-                const undoEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
-                window.dispatchEvent(undoEvent);
-            }
-            return; 
-        }
         
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
-        this.lastCoords = coords;
         const targetRadius = this.snapThreshold / this.transform.scale;
+        
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - this.lastTapTime;
         
         this.editingLineIndex = -1;
         this.editingVertexType = null;
         this.movingLineIndex = -1;
 
-        // 1순위: 정점(시작점/끝점) 터치 검사 (정점 편집 트리거)
+        // 💡 [기능 보강 핵심 인터락] 선분 몸통 영역 내 '더블 탭 개별 삭제' 디텍팅 시동
+        if (tapLength < this.tapThreshold && tapLength > 0) {
+            // 더블 터치 중 손가락이 무리하게 튀지 않았는지 미세 오차 거리를 필터링 검증
+            const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, coords.y - this.lastTapCoords.y);
+            if (distFromLastTap < targetRadius) {
+                
+                // 터치 궤적 내에 존재하는 표적 가이드라인 탐색
+                for (let i = 0; i < this.lines.length; i++) {
+                    if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
+                        // 락프리 표적 선 즉시 완전 파괴 소거
+                        this.lines.splice(i, 1);
+                        
+                        this.lastTapTime = 0; // 더블 탭 카운터 인프라 원점 리셋
+                        this.currentLine = null;
+                        
+                        this.render();
+                        this.calculateFinalAngle();
+                        
+                        // 외부 스토리지 및 데이터 영속 허브에 삭제 내용 즉시 동기화 이벤트 송출
+                        const deleteEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
+                        window.dispatchEvent(deleteEvent);
+                        return; // 삭제 완료 즉시 드래그 및 드로잉 흐름 완전 차단 컷
+                    }
+                }
+            }
+        }
+        
+        // 더블 탭이 아닐 경우 다음 비교를 위해 타임 스탬프 및 첫 터치 원점 좌표 기록
+        this.lastTapTime = currentTime;
+        this.lastTapCoords = coords;
+        this.lastCoords = coords;
+
+        // 1순위 분기: 정점(시작점/끝점) 터치 검사 (정점 개별 편집 모드 락)
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i];
             if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
@@ -150,7 +172,7 @@ class BowAnalyzer {
             }
         }
 
-        // 2순위: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 트리거)
+        // 2순위 분기: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 모드 락)
         if (this.editingLineIndex === -1) {
             for (let i = 0; i < this.lines.length; i++) {
                 if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
@@ -160,7 +182,7 @@ class BowAnalyzer {
             }
         }
 
-        // 3순위: 아무것도 잡지 않았다면 신규 선 드로잉 시작
+        // 3순위 분기: 아무것도 잡지 않은 허공이라면 신규 가이드라인 드로잉 가동
         if (this.editingLineIndex === -1 && this.movingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
@@ -177,7 +199,7 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
-        // 분기 A: 정점 개별 미세 편집 드래그 가동
+        // 분기 A: 정점 개별 미세 편집 드래그 처리
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
@@ -202,7 +224,7 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         } 
-        // 분기 B: 💡[기능 보강 핵심] 선 전체 몸통 통째로 평행 이동 드래그 가동
+        // 분기 B: 선 전체 몸통 통째로 평행 이동 드래그 처리
         else if (this.movingLineIndex !== -1) {
             const line = this.lines[this.movingLineIndex];
             const deltaX = coords.x - this.lastCoords.x;
@@ -217,7 +239,7 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         }
-        // 분기 C: 순정 상태의 실시간 신규 가이드라인 드로우
+        // 분기 C: 실시간 신규 가이드라인 드로우 트랙킹
         else if (this.currentLine) {
             const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
             if (snapEndpoint) {
@@ -316,7 +338,7 @@ class BowAnalyzer {
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.dbVersion || line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
         return diff;
@@ -362,7 +384,6 @@ class BowAnalyzer {
         
         // 가이드라인 순회 드로우
         this.lines.forEach((line, idx) => {
-            // 💡 [테크니컬 하이라이트] 현재 개별 정점을 수정 중이거나 선 전체를 밀고 있다면 오렌지 레이저 컬러 수사
             const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
             this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
             this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
