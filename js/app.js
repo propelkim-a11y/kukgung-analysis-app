@@ -1,11 +1,13 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.5 - 초기 부팅 프리징 완전 정화 및 수평계 정중앙 마스터 패치)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.6 - window.load 물리 렌더 안정 정렬판)
  */
 
 window.bowAppNodes = {};
 
-document.addEventListener('DOMContentLoaded', () => {
+// 💡 [프리징 박멸 핵심] DOMContentLoaded의 성급한 하드웨어 접근을 차단하고,
+// 브라우저의 그래픽 가속 세션 및 미디어 인프라 렌더링이 100% 완료된 물리적 안전 타이밍에 시스템을 시동합니다.
+window.addEventListener('load', () => {
     const core = window.bowAppCore;
     const gesture = window.bowAppGesture;
 
@@ -44,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 오차 즉시 박멸
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -61,16 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 💡 하드웨어 기동 순서 매핑: 모듈 바인딩 및 뷰포트 레이아웃 정렬을 최우선 실행합니다.
+    // 하드웨어 그래픽 가속 레이어가 안전하게 개통된 상태에서 코어 모듈을 순차 기동합니다.
     gesture.init(nodes.videoViewport, nodes.mainVideo);
     if (window.bowAnalyzer) {
         window.bowAnalyzer.init(nodes.drawCanvas);
     }
     
     resizeCanvasToDisplay();
+    gesture.applyTransform();
 
-    // 💡 [치명적 굳음 완전 박멸] 초기 구동 시 IndexedDB 상태 로드 전에 캔버스를 강제 가속 제어하던 
-    // gesture.applyTransform() 실행 구문을 이곳에서 완벽하게 제거하여 부팅 락을 원천 파괴했습니다.
+    // UI 인프라 결합이 완벽히 끝난 후 스토리지를 비동기로 가동하여 교착을 원천 배제합니다.
     core.initDB().then(async () => {
         try {
             await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
@@ -88,8 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    // 💡 [첫 터치 안전 인터락 통합] 사용자가 스마트폰 화면을 터치하는 안전한 컨텍스트 환경에서만
-    // 센서 언락과 카메라 시동, 그리고 제스처 엔진의 최초 매트릭스 정렬(`applyTransform`)을 동시 수행시켜 프리징을 소멸시킵니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -98,12 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
             await startCamera();
         }
-        
-        // 터치 해제 후 제스처 엔진의 첫 중심축 행렬을 안전하게 주사
-        if (gesture && typeof gesture.applyTransform === 'function') {
-            gesture.applyTransform();
-        }
-        
         window.removeEventListener('click', triggerSensorUnlock);
         window.removeEventListener('touchstart', triggerSensorUnlock);
     };
@@ -413,4 +407,87 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         setActiveMenu(nodes.btnOpen);
         if (window.bowAnalyzer) {
-            window.bowAnalyzer.
+            window.bowAnalyzer.clearLines();
+            window.bowAnalyzer.setMode('move');
+        }
+        setTimeout(resizeCanvasToDisplay, 100);
+    });
+
+    nodes.btnMove.addEventListener('click', () => {
+        setActiveMenu(nodes.btnMove);
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.setMode('move');
+            window.bowAnalyzer.render();
+        }
+    });
+
+    nodes.btnDraw.addEventListener('click', () => {
+        setActiveMenu(nodes.btnDraw);
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.setMode('draw');
+            window.bowAnalyzer.render();
+        }
+    });
+
+    nodes.btnReset.addEventListener('click', async () => {
+        nodes.mainVideo.pause();
+        nodes.mainVideo.removeAttribute('src');
+        nodes.mainVideo.load();
+        nodes.btnPlayPause.textContent = '재생';
+        nodes.videoSlider.value = 0;
+        nodes.videoSlider.max = 100;
+
+        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+        
+        core.state.scale = 1;
+        core.state.offsetX = 0;
+        core.state.offsetY = 0;
+        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
+
+        await core.saveCache('lastLines', []);
+        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+        await core.saveCache('lastVideoBlob', null);
+        await core.saveCache('lastRecordedMime', null);
+
+        nodes.angleReport.textContent = "ANGLE 0.0°";
+        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
+        setTimeout(resizeCanvasToDisplay, 100);
+    });
+    
+    nodes.panelHandle.addEventListener('click', () => {
+        core.state.isPanelOpen = !core.state.isPanelOpen;
+        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
+        else nodes.unifiedPanel.classList.add('collapsed');
+    });
+    
+    window.addEventListener('bowAngleUpdate', (e) => {
+        nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
+        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
+    });
+    
+    window.addEventListener('bowGestureUndo', (e) => {
+        core.saveCache('lastLines', e.detail.lines);
+    });
+    
+    // 💡 [정중앙 정렬 복구 패치 완료] CSS 초기화 픽셀(`top: 50%; left: 50%;`)과 오차가 나지 않도록 
+    // translate 기준 중심축 보정값을 단단히 결합하여 수평계 라인이 반쪽으로 잘리거나 쏠리던 연산 밀림을 원천 제거했습니다.
+    window.addEventListener('bowGyroUpdate', (e) => {
+        const { roll, isLevel } = e.detail;
+        if (isNaN(roll)) return;
+
+        if (nodes.sceneRecord.classList.contains('active')) {
+            if (nodes.gyroHorizonLine && nodes.gyroVerticalLine) {
+                nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
+                nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
+                
+                if (isLevel) {
+                    nodes.gyroHorizonLine.classList.add('perfect-level');
+                    nodes.gyroVerticalLine.classList.add('perfect-level');
+                } else {
+                    nodes.gyroHorizonLine.classList.remove('perfect-level');
+                    nodes.gyroVerticalLine.classList.remove('perfect-level');
+                }
+            }
+        }
+    });
+});
