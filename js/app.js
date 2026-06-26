@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.14 - 스마트 분할 초기화 싱크 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.15 - 영상/줌 구도 동시 박제 초기화 완결판)
  */
 
 window.bowAppNodes = {};
@@ -46,7 +46,7 @@ window.addEventListener('load', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 오차 박멸
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -90,8 +90,6 @@ window.addEventListener('load', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    // 💡 [자이로 및 카메라 깨움 인터락] 첫 터치 여부와 무관하게 수평계 라인은 부팅 즉시 
-    // 실시간 작동하며, 모바일 보안 권한 및 카메라 스트림 가동용 원터치 언락 이벤트 스위치로 정렬합니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -263,7 +261,7 @@ window.addEventListener('load', () => {
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    // 💡 [무결성 이미지 병합] 일시정지된 영상 프레임과 S펜으로 정렬해 둔 각도 오버레이 레이어를 결합하는 스냅샷 드라이버
+    // 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
     nodes.btnSnapshot.addEventListener('click', () => {
         if (!nodes.mainVideo.src || nodes.mainVideo.readyState < 2) {
             alert('캡처할 영상 데이터가 준비되지 않았습니다.');
@@ -272,7 +270,6 @@ window.addEventListener('load', () => {
 
         setActiveMenu(nodes.btnSnapshot);
 
-        // 1. 비디오 소스의 원래 물리 해상도 가로세로 규격을 정확히 획득
         const vWidth = nodes.mainVideo.videoWidth;
         const vHeight = nodes.mainVideo.videoHeight;
         if (!vWidth || !vHeight) {
@@ -280,28 +277,21 @@ window.addEventListener('load', () => {
             return;
         }
 
-        // 2. 메모리 백그라운드 상에 고화질 가상 머지용 캔버스 전격 빌드
         const mergeCanvas = document.createElement('canvas');
         mergeCanvas.width = vWidth;
         mergeCanvas.height = vHeight;
         const mCtx = mergeCanvas.getContext('2d');
 
-        // 3. [1단계 복사] 가상 컨텍스트에 현재 일시정지된 동영상의 생생한 프레임 픽셀을 드로우
         mCtx.drawImage(nodes.mainVideo, 0, 0, vWidth, vHeight);
-
-        // 4. [2단계 복사] 제스처 엔진의 현재 손가락 줌인 배율 매트릭스 수치 연동 복사
         mCtx.save();
         
-        // 실제 비디오 크기와 현재 디스플레이에 노출 중인 비디오 스타일 크기 사이의 정밀한 비율 계수 도출
         const rect = nodes.mainVideo.getBoundingClientRect();
         const ratioX = vWidth / rect.width;
         const ratioY = vHeight / rect.height;
 
-        // 제스처 트랜스폼 오프셋 좌표값 매핑 정렬
         mCtx.translate(core.state.offsetX * ratioX, core.state.offsetY * ratioY);
         mCtx.scale(core.state.scale, core.state.scale);
 
-        // 5. 현재 사용자가 그려둔 각도 캔버스 실물 소스 원형 그대로 중첩 사사
         mCtx.drawImage(
             nodes.drawCanvas, 0, 0, 
             nodes.drawCanvas.width, nodes.drawCanvas.height, 
@@ -309,7 +299,6 @@ window.addEventListener('load', () => {
         );
         mCtx.restore();
 
-        // 6. [디스크 아카이빙 내보내기] 초고화질 png 이미지 데이터 주소 바인딩 아웃풋
         try {
             const imgDataURL = mergeCanvas.toDataURL('image/png');
             const downloadLink = document.createElement('a');
@@ -323,7 +312,7 @@ window.addEventListener('load', () => {
             document.body.removeChild(downloadLink);
             
             alert('현재 분석 화면이 초고화질 이미지(.png)로 결합되어 갤러리에 저장되었습니다.');
-            setActiveMenu(nodes.btnMove); // 저장이 완료되면 다시 기본 확대이동 모드로 원귀 정렬
+            setActiveMenu(nodes.btnMove); 
         } catch (err) {
             alert('보안 컨텍스트 에러로 스냅샷을 추출하지 못했습니다.');
             console.error(err);
@@ -458,7 +447,6 @@ window.addEventListener('load', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
-    // 💡 [파일오픈 복구 완벽 완료] 단일 파일 참조 인덱스를 명확하게 지정하여 영상 로드를 복구했습니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -502,27 +490,21 @@ window.addEventListener('load', () => {
         }
     });
 
-    // 💡 [스마트 분할 초기화 적용 완료] 
-    // 대표님의 구상대로 화면 확대 배율과 크리스탈 투명 뷰포트의 줌 구도는 100% 그대로 유지한 상태에서,
-    // 오직 비디오 재생축 리셋, 캔버스 선 전체 삭제, 파일 인풋 고착 해제(동일 영상 즉시 재오픈)만 단독 구동합니다.
+    // 💡 [초미니멀 분할 초기화 대수술 완료]
+    // 영상을 증발시키던 무리한 파괴 코드 3줄(removeAttribute, load, videoInput.value)을 완벽히 청소했습니다.
+    // 이제 초기화 버튼을 누르는 순간, 화면의 동영상과 확대 줌인 구도는 그 자리 그대로 안전하게 '박제'되고,
+    // 오직 캔버스 표면 위의 초록색 분석 선 데이터 배열만 완벽하게 싹 소거 지워집니다.
     nodes.btnReset.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.mainVideo.removeAttribute('src');
-        nodes.mainVideo.load();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.videoSlider.value = 0;
-        nodes.videoSlider.max = 100;
-
-        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+        // 오직 고각 선 스케치 인스턴스만 단독 클리어
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.clearLines();
+        }
         
+        // 데이터 영속소 캐시 내부 선 배열만 빈 값으로 소거 동기화
         await core.saveCache('lastLines', []);
-        await core.saveCache('lastVideoBlob', null);
-        await core.saveCache('lastRecordedMime', null);
-
-        nodes.videoInput.value = '';
 
         nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 선 데이터가 완전히 초기화되었습니다. 현재 확대 구도 상태로 즉시 분석을 재개할 수 있습니다.');
+        alert('현재 확대 구도와 동영상을 유지한 채, 가이드라인 선만 완전히 초기화되었습니다.');
         setTimeout(resizeCanvasToDisplay, 100);
     });
     
