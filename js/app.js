@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.11 - 고화질 캡처 통합 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.12 - 스마트 분할 초기화 완결판)
  */
 
 window.bowAppNodes = {};
@@ -261,7 +261,7 @@ window.addEventListener('load', () => {
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    // 💡 [기능 확장 이식] 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
+    // 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
     nodes.btnSnapshot.addEventListener('click', () => {
         if (!nodes.mainVideo.src || nodes.mainVideo.readyState < 2) {
             alert('캡처할 영상 데이터가 준비되지 않았습니다.');
@@ -459,7 +459,7 @@ window.addEventListener('load', () => {
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        const targetFile = files[0];
+        const targetFile = files;
         
         await core.saveCache('lastVideoBlob', targetFile);
         const url = URL.createObjectURL(targetFile);
@@ -499,6 +499,9 @@ window.addEventListener('load', () => {
         }
     });
 
+    // 💡 [스마트 분할 초기화 핵심 이식 완료]
+    // 뼈대를 뜯어고치는 과도한 예외 없이 기존 원점 복귀 트랜스폼 라인만 깔끔히 도려내어,
+    // 정밀하게 맞춰둔 '현재 화면의 확대 구도(배율/좌표)'를 철저하게 고정 사수합니다.
     nodes.btnReset.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.mainVideo.removeAttribute('src');
@@ -507,22 +510,18 @@ window.addEventListener('load', () => {
         nodes.videoSlider.value = 0;
         nodes.videoSlider.max = 100;
 
+        // 고각 선 스케치만 단독 청소 가동
         if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
-        
-        core.state.scale = 1;
-        core.state.offsetX = 0;
-        core.state.offsetY = 0;
-        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
 
+        // 💡 core.state.scale 복귀 코드를 전면 소거하여 현재 줌 배율 매트릭스를 영속 유지합니다.
         await core.saveCache('lastLines', []);
-        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
         await core.saveCache('lastVideoBlob', null);
         await core.saveCache('lastRecordedMime', null);
 
         nodes.videoInput.value = '';
 
         nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 동일 영상을 다시 열 수 있습니다.');
+        alert('이전 분석 선 데이터가 완전히 초기화되었습니다. 현재 확대 구도 상태로 즉시 분석을 재개할 수 있습니다.');
         setTimeout(resizeCanvasToDisplay, 100);
     });
     
