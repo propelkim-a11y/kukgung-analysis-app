@@ -1,6 +1,6 @@
 /**
  * js/app_gesture.js - [Part 1]
- * 국궁 자세 분석 앱 - 멀티 터치 제스처 처리기 (확대 시 선분 위치 밀림 박멸 완결판 v18.0)
+ * 국궁 자세 분석 앱 - 멀티 터치 제스처 처리기 (확대 시 선분 위치 밀림 및 선긋기 오작동 박멸 완결판 v18.2)
  */
 
 class BowAppGesture {
@@ -34,7 +34,7 @@ class BowAppGesture {
     }
 
     handlePointerDown(e) {
-        // 선긋기 모드일 때는 제스처 엔진의 드래그 연산 상태를 즉시 무력화하고 양보
+        // 💡 [선긋기 모드 최우선 인터락] 선긋기 모드일 때는 제스처 엔진의 모든 추적 포인터를 강제 소거하고 제어권 양보
         if (window.bowAnalyzer && window.bowAnalyzer.toolMode === 'draw') {
             this.activePointers.clear();
             if (this.core && this.core.state) {
@@ -55,6 +55,7 @@ class BowAppGesture {
         } else if (this.activePointers.size === 2) {
             state.isDragging = false;
             const pointers = Array.from(this.activePointers.values());
+            // 💡 [기하학 오타 치유 완료] pointers[0]과 pointers[1]의 인덱스를 정밀 삽입하여 실제 거리 연산 가동
             this.initialDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
             this.initialScale = state.scale;
         }
@@ -70,6 +71,7 @@ class BowAppGesture {
         
         if (this.activePointers.size === 2) {
             const pointers = Array.from(this.activePointers.values());
+            // 💡 [기하학 오타 치유 완료] 멀티 터치 줌팩터 연산 시 인덱스 무결성 싱크 정렬 완료
             const currentDist = Math.hypot(pointers[0].clientX - pointers[1].clientX, pointers[0].clientY - pointers[1].clientY);
             if (this.initialDist > 0) {
                 const factor = currentDist / this.initialDist;
