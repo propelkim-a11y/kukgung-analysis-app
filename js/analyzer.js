@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v18.9 - 분석 캔버스 그리드 완전 소거 버전)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.0 - 선/정점 인터랙티브 미세 편집 완결 버전)
  */
 
 class BowAnalyzer {
@@ -11,14 +11,16 @@ class BowAnalyzer {
         this.currentLine = null;
         this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
         this.toolMode = 'move'; 
-        this.snapThreshold = 15; 
+        this.snapThreshold = 18; // 💡 손가락 터치 타겟팅 정밀도를 위해 터치 반경 미세 확장
         this.isSnapped = false;
         this.lastTapTime = 0;
         this.tapThreshold = 300; 
 
-        // 선 편집 미세 수정을 위한 상태 변수
+        // 선/정점 편집 미세 수정을 위한 상태 변수
         this.editingLineIndex = -1;  
         this.editingVertexType = null; 
+        this.movingLineIndex = -1;
+        this.lastCoords = { x: 0, y: 0 };
 
         this.handlePointerDown = this.handlePointerDown.bind(this);
         this.handlePointerMove = this.handlePointerMove.bind(this);
@@ -53,6 +55,7 @@ class BowAnalyzer {
         this.currentLine = null;
         this.editingLineIndex = -1;
         this.editingVertexType = null;
+        this.movingLineIndex = -1;
         this.render();
         this.broadcastAngle(0);
     }
@@ -77,6 +80,28 @@ class BowAnalyzer {
         const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
+
+    // 💡 [기본 충실 수학 공식] 선 전체 이동 판정을 위한 점과 선분 사이의 최단거리 측정 함수
+    getDistanceToLine(x, y, line) {
+        const A = x - line.start.x;
+        const B = y - line.start.y;
+        const C = line.end.x - line.start.x;
+        const D = line.end.y - line.start.y;
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        if (lenSq !== 0) param = dot / lenSq;
+        let xx, yy;
+        if (param < 0) {
+            xx = line.start.x; yy = line.start.y;
+        } else if (param > 1) {
+            xx = line.end.x; yy = line.end.y;
+        } else {
+            xx = line.start.x + param * C;
+            yy = line.start.y + param * D;
+        }
+        return Math.hypot(x - xx, y - yy);
+    }
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -92,6 +117,7 @@ class BowAnalyzer {
             this.currentLine = null;
             this.editingLineIndex = -1;
             this.editingVertexType = null;
+            this.movingLineIndex = -1;
             const hasUndone = this.undoLastLine();
             if (hasUndone) {
                 const undoEvent = new CustomEvent('bowGestureUndo', { detail: { lines: this.lines } });
@@ -102,10 +128,14 @@ class BowAnalyzer {
         
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
+        this.lastCoords = coords;
         const targetRadius = this.snapThreshold / this.transform.scale;
+        
         this.editingLineIndex = -1;
         this.editingVertexType = null;
+        this.movingLineIndex = -1;
 
+        // 1순위: 정점(시작점/끝점) 터치 검사 (정점 편집 트리거)
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i];
             if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
@@ -120,7 +150,18 @@ class BowAnalyzer {
             }
         }
 
+        // 2순위: 정점을 안 잡았다면 선분 몸통 터치 검사 (선 전체 평행 이동 트리거)
         if (this.editingLineIndex === -1) {
+            for (let i = 0; i < this.lines.length; i++) {
+                if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
+                    this.movingLineIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // 3순위: 아무것도 잡지 않았다면 신규 선 드로잉 시작
+        if (this.editingLineIndex === -1 && this.movingLineIndex === -1) {
             let startPt = { x: coords.x, y: coords.y };
             const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
             if (snappedPt) startPt = snappedPt;
@@ -136,6 +177,7 @@ class BowAnalyzer {
         let targetY = coords.y;
         this.isSnapped = false;
 
+        // 분기 A: 정점 개별 미세 편집 드래그 가동
         if (this.editingLineIndex !== -1 && this.editingVertexType) {
             const line = this.lines[this.editingLineIndex];
             const basePt = this.editingVertexType === 'start' ? line.end : line.start;
@@ -158,12 +200,24 @@ class BowAnalyzer {
             }
 
             this.render();
-            if (this.lines.length >= 2) {
-                this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
-            } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines));
-            }
+            this.calculateFinalAngle();
         } 
+        // 분기 B: 💡[기능 보강 핵심] 선 전체 몸통 통째로 평행 이동 드래그 가동
+        else if (this.movingLineIndex !== -1) {
+            const line = this.lines[this.movingLineIndex];
+            const deltaX = coords.x - this.lastCoords.x;
+            const deltaY = coords.y - this.lastCoords.y;
+
+            line.start.x += deltaX;
+            line.start.y += deltaY;
+            line.end.x += deltaX;
+            line.end.y += deltaY;
+
+            this.lastCoords = coords;
+            this.render();
+            this.calculateFinalAngle();
+        }
+        // 분기 C: 순정 상태의 실시간 신규 가이드라인 드로우
         else if (this.currentLine) {
             const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
             if (snapEndpoint) {
@@ -200,6 +254,11 @@ class BowAnalyzer {
             this.render();
             this.calculateFinalAngle();
         } 
+        else if (this.movingLineIndex !== -1) {
+            this.movingLineIndex = -1;
+            this.render();
+            this.calculateFinalAngle();
+        }
         else if (this.currentLine) {
             const dist = Math.hypot(this.currentLine.end.x - this.currentLine.start.x, this.currentLine.end.y - this.currentLine.start.y);
             if (dist > (8 / this.transform.scale)) {
@@ -211,7 +270,6 @@ class BowAnalyzer {
             this.calculateFinalAngle();
         }
     }
-
     findCloseEndpoint(x, y) {
         const adjustedThreshold = this.snapThreshold / this.transform.scale;
         for (let line of this.lines) {
@@ -233,6 +291,7 @@ class BowAnalyzer {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
         }
     }
+
     calculateFinalAngle() {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
@@ -257,7 +316,7 @@ class BowAnalyzer {
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
-        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        const angle2 = Math.atan2(-(line2.dbVersion || line2.end.y - line2.start.y), line2.end.x - line2.start.x);
         let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
         if (diff > 180) diff = 360 - diff;
         return diff;
@@ -299,16 +358,23 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        // 💡 [그리드 완전 소거 패치 완료] 시인성을 가로막던 drawBackgroundGrid 격자 함수 호출을 완전히 제거했습니다.
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
-        this.ctx.strokeStyle = '#00FF66';
-        this.ctx.fillStyle = '#00FF66';
-        this.lines.forEach(line => this.drawSingleLine(line));
+        
+        // 가이드라인 순회 드로우
+        this.lines.forEach((line, idx) => {
+            // 💡 [테크니컬 하이라이트] 현재 개별 정점을 수정 중이거나 선 전체를 밀고 있다면 오렌지 레이저 컬러 수사
+            const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
+            this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
+            this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
+            this.drawSingleLine(line);
+        });
+
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
             this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
+
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
             this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFF00';
