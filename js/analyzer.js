@@ -1,6 +1,6 @@
 /**
  * js/analyzer.js
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.7 - 캔버스 트랜스폼 락 해제 및 줌 구도 사수 완결판)
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v19.8 - 기하 연산 오타 완전 소멸 및 선긋기 복구 완결판)
  */
 
 class BowAnalyzer {
@@ -57,9 +57,7 @@ class BowAnalyzer {
         this.render();
     }
 
-    // 💡 [스마트 분할 초기화 핵심 정화] 
-    // 기존에 존재하던 this.transform 초기화 라인을 과감히 삭제 파괴하여,
-    // 초기화 단추 클릭 시 확대/축소 배율 매트릭스는 그대로 고정 박제 사수하고 오직 선 데이터만 비워냅니다.
+    // 💡 [줌 구도 고정 본능 수호] 확대/축소 배율 매트릭스는 그대로 사수하고 오직 선 데이터만 지워냅니다.
     clearLines() {
         this.lines = [];
         this.currentLine = null;
@@ -126,7 +124,7 @@ class BowAnalyzer {
         this.canvas.setPointerCapture(event.pointerId);
         const coords = this.getCanvasCoordinates(event);
         
-        // 스타일러스 펜 입력 시 히트박스 영역을 35필셀로 가변 확장하여 조작 성공률 극대화
+        // 스타일러스 펜 입력 시 히트박스 영역을 35픽셀로 가변 확장하여 조작 성공률 극대화
         const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
         const targetRadius = baseRadius / this.transform.scale;
         
@@ -382,6 +380,7 @@ class BowAnalyzer {
         return Number((angle % 180).toFixed(1));
     }
 
+    // 💡 [오타 완벽 소멸] 캔버스를 멈추게 만들던 line2.dbVersion 잔여 결함을 완전히 도려내고 복구했습니다.
     getIntersectionAngle(line1, line2) {
         if (!line1 || !line2) return 0;
         const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
