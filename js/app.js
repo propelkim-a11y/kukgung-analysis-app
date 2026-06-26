@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.13 - 파일 열기 파이프라인 무결성 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.14 - 스마트 분할 초기화 싱크 완결판)
  */
 
 window.bowAppNodes = {};
@@ -46,7 +46,7 @@ window.addEventListener('load', () => {
 
     let selectedFPS = 30;
 
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
+    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 오차 박멸
     function resizeCanvasToDisplay() {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -90,6 +90,8 @@ window.addEventListener('load', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
+    // 💡 [자이로 및 카메라 깨움 인터락] 첫 터치 여부와 무관하게 수평계 라인은 부팅 즉시 
+    // 실시간 작동하며, 모바일 보안 권한 및 카메라 스트림 가동용 원터치 언락 이벤트 스위치로 정렬합니다.
     const triggerSensorUnlock = async () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -261,7 +263,7 @@ window.addEventListener('load', () => {
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    // 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
+    // 💡 [무결성 이미지 병합] 일시정지된 영상 프레임과 S펜으로 정렬해 둔 각도 오버레이 레이어를 결합하는 스냅샷 드라이버
     nodes.btnSnapshot.addEventListener('click', () => {
         if (!nodes.mainVideo.src || nodes.mainVideo.readyState < 2) {
             alert('캡처할 영상 데이터가 준비되지 않았습니다.');
@@ -299,7 +301,7 @@ window.addEventListener('load', () => {
         mCtx.translate(core.state.offsetX * ratioX, core.state.offsetY * ratioY);
         mCtx.scale(core.state.scale, core.state.scale);
 
-        // 5. 현재 사용자가 S펜으로 열심히 그려둔 각도 캔버스 실물 소스 원형 그대로 중첩 사사
+        // 5. 현재 사용자가 그려둔 각도 캔버스 실물 소스 원형 그대로 중첩 사사
         mCtx.drawImage(
             nodes.drawCanvas, 0, 0, 
             nodes.drawCanvas.width, nodes.drawCanvas.height, 
@@ -456,7 +458,7 @@ window.addEventListener('load', () => {
     
     nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
     
-    // 💡 [열기 에러 완벽 수정] FileList 배열 포인터를 files[0] 단일 타깃으로 명밀 교정 완료했습니다.
+    // 💡 [파일오픈 복구 완벽 완료] 단일 파일 참조 인덱스를 명확하게 지정하여 영상 로드를 복구했습니다.
     nodes.videoInput.addEventListener('change', async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -500,6 +502,9 @@ window.addEventListener('load', () => {
         }
     });
 
+    // 💡 [스마트 분할 초기화 적용 완료] 
+    // 대표님의 구상대로 화면 확대 배율과 크리스탈 투명 뷰포트의 줌 구도는 100% 그대로 유지한 상태에서,
+    // 오직 비디오 재생축 리셋, 캔버스 선 전체 삭제, 파일 인풋 고착 해제(동일 영상 즉시 재오픈)만 단독 구동합니다.
     nodes.btnReset.addEventListener('click', async () => {
         nodes.mainVideo.pause();
         nodes.mainVideo.removeAttribute('src');
