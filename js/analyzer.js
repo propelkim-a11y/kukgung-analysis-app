@@ -1,6 +1,6 @@
 /**
- * js/analyzer.js (Part 1 / 3)
- * 국궁 고각 분석 시스템 - 락 프리 최종 완결판
+ * js/analyzer.js
+ * 국궁 고각 분석 시스템 - 락 프리 최종 완결판 (v18.9 - 분석 캔버스 그리드 완전 소거 버전)
  */
 
 class BowAnalyzer {
@@ -77,9 +77,6 @@ class BowAnalyzer {
         const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
         return { x: canvasX, y: canvasY };
     }
-/**
- * js/analyzer.js (Part 2 / 3)
- */
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -164,7 +161,7 @@ class BowAnalyzer {
             if (this.lines.length >= 2) {
                 this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
             } else if (this.lines.length === 1) {
-                this.broadcastAngle(this.getLineAngle(this.lines[0]));
+                this.broadcastAngle(this.getLineAngle(this.lines));
             }
         } 
         else if (this.currentLine) {
@@ -218,27 +215,29 @@ class BowAnalyzer {
     findCloseEndpoint(x, y) {
         const adjustedThreshold = this.snapThreshold / this.transform.scale;
         for (let line of this.lines) {
-            if (Math.hypot(line.start.x - x, line.start.y - y) < adjustedThreshold) return line.start;
-            if (Math.hypot(line.end.x - x, line.end.y - y) < adjustedThreshold) return line.end;
+            if (Math.hypot(line.start.x - x, line.start.y - y) < adjustedThreshold) {
+                return { x: line.start.x, y: line.start.y };
+            }
+            if (Math.hypot(line.end.x - x, line.end.y - y) < adjustedThreshold) {
+                return { x: line.end.x, y: line.end.y };
+            }
         }
         return null;
     }
-/**
- * js/analyzer.js (Part 3 / 3)
- */
+
     calculateAnglesInline() {
-        if (this.lines.length === 0 && this.currentLine) {
+        if (!this.currentLine) return;
+        if (this.lines.length === 0) {
             this.broadcastAngle(this.getLineAngle(this.currentLine));
-        } else if (this.lines.length >= 1 && this.currentLine) {
+        } else {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine));
         }
     }
-
     calculateFinalAngle() {
         if (this.lines.length >= 2) {
             this.broadcastAngle(this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]));
         } else if (this.lines.length === 1) {
-            this.broadcastAngle(this.getLineAngle(this.lines[0]));
+            this.broadcastAngle(this.getLineAngle(this.lines));
         } else {
             this.broadcastAngle(0);
         }
@@ -246,7 +245,7 @@ class BowAnalyzer {
 
     getLineAngle(line) {
         if (!line) return 0;
-        const singleLine = Array.isArray(line) ? line[0] : line;
+        const singleLine = Array.isArray(line) ? line : line;
         if (!singleLine || !singleLine.start || !singleLine.end) return 0;
         const dx = singleLine.end.x - singleLine.start.x;
         const dy = singleLine.end.y - singleLine.start.y;
@@ -265,28 +264,8 @@ class BowAnalyzer {
     }
 
     broadcastAngle(angle) {
-        const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: angle.toFixed(1) } });
+        const angleEvent = new CustomEvent('bowAngleUpdate', { detail: { angle: Number(angle).toFixed(1) } });
         window.dispatchEvent(angleEvent);
-    }
-
-    drawBackgroundGrid(scaleX, canvasScaleY) {
-        this.ctx.save();
-        this.ctx.lineWidth = (0.75 * scaleX) / this.transform.scale;
-        this.ctx.strokeStyle = 'rgba(0, 122, 255, 0.23)'; 
-        const gridSize = 50; 
-        const widthBound = this.canvas.width / this.transform.scale;
-        const heightBound = this.canvas.height / this.transform.scale;
-        const startX = Math.floor((-this.transform.offsetX * scaleX / this.transform.scale) / gridSize) * gridSize - widthBound;
-        const endX = startX + (widthBound * 3);
-        const startY = Math.floor((-this.transform.offsetY * canvasScaleY / this.transform.scale) / gridSize) * gridSize - heightBound;
-        const endY = startY + (heightBound * 3);
-        for (let x = startX; x <= endX; x += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(x, startY); this.ctx.lineTo(x, endY); this.ctx.stroke();
-        }
-        for (let y = startY; y <= endY; y += gridSize) {
-            this.ctx.beginPath(); this.ctx.moveTo(startX, y); this.ctx.lineTo(endX, y); this.ctx.stroke();
-        }
-        this.ctx.restore();
     }
 
     drawInlineAngleArc(line1, line2, scaleX) {
@@ -320,7 +299,7 @@ class BowAnalyzer {
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
         
-        this.drawBackgroundGrid(scaleX, canvasScaleY);
+        // 💡 [그리드 완전 소거 패치 완료] 시인성을 가로막던 drawBackgroundGrid 격자 함수 호출을 완전히 제거했습니다.
         this.ctx.lineWidth = (2 * scaleX) / this.transform.scale; 
         this.ctx.strokeStyle = '#00FF66';
         this.ctx.fillStyle = '#00FF66';
@@ -328,8 +307,7 @@ class BowAnalyzer {
         if (this.lines.length >= 2) {
             this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
         } else if (this.lines.length === 1 && this.currentLine) {
-            // 💡 [참조 크래시 완전 해결] lines 배열 원본 전체 대신 첫 번째 선 객체인 this.lines[0]을 명확하게 타겟팅
-            this.drawInlineAngleArc(this.lines[0], this.currentLine, scaleX);
+            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
         }
         if (this.currentLine) {
             this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFF00';
