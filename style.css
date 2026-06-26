@@ -1,6 +1,6 @@
 /**
  * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v18.7 - 크리스탈 다크 패널 마감 버전)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v18.8 - 크리스탈 에어 글래스 마감 버전)
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -159,7 +159,7 @@ body, html {
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
 
-/* 7. 하단 패널 영역 (💡가시성 확보를 위한 크리스탈 다크 88% 글래스모피즘 마감 패치) */
+/* 7. 하단 패널 영역 (💡답답함을 원천 정화한 크리스탈 에어 글래스 35% 마감 패치) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -168,9 +168,9 @@ body, html {
     height: 33.333vh; 
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom);
-    background: rgba(10, 10, 12, 0.88) !important; 
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
+    background: rgba(10, 10, 14, 0.35) !important; 
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
     border-top: 0.5px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 30px 30px 0 0 !important;
 }
