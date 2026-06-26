@@ -1,10 +1,11 @@
 /**
  * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.11 - 고화질 캡처 통합 완결판)
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.6 - window.load 물리 렌더 안정 정렬판)
  */
 
 window.bowAppNodes = {};
 
+// 💡 [프리징 박멸 핵심] DOMContentLoaded의 성급한 하드웨어 접근을 차단하고,
 // 브라우저의 그래픽 가속 세션 및 미디어 인프라 렌더링이 100% 완료된 물리적 안전 타이밍에 시스템을 시동합니다.
 window.addEventListener('load', () => {
     const core = window.bowAppCore;
@@ -32,7 +33,6 @@ window.addEventListener('load', () => {
     nodes.btnOpen = document.getElementById('btn-open');
     nodes.btnMove = document.getElementById('btn-move');
     nodes.btnDraw = document.getElementById('btn-draw');
-    nodes.btnSnapshot = document.getElementById('btn-snapshot');
     nodes.btnReset = document.getElementById('btn-reset');
     nodes.videoInput = document.getElementById('video-input');
     
@@ -251,82 +251,12 @@ window.addEventListener('load', () => {
         }
     });
     function setActiveMenu(activeBtn) {
-        const menuGroup = [
-            nodes.btnOpen, nodes.btnMove, nodes.btnDraw, 
-            nodes.btnSnapshot, nodes.btnDownloadVideo
-        ];
-        menuGroup.forEach(btn => {
+        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
             if (btn) btn.classList.remove('active');
         });
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    // 💡 [기능 확장 이식] 동영상 프레임과 캔버스 고각 레이어를 1대1 무결성 결합하는 캡처 드라이버
-    nodes.btnSnapshot.addEventListener('click', () => {
-        if (!nodes.mainVideo.src || nodes.mainVideo.readyState < 2) {
-            alert('캡처할 영상 데이터가 준비되지 않았습니다.');
-            return;
-        }
-
-        setActiveMenu(nodes.btnSnapshot);
-
-        // 1. 비디오 소스의 원래 물리 해상도 가로세로 규격을 정확히 획득
-        const vWidth = nodes.mainVideo.videoWidth;
-        const vHeight = nodes.mainVideo.videoHeight;
-        if (!vWidth || !vHeight) {
-            alert('영상 스트림의 픽셀 메트릭을 추적할 수 없습니다.');
-            return;
-        }
-
-        // 2. 메모리 백그라운드 상에 고화질 가상 머지용 캔버스 전격 빌드
-        const mergeCanvas = document.createElement('canvas');
-        mergeCanvas.width = vWidth;
-        mergeCanvas.height = vHeight;
-        const mCtx = mergeCanvas.getContext('2d');
-
-        // 3. [1단계 복사] 가상 컨텍스트에 현재 일시정지된 동영상의 생생한 프레임 픽셀을 드로우
-        mCtx.drawImage(nodes.mainVideo, 0, 0, vWidth, vHeight);
-
-        // 4. [2단계 복사] 제스처 엔진의 현재 손가락 줌인 배율 매트릭스 수치 연동 복사
-        mCtx.save();
-        
-        // 실제 비디오 크기와 현재 디스플레이에 노출 중인 비디오 스타일 크기 사이의 정밀한 비율 계수 도출
-        const rect = nodes.mainVideo.getBoundingClientRect();
-        const ratioX = vWidth / rect.width;
-        const ratioY = vHeight / rect.height;
-
-        // 제스처 트랜스폼 오프셋 좌표값 매핑 정렬
-        mCtx.translate(core.state.offsetX * ratioX, core.state.offsetY * ratioY);
-        mCtx.scale(core.state.scale, core.state.scale);
-
-        // 5. 현재 사용자가 S펜으로 열심히 그려둔 각도 캔버스 실물 소스 원형 그대로 중첩 사사
-        mCtx.drawImage(
-            nodes.drawCanvas, 0, 0, 
-            nodes.drawCanvas.width, nodes.drawCanvas.height, 
-            0, 0, vWidth, vHeight
-        );
-        mCtx.restore();
-
-        // 6. [디스크 아카이빙 내보내기] 초고화질 png 이미지 데이터 주소 바인딩 아웃풋
-        try {
-            const imgDataURL = mergeCanvas.toDataURL('image/png');
-            const downloadLink = document.createElement('a');
-            downloadLink.href = imgDataURL;
-            
-            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-            downloadLink.download = `kukgung_snapshot_${dateStr}_${Date.now()}.png`;
-            
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            alert('현재 분석 화면이 초고화질 이미지(.png)로 결합되어 갤러리에 저장되었습니다.');
-            setActiveMenu(nodes.btnMove); // 저장이 완료되면 다시 기본 확대이동 모드로 원귀 정렬
-        } catch (err) {
-            alert('보안 컨텍스트 에러로 스냅샷을 추출하지 못했습니다.');
-            console.error(err);
-        }
-    });
     if (nodes.btnDownloadVideo) {
         nodes.btnDownloadVideo.addEventListener('click', async () => {
             try {
@@ -519,10 +449,8 @@ window.addEventListener('load', () => {
         await core.saveCache('lastVideoBlob', null);
         await core.saveCache('lastRecordedMime', null);
 
-        nodes.videoInput.value = '';
-
         nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 동일 영상을 다시 열 수 있습니다.');
+        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
         setTimeout(resizeCanvasToDisplay, 100);
     });
     
@@ -541,6 +469,8 @@ window.addEventListener('load', () => {
         core.saveCache('lastLines', e.detail.lines);
     });
     
+    // 💡 [정중앙 정렬 복구 패치 완료] CSS 초기화 픽셀(`top: 50%; left: 50%;`)과 오차가 나지 않도록 
+    // translate 기준 중심축 보정값을 단단히 결합하여 수평계 라인이 반쪽으로 잘리거나 쏠리던 연산 밀림을 원천 제거했습니다.
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
