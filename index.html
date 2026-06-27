@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>국궁 자세 분석 시스템 (Archery Mechanics Analyzer)</title>
+    <title>국궁 (Archery Mechanics Analyzer) 자세 분석 시스템</title>
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,7 +14,7 @@
 <body>
 
     <!-- ================================================================= -->
-    <!-- [SCENE 1] 촬영 모드 화면 --> ver 1.91
+    <!-- [SCENE 1] 촬영 모드 화면 -->
     <!-- ================================================================= -->
     <div id="scene-record" class="app-scene active">
         <div class="viewport-container">
@@ -62,7 +62,6 @@
             </div>
 
             <div class="panel-content-wrapper">
-                <!-- 💡 [기능 확장] 분석 모드 메뉴 바 우측 끝에 크리스탈 [저장] 버튼 추가 이식 -->
                 <nav class="text-menu-bar">
                     <button id="btn-open" class="menu-btn">열기</button>
                     <button id="btn-move" class="menu-btn">확대</button>
@@ -101,8 +100,8 @@
             window.addEventListener('load', () => {
                 const repoPath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
                 navigator.serviceWorker.register('sw.js?v=17.0', { scope: repoPath })
-                    .then(reg => console.log('[PWA] 서비스 워커 가동:', reg.scope))
-                    .catch(err => console.error('[PWA] 서비스 워커 경로 에러:', err));
+                    .then(reg => console.log('[PWA] : 서비스 워커 가동', reg.scope))
+                    .catch(err => console.error('[PWA] : 서비스 워커 경로 에러', err));
             });
         }
     </script>
