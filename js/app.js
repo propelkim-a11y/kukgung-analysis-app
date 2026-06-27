@@ -1,493 +1,316 @@
 /**
- * js/app.js
- * 국궁 자세 분석 시스템 - 마스터 컨트롤러 마스터 완결본 (v18.6 - window.load 물리 렌더 안정 정렬판)
+ * js/app.js - [Part 1]
+ * - 국궁 고각 분석 시스템 통합 제어 커널 완결판
+ * - 오디오 인터락 및 모바일 갤러리 저장을 위한 네이티브 공유 시스템 탑재 버전
  */
 
-window.bowAppNodes = {};
+class BowAppController {
+    constructor() {
+        this.mediaRecorder = null;
+        this.recordedChunks = [];
+        this.stream = null;
 
-// 💡 [프리징 박멸 핵심] DOMContentLoaded의 성급한 하드웨어 접근을 차단하고,
-// 브라우저의 그래픽 가속 세션 및 미디어 인프라 렌더링이 100% 완료된 물리적 안전 타이밍에 시스템을 시동합니다.
-window.addEventListener('load', () => {
-    const core = window.bowAppCore;
-    const gesture = window.bowAppGesture;
+        // 핵심 DOM 엘리먼트 바인딩
+        this.cameraPreview = document.getElementById('camera-preview');
+        this.mainVideo = document.getElementById('main-video');
+        this.drawCanvas = document.getElementById('draw-canvas');
+        this.btnRecordToggle = document.getElementById('btn-record-toggle');
+        this.btnGoAnalyze = document.getElementById('btn-go-analyze');
+        this.btnGoRecord = document.getElementById('btn-go-record');
+        this.btnDownloadVideo = document.getElementById('btn-download-video');
+        this.videoInput = document.getElementById('video-input');
+        this.btnOpen = document.getElementById('btn-open');
+        this.btnMove = document.getElementById('btn-move');
+        this.btnDraw = document.getElementById('btn-draw');
+        this.btnReset = document.getElementById('btn-reset');
+        this.videoSlider = document.getElementById('video-slider');
+        this.btnPlayPause = document.getElementById('btn-play-pause');
+        this.btnFramePrev = document.getElementById('btn-frame-prev');
+        this.btnFrameNext = document.getElementById('btn-frame-next');
+        this.recordStatus = document.getElementById('record-status');
+        this.angleReport = document.getElementById('angle-report');
+        this.unifiedPanel = document.getElementById('unified-panel');
+        this.panelHandle = document.getElementById('panel-handle');
 
-    // 1. 공용 DOM 핵심 노드 전역 인프라 매핑
-    const nodes = window.bowAppNodes;
-    nodes.sceneRecord = document.getElementById('scene-record');
-    nodes.sceneAnalyze = document.getElementById('scene-analyze');
-    nodes.btnGoAnalyze = document.getElementById('btn-go-analyze');
-    nodes.btnGoRecord = document.getElementById('btn-go-record');
+        this.isRecording = false;
+        this.currentVideoBlob = null;
+    }
 
-    nodes.cameraPreview = document.getElementById('camera-preview');
-    nodes.btnRecordToggle = document.getElementById('btn-record-toggle');
-    nodes.recordStatus = document.getElementById('record-status');
-    nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
-    nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
-
-    nodes.videoViewport = document.getElementById('video-viewport');
-    nodes.mainVideo = document.getElementById('main-video');
-    nodes.drawCanvas = document.getElementById('draw-canvas');
-    nodes.unifiedPanel = document.getElementById('unified-panel');
-    nodes.panelHandle = document.getElementById('panel-handle');
-    
-    nodes.btnOpen = document.getElementById('btn-open');
-    nodes.btnMove = document.getElementById('btn-move');
-    nodes.btnDraw = document.getElementById('btn-draw');
-    nodes.btnReset = document.getElementById('btn-reset');
-    nodes.videoInput = document.getElementById('video-input');
-    
-    nodes.btnDownloadVideo = document.getElementById('btn-download-video');
-
-    nodes.videoSlider = document.getElementById('video-slider');
-    nodes.btnFramePrev = document.getElementById('btn-frame-prev');
-    nodes.btnPlayPause = document.getElementById('btn-play-pause');
-    nodes.btnFrameNext = document.getElementById('btn-frame-next');
-    nodes.angleReport = document.getElementById('angle-report');
-
-    let selectedFPS = 30;
-
-    // 2. 화면 터치 해상도(Viewport)와 캔버스를 완벽 동기화하여 수평계 잘림 및 오차 즉시 박멸
-    function resizeCanvasToDisplay() {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        const dpr = window.devicePixelRatio || 1;
+    async init() {
+        this.setupEventListeners();
         
-        nodes.drawCanvas.width = width * dpr;
-        nodes.drawCanvas.height = height * dpr;
-        
+        // 데이터베이스 부팅 및 복원 인터락 가동
+        if (window.bowAppCore) {
+            await window.bowAppCore.initDB();
+            await window.bowAppCore.restoreLastSession(this.mainVideo, this.drawCanvas);
+        }
+
+        // 수평계 자이로 가동
+        if (window.bowGyroSensor) {
+            await window.bowGyroSensor.start();
+        }
+
+        // 제스처 모듈 바인딩
+        if (window.bowAppGesture) {
+            window.bowAppGesture.init(document.getElementById('video-viewport'), this.mainVideo);
+        }
+
+        // 분석 도화선 캔버스 래퍼 가동
         if (window.bowAnalyzer) {
-            window.bowAnalyzer.canvas = nodes.drawCanvas;
-            window.bowAnalyzer.ctx = nodes.drawCanvas.getContext('2d');
-            window.bowAnalyzer.render();
+            window.bowAnalyzer.init(this.drawCanvas);
         }
     }
-    window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // 하드웨어 그래픽 가속 레이어가 안전하게 개통된 상태에서 코어 모듈을 순차 기동합니다.
-    gesture.init(nodes.videoViewport, nodes.mainVideo);
-    if (window.bowAnalyzer) {
-        window.bowAnalyzer.init(nodes.drawCanvas);
-    }
-    
-    resizeCanvasToDisplay();
-    gesture.applyTransform();
+    setupEventListeners() {
+        // 카메라 기동 인터락
+        this.cameraPreview.parentElement.addEventListener('click', () => this.startCamera());
 
-    // UI 인프라 결합이 완벽히 끝난 후 스토리지를 비동기로 가동하여 교착을 원천 배제합니다.
-    core.initDB().then(async () => {
-        try {
-            await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
-        } catch (e) {
-            console.warn('[System] 시크릿 안전 부팅 보호막 가동 완료');
-        }
+        // 녹화 제어 토글
+        this.btnRecordToggle.addEventListener('click', () => this.toggleRecording());
 
-        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-        }
-    });
+        // 씬 전환 라우팅
+        this.btnGoAnalyze.addEventListener('click', () => this.switchScene('scene-analyze'));
+        this.btnGoRecord.addEventListener('click', () => this.switchScene('scene-record'));
 
-    let cameraStream = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let isRecording = false;
-    const triggerSensorUnlock = async () => {
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-            window.bowGyroSensor.start();
-        }
-        if (!cameraStream && nodes.sceneRecord.classList.contains('active')) {
-            await startCamera();
-        }
-        window.removeEventListener('click', triggerSensorUnlock);
-        window.removeEventListener('touchstart', triggerSensorUnlock);
-    };
-    window.addEventListener('click', triggerSensorUnlock);
-    window.addEventListener('touchstart', triggerSensorUnlock);
+        // 비디오 파일 로더 인터락
+        this.btnOpen.addEventListener('click', () => this.videoInput.click());
+        this.videoInput.addEventListener('change', (e) => this.handleVideoUpload(e));
 
-    async function startCamera() {
-        if (cameraStream) stopCamera();
-        try {
-            const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
-            let videoConstraints = { 
-                facingMode: { ideal: "environment" }, 
-                width: 1280, 
-                height: 720,
-                frameRate: { ideal: selectedFPS }
-            };
-            if (isPC) {
-                videoConstraints = { width: 1280, height: 720 };
-            }
+        // 모드 전환 단추 동기화
+        this.btnMove.addEventListener('click', () => this.setActiveMode('move'));
+        this.btnDraw.addEventListener('click', () => this.setActiveMode('draw'));
+        this.btnReset.addEventListener('click', () => {
+            if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+        });
 
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: videoConstraints,
-                audio: false
+        // 비디오 재생 코어 리스너
+        this.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
+        this.mainVideo.addEventListener('timeupdate', () => this.updateSlider());
+        this.videoSlider.addEventListener('input', (e) => this.seekVideo(e));
+
+        this.btnFramePrev.addEventListener('click', () => this.stepFrame(-0.033));
+        this.btnFrameNext.addEventListener('click', () => this.stepFrame(0.033));
+
+        // 네이티브 에어 시트 스마트폰 갤러리 저장 인터락
+        this.btnDownloadVideo.addEventListener('click', () => this.exportToGallery());
+
+        // 패널 드래그 축소 제어
+        if (this.panelHandle) {
+            this.panelHandle.addEventListener('click', () => {
+                this.unifiedPanel.classList.toggle('collapsed');
             });
-            nodes.cameraPreview.srcObject = cameraStream;
-            nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
-            setTimeout(resizeCanvasToDisplay, 150);
-        } catch (err) {
-            if (selectedFPS > 30) {
-                selectedFPS = 30;
-                const activeBtn = document.querySelector('.fps-btn[data-fps="30"]');
-                if (activeBtn) {
-                    document.querySelectorAll('.fps-btn').forEach(b => b.classList.remove('active'));
-                    activeBtn.classList.add('active');
-                }
-                await startCamera();
-            } else {
-                nodes.recordStatus.textContent = '카메라 장치 로드 실패.';
+        }
+
+        // 각도 업데이트 전역 이벤트 바인딩
+        window.addEventListener('bowAngleUpdate', (e) => {
+            if (this.angleReport) {
+                this.angleReport.innerText = `ANGLE ${e.detail.angle}°`;
             }
+        });
+
+        // 자이로 네온 발광 스위칭 인터락
+        window.addEventListener('bowGyroUpdate', (e) => {
+            const hLine = document.getElementById('gyro-horizon-line');
+            const vLine = document.getElementById('gyro-vertical-line');
+            if (!hLine || !vLine) return;
+
+            hLine.style.transform = `translate(-50%, -50%) rotate(${e.detail.roll}deg)`;
+            hLine.setAttribute('data-angle', `${e.detail.roll}°`);
+
+            if (e.detail.isLevel) {
+                hLine.classList.add('perfect-level');
+                vLine.classList.add('perfect-level');
+            } else {
+                hLine.classList.remove('perfect-level');
+                vLine.classList.remove('perfect-level');
+            }
+        });
+    }
+
+    async startCamera() {
+        if (this.stream) return;
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: true // 국궁 발시 사운드 분석 인터락 결합
+            });
+            this.cameraPreview.srcObject = this.stream;
+            this.recordStatus.innerText = '카메라 커널 연결 성공. 녹화 준비 완료.';
+        } catch (err) {
+            this.recordStatus.innerText = '카메라 장치 하드웨어 개방 실패.';
             console.error(err);
         }
     }
 
-    function stopCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
+    toggleRecording() {
+        if (!this.stream) {
+            this.startCamera().then(() => this.startRecordingProcess());
+            return;
         }
-        nodes.cameraPreview.srcObject = null;
-    }
-
-    const fpsButtons = document.querySelectorAll('.fps-btn');
-    const cpuCores = navigator.hardwareConcurrency || 4;
-    
-    if (cpuCores <= 4) {
-        fpsButtons.forEach(btn => {
-            const fpsVal = parseInt(btn.getAttribute('data-fps'), 10);
-            if (fpsVal >= 120) {
-                btn.style.opacity = '0.25';
-                btn.style.pointerEvents = 'none';
-            }
-        });
-    }
-
-    fpsButtons.forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (isRecording) return;
-            fpsButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedFPS = parseInt(btn.getAttribute('data-fps'), 10);
-            if (nodes.sceneRecord.classList.contains('active')) {
-                await startCamera();
-            }
-        });
-    });
-
-    nodes.btnGoRecord.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.sceneAnalyze.classList.remove('active');
-        nodes.sceneRecord.classList.add('active');
-        await startCamera();
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-            window.bowGyroSensor.start();
-        }
-    });
-
-    function transitToAnalyzeMode() {
-        stopCamera();
-        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
-            window.bowGyroSensor.stop();
-        }
-        nodes.sceneRecord.classList.remove('active');
-        nodes.sceneAnalyze.classList.add('active');
-        setActiveMenu(nodes.btnMove);
-        if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
-        setTimeout(resizeCanvasToDisplay, 100);
-    }
-
-    nodes.btnGoAnalyze.addEventListener('click', transitToAnalyzeMode);
-
-    nodes.btnRecordToggle.addEventListener('click', () => {
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-            window.bowGyroSensor.start();
-        }
-        if (!cameraStream) return;
-        
-        if (!isRecording) {
-            recordedChunks = [];
-            let options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = { mimeType: 'video/webm;codecs=vp8' };
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options = { mimeType: 'video/mp4' };
-                }
-            }
-            
-            try {
-                mediaRecorder = new MediaRecorder(cameraStream, options);
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-                };
-                mediaRecorder.onstop = async () => {
-                    const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-                    const videoURL = URL.createObjectURL(videoBlob);
-                    nodes.mainVideo.src = videoURL;
-                    
-                    await core.saveCache('lastVideoBlob', videoBlob);
-                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
-                    
-                    transitToAnalyzeMode();
-                };
-                
-                mediaRecorder.start();
-                isRecording = true;
-                nodes.btnRecordToggle.textContent = '녹화중지';
-                nodes.btnRecordToggle.classList.add('recording');
-                nodes.recordStatus.textContent = '고해상도 프레임 캡처 진행 중...';
-            } catch (e) {
-                console.error('녹화 시동 오류:', e);
-            }
+        if (!this.isRecording) {
+            this.startRecordingProcess();
         } else {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            isRecording = false;
-            nodes.btnRecordToggle.textContent = '녹화시작';
-            nodes.btnRecordToggle.classList.remove('recording');
+            this.stopRecordingProcess();
         }
-    });
-    function setActiveMenu(activeBtn) {
-        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
-            if (btn) btn.classList.remove('active');
-        });
-        if (activeBtn) activeBtn.classList.add('active');
     }
 
-    if (nodes.btnDownloadVideo) {
-        nodes.btnDownloadVideo.addEventListener('click', async () => {
-            try {
-                const savedBlob = await core.loadCache('lastVideoBlob');
-                if (!savedBlob) {
-                    alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.');
-                    return;
-                }
-                
-                const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm';
-                let fileExtension = '.webm';
-                
-                if (actualMime.includes('mp4')) {
-                    fileExtension = '.mp4';
-                }
+    startRecordingProcess() {
+        this.recordedChunks = [];
+        let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2' };
+        }
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm' };
+        }
 
-                const url = URL.createObjectURL(savedBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                
-                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-                a.download = `kukgung_analysis_${dateStr}${fileExtension}`;
-                
-                document.body.appendChild(a);
-                a.click();
-                
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+        try {
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
+            this.mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) this.recordedChunks.push(e.data);
+            };
+            this.mediaRecorder.onstop = () => {
+                this.currentVideoBlob = new Blob(this.recordedChunks, { type: options.mimeType || 'video/mp4' });
+                const videoURL = URL.createObjectURL(this.currentVideoBlob);
+                this.mainVideo.src = videoURL;
+                this.recordStatus.innerText = '녹화본이 성공적으로 인코딩되어 분석 버퍼에 전송되었습니다.';
+                this.switchScene('scene-analyze');
+            };
+
+            this.mediaRecorder.start();
+            this.isRecording = true;
+            this.btnRecordToggle.innerText = '녹화종료';
+            this.btnRecordToggle.classList.add('recording');
+            this.recordStatus.innerText = '자세 오디오 및 영상 동시 기록중...';
+        } catch (e) {
+            console.error('레코더 아키텍처 가동 실패:', e);
+        }
+    }
+
+    stopRecordingProcess() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            this.btnRecordToggle.innerText = '녹화시작';
+            this.btnRecordToggle.classList.remove('recording');
+        }
+    }
+
+    switchScene(sceneId) {
+        document.querySelectorAll('.app-scene').forEach(scene => {
+            scene.classList.remove('active');
+        });
+        document.getElementById(sceneId).classList.add('active');
+        
+        if (sceneId === 'scene-analyze' && this.mainVideo.src) {
+            this.mainVideo.play().catch(() => {});
+            this.btnPlayPause.innerText = '일시정지';
+        } else {
+            this.mainVideo.pause();
+        }
+    }
+/**
+ * js/app.js - [Part 2]
+ * - 국궁 고각 분석 시스템 통합 제어 커널 완결판
+ * - 오디오 인터락 및 모바일 갤러리 저장을 위한 네이티브 공유 시스템 탑재 버전
+ */
+
+    handleVideoUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            this.currentVideoBlob = file;
+            const url = URL.createObjectURL(file);
+            this.mainVideo.src = url;
+            this.switchScene('scene-analyze');
+        }
+    }
+
+    setActiveMode(mode) {
+        this.btnMove.classList.remove('active');
+        this.btnDraw.classList.remove('active');
+        if (mode === 'move') this.btnMove.classList.add('active');
+        if (mode === 'draw') this.btnDraw.classList.add('active');
+        if (window.bowAnalyzer) window.bowAnalyzer.setMode(mode);
+    }
+
+    togglePlayPause() {
+        if (this.mainVideo.paused) {
+            this.mainVideo.play();
+            this.btnPlayPause.innerText = '일시정지';
+        } else {
+            this.mainVideo.pause();
+            this.btnPlayPause.innerText = '재생';
+        }
+    }
+
+    updateSlider() {
+        if (!this.mainVideo.duration) return;
+        const value = (this.mainVideo.currentTime / this.mainVideo.duration) * 100;
+        this.videoSlider.value = value;
+    }
+
+    seekVideo(event) {
+        if (!this.mainVideo.duration) return;
+        const time = (event.target.value / 100) * this.mainVideo.duration;
+        this.mainVideo.currentTime = time;
+    }
+
+    stepFrame(amount) {
+        this.mainVideo.pause();
+        this.btnPlayPause.innerText = '재생';
+        this.mainVideo.currentTime = Math.min(Math.max(0, this.mainVideo.currentTime + amount), this.mainVideo.duration);
+    }
+
+    /**
+     * [💡 스마트폰 갤러리 내이티브 시트 연동 핵심 함수]
+     * - Web Share API를 기동하여 iOS '비디오 저장' 단추 및 안드로이드 공유 시트를 강제 팝업합니다.
+     * - 미지원 구형 기기는 에어드롭/로컬 다운로드 파이프라인으로 안전하게 대체 우회합니다.
+     */
+    async exportToGallery() {
+        if (!this.currentVideoBlob) {
+            alert('분석 화면에 로드된 동영상 파일 자원이 없습니다.');
+            return;
+        }
+
+        const fileExtension = this.currentVideoBlob.type.includes('webm') ? 'webm' : 'mp4';
+        const filename = `kukgung_analysis_${Date.now()}.${fileExtension}`;
+        const file = new File([this.currentVideoBlob], filename, { type: this.currentVideoBlob.type });
+
+        // iOS 내이티브 사진 앱 갤러리 직접 저장 시스템 시트 호출 검증
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: '국궁 자세 분석 동영상',
+                    text: '고각 분석 시스템에서 익스포트된 동영상 자원입니다.'
+                });
             } catch (err) {
-                alert('파일 내보내기 도중 오류가 발생했습니다.');
-                console.error(err);
-            }
-        });
-    }
-
-    let currentFrameTime = 1 / 30; 
-    
-    nodes.mainVideo.addEventListener('loadedmetadata', () => {
-        const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
-        currentFrameTime = 1 / detectedFPS;
-
-        if (!isFinite(nodes.mainVideo.duration) || nodes.mainVideo.duration === 0 || isNaN(nodes.mainVideo.duration)) {
-            nodes.mainVideo.currentTime = 1e9;
-            nodes.mainVideo.addEventListener('timeupdate', function recoverDuration() {
-                if (nodes.mainVideo.duration && isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
-                    nodes.videoSlider.max = nodes.mainVideo.duration;
-                    nodes.videoSlider.step = 0.0001;
-                    nodes.mainVideo.currentTime = 0;
-                    nodes.mainVideo.removeEventListener('timeupdate', recoverDuration);
-                }
-            });
-        } else {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-        }
-        
-        resizeCanvasToDisplay();
-    });
-
-    nodes.mainVideo.addEventListener('timeupdate', () => {
-        if (!isNaN(nodes.mainVideo.currentTime) && isFinite(nodes.mainVideo.duration)) {
-            nodes.videoSlider.value = nodes.mainVideo.currentTime;
-        }
-    });
-    
-    nodes.videoSlider.addEventListener('input', () => {
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
-    });
-    
-    nodes.btnPlayPause.addEventListener('click', () => {
-        if (nodes.mainVideo.paused) {
-            nodes.mainVideo.play();
-            nodes.btnPlayPause.textContent = '일시정지';
-        } else {
-            nodes.mainVideo.pause();
-            nodes.btnPlayPause.textContent = '재생';
-        }
-    });
-
-    let longPressTimer = null;
-    let repeatInterval = null;
-
-    function startFrameRepeat(direction) {
-        clearFrameRepeat();
-        longPressTimer = setTimeout(() => {
-            repeatInterval = setInterval(() => {
-                nodes.mainVideo.pause();
-                nodes.btnPlayPause.textContent = '재생';
-                if (direction === 'next') {
-                    nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
-                } else {
-                    nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
-                }
-            }, 60); 
-        }, 300);
-    }
-
-    function clearFrameRepeat() {
-        if (longPressTimer) clearTimeout(longPressTimer);
-        if (repeatInterval) clearInterval(repeatInterval);
-        longPressTimer = null;
-        repeatInterval = null;
-    }
-    
-    nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
-        startFrameRepeat('prev');
-    });
-    
-    nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        nodes.mainVideo.pause();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
-        startFrameRepeat('next');
-    });
-
-    window.addEventListener('pointerup', clearFrameRepeat);
-    window.addEventListener('pointercancel', clearFrameRepeat);
-    nodes.btnFramePrev.addEventListener('pointerleave', clearFrameRepeat);
-    nodes.btnFrameNext.addEventListener('pointerleave', clearFrameRepeat);
-    
-    nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
-    
-    nodes.videoInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        const targetFile = files[0];
-        
-        await core.saveCache('lastVideoBlob', targetFile);
-        const url = URL.createObjectURL(targetFile);
-        nodes.mainVideo.src = url;
-        nodes.mainVideo.load();
-        
-        nodes.mainVideo.addEventListener('loadeddata', () => {
-            nodes.videoSlider.max = nodes.mainVideo.duration;
-            nodes.videoSlider.step = 0.0001;
-            resizeCanvasToDisplay();
-        }, { once: true });
-
-        if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
-            window.bowGyroSensor.stop();
-        }
-        setActiveMenu(nodes.btnOpen);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.clearLines();
-            window.bowAnalyzer.setMode('move');
-        }
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
-
-    nodes.btnMove.addEventListener('click', () => {
-        setActiveMenu(nodes.btnMove);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('move');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnDraw.addEventListener('click', () => {
-        setActiveMenu(nodes.btnDraw);
-        if (window.bowAnalyzer) {
-            window.bowAnalyzer.setMode('draw');
-            window.bowAnalyzer.render();
-        }
-    });
-
-    nodes.btnReset.addEventListener('click', async () => {
-        nodes.mainVideo.pause();
-        nodes.mainVideo.removeAttribute('src');
-        nodes.mainVideo.load();
-        nodes.btnPlayPause.textContent = '재생';
-        nodes.videoSlider.value = 0;
-        nodes.videoSlider.max = 100;
-
-        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
-        
-        core.state.scale = 1;
-        core.state.offsetX = 0;
-        core.state.offsetY = 0;
-        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
-
-        await core.saveCache('lastLines', []);
-        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
-        await core.saveCache('lastVideoBlob', null);
-        await core.saveCache('lastRecordedMime', null);
-
-        nodes.angleReport.textContent = "ANGLE 0.0°";
-        alert('이전 분석 데이터가 완전히 초기화되었습니다. 즉시 다음 영상 작업을 진행할 수 있습니다.');
-        setTimeout(resizeCanvasToDisplay, 100);
-    });
-    
-    nodes.panelHandle.addEventListener('click', () => {
-        core.state.isPanelOpen = !core.state.isPanelOpen;
-        if (core.state.isPanelOpen) nodes.unifiedPanel.classList.remove('collapsed');
-        else nodes.unifiedPanel.classList.add('collapsed');
-    });
-    
-    window.addEventListener('bowAngleUpdate', (e) => {
-        nodes.angleReport.textContent = `ANGLE ${e.detail.angle}°`;
-        if (window.bowAnalyzer) core.saveCache('lastLines', window.bowAnalyzer.lines);
-    });
-    
-    window.addEventListener('bowGestureUndo', (e) => {
-        core.saveCache('lastLines', e.detail.lines);
-    });
-    
-    // 💡 [정중앙 정렬 복구 패치 완료] CSS 초기화 픽셀(`top: 50%; left: 50%;`)과 오차가 나지 않도록 
-    // translate 기준 중심축 보정값을 단단히 결합하여 수평계 라인이 반쪽으로 잘리거나 쏠리던 연산 밀림을 원천 제거했습니다.
-    window.addEventListener('bowGyroUpdate', (e) => {
-        const { roll, isLevel } = e.detail;
-        if (isNaN(roll)) return;
-
-        if (nodes.sceneRecord.classList.contains('active')) {
-            if (nodes.gyroHorizonLine && nodes.gyroVerticalLine) {
-                nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
-                nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
-                
-                if (isLevel) {
-                    nodes.gyroHorizonLine.classList.add('perfect-level');
-                    nodes.gyroVerticalLine.classList.add('perfect-level');
-                } else {
-                    nodes.gyroHorizonLine.classList.remove('perfect-level');
-                    nodes.gyroVerticalLine.classList.remove('perfect-level');
+                // 사용자가 취소한 경우가 아닐 때만 차선책 에러 처리
+                if (err.name !== 'AbortError') {
+                    this.fallbackDownloadPipeline(filename);
                 }
             }
+        } else {
+            // Web Share API 미지원 브라우저 환경을 위한 크로스 브라우징 샌드박스 강제 다운로드 우회
+            this.fallbackDownloadPipeline(filename);
         }
-    });
+    }
+
+    fallbackDownloadPipeline(filename) {
+        const downloadUrl = URL.createObjectURL(this.currentVideoBlob);
+        const tempAnchor = document.createElement('a');
+        tempAnchor.href = downloadUrl;
+        tempAnchor.download = filename;
+        document.body.appendChild(tempAnchor);
+        tempAnchor.click();
+        document.body.removeChild(tempAnchor);
+        URL.revokeObjectURL(downloadUrl);
+        alert('OS 공유 시스템 인터페이스를 불러오지 못해 파일 다운로드 파이프라인으로 자동 우회 저장되었습니다.');
+    }
+}
+
+// 윈도우 인프라 초기화 커널 인스턴스 바인딩
+window.addEventListener('DOMContentLoaded', () => {
+    window.bowAppController = new BowAppController();
+    window.bowAppController.init();
 });
