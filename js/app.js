@@ -1,548 +1,326 @@
 /**
- * js/analyzer.js - [Part 1]
- * 국궁 고각 분석 시스템 - 초기화 기능 보강 및 자석 스냅 엔진 탑재 완결판 (v20.1)
+ * js/app.js
+ * 국궁 자세 분석 시스템 - 마스터 컨트롤러 통합 완결판 (v20.1)
+ * [변경사항] 초기화(Reset) 버튼 클릭 시 비디오 스트림을 파괴하지 않고 선분 및 트랜스폼만 리셋하도록 최적화
  */
 
-class BowAnalyzer {
-    constructor() {
-        this.canvas = null;
-        this.ctx = null;
-        this.lines = [];
-        this.currentLine = null;
-        this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
-        this.toolMode = 'move';
-        this.snapThreshold = 18; // 손가락 터치 타겟팅 기본 반경
-        this.isSnapped = false;
+window.bowAppNodes = {};
 
-        // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
-        this.isAngleSnapped = false;
-        this.angleSnapThreshold = 1.5; // (±1.5°) 자석 각도 오차 범위
+window.addEventListener('load', () => {
+    const core = window.bowAppCore;
+    const gesture = window.bowAppGesture;
+    const nodes = window.bowAppNodes;
 
-        // 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
-        this.lastTapTime = 0;
-        this.tapThreshold = 300; // 0.3초 이내 연속 터치 시 더블 탭 인정
-        this.lastTapCoords = { x: 0, y: 0 };
+    // 1. DOM 공용 핵심 인프라 노드 매핑
+    nodes.sceneRecord = document.getElementById('scene-record');
+    nodes.sceneAnalyze = document.getElementById('scene-analyze');
+    nodes.btnGoAnalyze = document.getElementById('btn-go-analyze');
+    nodes.btnGoRecord = document.getElementById('btn-go-record');
 
-        // 선 정점 편집 미세 수정을 위한 상태 변수
-        this.editingLineIndex = -1;
-        this.editingVertexType = null;
-        this.movingLineIndex = -1;
-        this.lastCoords = { x: 0, y: 0 };
+    nodes.cameraPreview = document.getElementById('camera-preview');
+    nodes.btnRecordToggle = document.getElementById('btn-record-toggle');
+    nodes.recordStatus = document.getElementById('record-status');
+    nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
+    nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
 
-        this.handlePointerDown = this.handlePointerDown.bind(this);
-        this.handlePointerMove = this.handlePointerMove.bind(this);
-        this.handlePointerUp = this.handlePointerUp.bind(this);
+    nodes.videoViewport = document.getElementById('video-viewport');
+    nodes.mainVideo = document.getElementById('main-video');
+    nodes.drawCanvas = document.getElementById('draw-canvas');
+    nodes.unifiedPanel = document.getElementById('unified-panel');
+    nodes.panelHandle = document.getElementById('panel-handle');
+
+    nodes.btnOpen = document.getElementById('btn-open');
+    nodes.btnMove = document.getElementById('btn-move');
+    nodes.btnDraw = document.getElementById('btn-draw');
+    nodes.btnCapture = document.getElementById('btn-capture');
+    nodes.btnReset = document.getElementById('btn-reset');
+    nodes.videoInput = document.getElementById('video-input');
+    nodes.btnDownloadVideo = document.getElementById('btn-download-video');
+
+    nodes.videoSlider = document.getElementById('video-slider');
+    nodes.btnFramePrev = document.getElementById('btn-frame-prev');
+    nodes.btnPlayPause = document.getElementById('btn-play-pause');
+    nodes.btnFrameNext = document.getElementById('btn-frame-next');
+    nodes.angleReport = document.getElementById('angle-report');
+
+    let selectedFPS = 30;
+    let currentFrameTime = 1 / 30;
+    let cameraStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    // 2. 화면 해상도(DPR) 동기화 및 캔버스 스케일링 보정
+    function resizeCanvasToDisplay() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const dpr = window.devicePixelRatio || 1;
+
+        nodes.drawCanvas.width = width * dpr;
+        nodes.drawCanvas.height = height * dpr;
+
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.canvas = nodes.drawCanvas;
+            window.bowAnalyzer.ctx = nodes.drawCanvas.getContext('2d');
+            window.bowAnalyzer.render();
+        }
     }
+    window.addEventListener('resize', resizeCanvasToDisplay);
 
-    // [💡 하드웨어 충돌 박멸] 리스너를 단 한 번만 영구 결합하여 중복 누적 버그 차단
-    init(canvasElement) {
-        this.canvas = canvasElement;
-        this.ctx = this.canvas.getContext('2d');
+    // 하드웨어 모듈 순차 가동 및 바인딩
+    gesture.init(nodes.videoViewport, nodes.mainVideo);
+    if (window.bowAnalyzer) {
+        window.bowAnalyzer.init(nodes.drawCanvas);
+    }
+    resizeCanvasToDisplay();
+    gesture.applyTransform();
+    // 3. 녹화 중지 시 자동 저장 및 분석 모드 즉시 연동 핸들러
+    function handleRecordingFinish(blob, phoneRollAtRecord = 0) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `kukgung_${timestamp}.webm`;
 
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove);
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp);
-        this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        console.log(`[시스템] 자동 저장 완료: ${fileName}`);
 
-        this.canvas.addEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.addEventListener('pointermove', this.handlePointerMove);
-        this.canvas.addEventListener('pointerup', this.handlePointerUp);
-        this.canvas.addEventListener('pointercancel', this.handlePointerUp);
+        if (nodes.mainVideo.src && nodes.mainVideo.src.startsWith('blob:')) {
+            URL.revokeObjectURL(nodes.mainVideo.src);
+        }
+
+        nodes.mainVideo.src = url;
+        nodes.mainVideo.dataset.phoneRoll = phoneRollAtRecord; 
         
-        this.render();
-    }
+        nodes.mainVideo.onloadedmetadata = () => {
+            const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
+            currentFrameTime = 1 / detectedFPS;
 
-    // [신규 보강] 선분만 확실하게 청소하고 리포트 및 이벤트를 즉시 초기화하는 메서드
-    clearLines() {
-        this.lines = [];          // 선분 데이터 비우기
-        this.currentLine = null;  // 현재 그리던 선 바인딩 해제
-        this.editingLineIndex = -1;
-        this.editingVertexType = null;
-        this.movingLineIndex = -1;
-        this.isAngleSnapped = false;
-        
-        this.render();            // 캔버스 다시 그리기 (빈 상태로)
-        
-        // 각도 리포트 초기화
-        const report = document.getElementById('angle-report');
-        if (report) report.innerHTML = '<div style="color:#aaa; font-size:13px; font-weight:normal; text-align:center;">분석 대기 중</div>';
-        
-        // 전역 이벤트 브로드캐스트 초기화 알림
-        window.dispatchEvent(new CustomEvent('bowAngleUpdate', { 
-            detail: { final: 0, visual: 0, roll: 0 } 
-        }));
-    }
-
-    updateTransform(scale, offsetX, offsetY) {
-        this.transform.scale = scale;
-        this.transform.offsetX = offsetX;
-        this.transform.offsetY = offsetY;
-        this.render();
-    }
-
-    setMode(mode) {
-        this.toolMode = mode;
-        this.render();
-    }
-
-    undoLastLine() {
-        if (this.lines.length > 0) {
-            this.lines.pop();
-            this.isAngleSnapped = false;
-            this.render();
-            this.calculateFinalAngle();
-            return true;
-        }
-        return false;
-    }
-
-    getCanvasCoordinates(event) {
-        if (!this.canvas) return { x: 0, y: 0 };
-        const rect = this.canvas.getBoundingClientRect();
-        const canvasScaleX = this.canvas.width / rect.width;
-        const canvasScaleY = this.canvas.height / rect.height;
-        const cX = (event.clientX - rect.left) * canvasScaleX;
-        const cY = (event.clientY - rect.top) * canvasScaleY;
-
-        const canvasX = (cX - (this.transform.offsetX * canvasScaleX)) / this.transform.scale;
-        const canvasY = (cY - (this.transform.offsetY * canvasScaleY)) / this.transform.scale;
-        return { x: canvasX, y: canvasY };
-    }
-
-    getDistanceToLine(x, y, line) {
-        if (!line || !line.start || !line.end) return Infinity;
-        const A = x - line.start.x;
-        const B = y - line.start.y;
-        const C = line.end.x - line.start.x;
-        const D = line.end.y - line.start.y;
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-        let param = -1;
-        if (lenSq !== 0) param = dot / lenSq;
-        let xx, yy;
-        if (param < 0) {
-            xx = line.start.x; yy = line.start.y;
-        } else if (param > 1) {
-            xx = line.end.x; yy = line.end.y;
-        } else {
-            xx = line.start.x + param * C;
-            yy = line.start.y + param * D;
-        }
-        return Math.hypot(x - xx, y - yy);
-    }
-
-    findCloseEndpoint(x, y) {
-        const baseRadius = window.isStylusActive ? 35 : this.snapThreshold;
-        const targetRadius = baseRadius / this.transform.scale;
-        for (let line of this.lines) {
-            if (Math.hypot(line.start.x - x, line.start.y - y) < targetRadius) {
-                return { x: line.start.x, y: line.start.y };
-            }
-            if (Math.hypot(line.end.x - x, line.end.y - y) < targetRadius) {
-                return { x: line.end.x, y: line.end.y };
-            }
-        }
-        return null;
-    }
-    // js/analyzer.js - [Part 2]
-    handlePointerDown(event) {
-        if (this.toolMode !== 'draw') return;
-        if (event.pointerType === 'pen') {
-            window.isStylusActive = true;
-        } else if (event.pointerType === 'touch' && window.isStylusActive) {
-            return;
-        }
-        event.preventDefault();
-        
-        this.canvas.setPointerCapture(event.pointerId);
-        const coords = this.getCanvasCoordinates(event);
-
-        const baseRadius = (event.pointerType === 'pen') ? 35 : this.snapThreshold;
-        const targetRadius = baseRadius / this.transform.scale;
-
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - this.lastTapTime;
-
-        this.editingLineIndex = -1;
-        this.editingVertexType = null;
-        this.movingLineIndex = -1;
-
-        if (tapLength < this.tapThreshold && tapLength > 0) {
-            const distFromLastTap = Math.hypot(coords.x - this.lastTapCoords.x, coords.y - this.lastTapCoords.y);
-            if (distFromLastTap < targetRadius) {
-                for (let i = 0; i < this.lines.length; i++) {
-                    if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
-                        this.lines.splice(i, 1);
-                        this.lastTapTime = 0;
-                        this.currentLine = null;
-                        this.isAngleSnapped = false;
-                        this.render();
-                        this.calculateFinalAngle();
-
-                        const deleteEvent = new CustomEvent('bowGestureUndo', {
-                            detail: { lines: this.lines }
-                        });
-                        window.dispatchEvent(deleteEvent);
-                        return;
-                    }
-                }
-            }
-        }
-
-        this.lastTapTime = currentTime;
-        this.lastTapCoords = coords;
-        this.lastCoords = coords;
-
-        for (let i = 0; i < this.lines.length; i++) {
-            const line = this.lines[i];
-            if (Math.hypot(line.start.x - coords.x, line.start.y - coords.y) < targetRadius) {
-                this.editingLineIndex = i;
-                this.editingVertexType = 'start';
-                break;
-            }
-            if (Math.hypot(line.end.x - coords.x, line.end.y - coords.y) < targetRadius) {
-                this.editingLineIndex = i;
-                this.editingVertexType = 'end';
-                break;
-            }
-        }
-
-        if (this.editingLineIndex === -1) {
-            for (let i = 0; i < this.lines.length; i++) {
-                if (this.getDistanceToLine(coords.x, coords.y, this.lines[i]) < targetRadius) {
-                    this.movingLineIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (this.editingLineIndex === -1 && this.movingLineIndex === -1) {
-            let startPt = { x: coords.x, y: coords.y };
-            const snappedPt = this.findCloseEndpoint(coords.x, coords.y);
-            if (snappedPt) startPt = snappedPt;
-            this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
-        }
-    }
-
-    snapToAbsoluteAngles(basePt, targetX, targetY) {
-        const dx = targetX - basePt.x;
-        const dy = targetY - basePt.y;
-        const length = Math.hypot(dx, dy);
-        if (length === 0) return { x: targetX, y: targetY };
-
-        let rawAngle = Math.atan2(-dy, dx) * (180 / Math.PI);
-        if (rawAngle < 0) rawAngle += 360;
-        const normalizedAngle = rawAngle % 180;
-
-        const targets = [37.79, 52.21];
-        this.isAngleSnapped = false;
-
-        for (let target of targets) {
-            if (Math.abs(normalizedAngle - target) < this.angleSnapThreshold) {
-                this.isAngleSnapped = true;
-                let targetRad = target * (Math.PI / 180);
-                if (rawAngle >= 180) targetRad = (target + 180) * (Math.PI / 180);
-                return {
-                    x: basePt.x + length * Math.cos(targetRad),
-                    y: basePt.y - length * Math.sin(targetRad)
-                };
-            }
-        }
-        return { x: targetX, y: targetY };
-    }
-
-    handlePointerMove(event) {
-        if (this.toolMode !== 'draw') return;
-        event.preventDefault();
-        const coords = this.getCanvasCoordinates(event);
-        let targetX = coords.x;
-        let targetY = coords.y;
-        this.isSnapped = false;
-
-        const isPen = (event.pointerType === 'pen');
-        const baseRadius = isPen ? 35 : this.snapThreshold;
-
-        if (this.editingLineIndex !== -1 && this.editingVertexType) {
-            const line = this.lines[this.editingLineIndex];
-            const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
-            const basePt = this.editingVertexType === 'start' ? line.end : line.start;
-
-            if (isPen) {
-                targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
-                targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
+            nodes.drawCanvas.width = nodes.mainVideo.videoWidth;
+            nodes.drawCanvas.height = nodes.mainVideo.videoHeight;
+            
+            if (isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+                nodes.videoSlider.max = nodes.mainVideo.duration;
+                nodes.videoSlider.step = 0.0001;
             }
 
-            const angleSnappedPt = this.snapToAbsoluteAngles(basePt, targetX, targetY);
-            targetX = angleSnappedPt.x;
-            targetY = angleSnappedPt.y;
-
-            if (!this.isAngleSnapped) {
-                const adjustedThreshold = baseRadius / this.transform.scale;
-                const dx = targetX - basePt.x;
-                const dy = targetY - basePt.y;
-                if (Math.abs(dx) < adjustedThreshold) {
-                    targetX = basePt.x; this.isSnapped = true;
-                } else if (Math.abs(dy) < adjustedThreshold) {
-                    targetY = basePt.y; this.isSnapped = true;
-                }
+            stopCamera();
+            if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
+                window.bowGyroSensor.stop();
             }
-
-            if (this.editingVertexType === 'start') { line.start = { x: targetX, y: targetY }; }
-            else { line.end = { x: targetX, y: targetY }; }
-
-            this.render();
-            this.calculateFinalAngle();
-        }
-        else if (this.movingLineIndex !== -1) {
-            const line = this.lines[this.movingLineIndex];
-            let deltaX = coords.x - this.lastCoords.x;
-            let deltaY = coords.y - this.lastCoords.y;
-
-            if (isPen) {
-                deltaX *= 0.55;
-                deltaY *= 0.55;
+            nodes.sceneRecord.classList.remove('active');
+            nodes.sceneAnalyze.classList.add('active');
+            setActiveMenu(nodes.btnMove);
+            if (window.bowAnalyzer) window.bowAnalyzer.setMode('move');
+            
+            nodes.mainVideo.currentTime = 0.1;
+            if (window.bowAnalyzer) {
+                window.bowAnalyzer.init(nodes.drawCanvas);
+                window.bowAnalyzer.render();
             }
-
-            line.start.x += deltaX;
-            line.start.y += deltaY;
-            line.end.x += deltaX;
-            line.end.y += deltaY;
-
-            this.lastCoords = coords;
-            this.render();
-            this.calculateFinalAngle();
-        }
-        else if (this.currentLine) {
-            const angleSnappedPt = this.snapToAbsoluteAngles(this.currentLine.start, targetX, targetY);
-            targetX = angleSnappedPt.x;
-            targetY = angleSnappedPt.y;
-
-            if (!this.isAngleSnapped) {
-                const snapEndpoint = this.findCloseEndpoint(targetX, targetY);
-                if (snapEndpoint) {
-                    targetX = snapEndpoint.x; targetY = snapEndpoint.y;
-                    this.isSnapped = true;
-                } else {
-                    const adjustedThreshold = baseRadius / this.transform.scale;
-                    const dx = targetX - this.currentLine.start.x;
-                    const dy = targetY - this.currentLine.start.y;
-                    if (Math.abs(dx) < adjustedThreshold) {
-                        targetX = this.currentLine.start.x; this.isSnapped = true;
-                    } else if (Math.abs(dy) < adjustedThreshold) {
-                        targetY = this.currentLine.start.y; this.isSnapped = true;
-                    }
-                }
-            }
-            this.currentLine.end = { x: targetX, y: targetY };
-            this.render();
-            this.calculateAnglesInline();
-        }
-    }
-
-    handlePointerUp(event) {
-        if (event.pointerType === 'pen') {
-            setTimeout(() => { window.isStylusActive = false; }, 500);
-        }
-        if (this.toolMode !== 'draw') return;
-
-        if (this.editingLineIndex !== -1 && this.editingVertexType) {
-            this.editingLineIndex = -1;
-            this.editingVertexType = null;
-        } else if (this.movingLineIndex !== -1) {
-            this.movingLineIndex = -1;
-        } else if (this.currentLine) {
-            const dx = this.currentLine.end.x - this.currentLine.start.x;
-            const dy = this.currentLine.end.y - this.currentLine.start.y;
-            if (Math.hypot(dx, dy) > 8) {
-                this.lines.push(this.currentLine);
-            }
-            this.currentLine = null;
-        }
-        this.isAngleSnapped = false;
-        this.render();
-        this.calculateFinalAngle();
-    }
-    // js/analyzer.js - [Part 3]
-    getCorrectedAngle(visualAngle) {
-        const video = window.bowAppNodes?.mainVideo;
-        const phoneRoll = parseFloat(video?.dataset?.phoneRoll || 0);
-        const finalAngle = visualAngle + phoneRoll;
-        
-        return { 
-            visual: visualAngle.toFixed(1), 
-            roll: phoneRoll.toFixed(1), 
-            final: finalAngle.toFixed(1) 
+            
+            console.log('[시스템] 분석 모드 자동 전환 및 비디오 로드 완료');
+            setTimeout(resizeCanvasToDisplay, 100);
         };
     }
 
-    calculateAnglesInline() {
-        if (!this.currentLine) return;
-        let rawAngle = 0;
+    // DB 연동 및 백업 세션 복구 처리
+    core.initDB().then(async () => {
+        try {
+            await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
+        } catch (e) {
+            console.warn('[System] 안전 부팅 보호막 작동');
+        }
+        if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
+            nodes.videoSlider.max = nodes.mainVideo.duration;
+            nodes.videoSlider.step = 0.0001;
+        }
+    });
+    // 5. 초기화 및 액션 버튼 이벤트 핸들러 바인딩
+    // [수정 완결판] 비디오는 그대로 두고, 선분 정보와 화면 뷰포트 확대 비율(Gesture)만 리셋
+    nodes.btnReset?.addEventListener('click', async () => {
+        if (window.bowAnalyzer) {
+            window.bowAnalyzer.clearLines(); // 선분 배열 비우기 + 내부 렌더 갱신
+        }
 
-        if (this.lines.length === 0) {
-            rawAngle = this.getLineAngle(this.currentLine);
+        // 뷰포트 크기 및 스케일 정보 원점(0) 초기화
+        core.state.scale = 1;
+        core.state.offsetX = 0;
+        core.state.offsetY = 0;
+        if (window.bowAppGesture) window.bowAppGesture.applyTransform();
+
+        // IndexedDB 로컬 캐시 스토리지 청소 (비디오 캐시는 유지)
+        await core.saveCache('lastLines', []);
+        await core.saveCache('lastTransform', { scale: 1, offsetX: 0, offsetY: 0 });
+
+        nodes.angleReport.innerHTML = `
+            <div class="final-angle" style="font-size:20px; font-weight:bold; color:#00FF66;">0.0°</div>
+            <div class="sub-info" style="font-size:11px; opacity:0.75; margin-top:2px;">(선분 초기화 완료)</div>
+        `;
+        console.log('[시스템] 분석 선분 및 화면 트랜스폼 리셋 완료 (영상 유지)');
+        setTimeout(resizeCanvasToDisplay, 100);
+    });
+
+    nodes.btnRecordToggle?.addEventListener('click', () => {
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (isMobile && window.bowGyroSensor?.start) window.bowGyroSensor.start();
+        if (!cameraStream) return;
+
+        if (!isRecording) {
+            recordedChunks = [];
+            let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp8' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' };
+
+            try {
+                mediaRecorder = new MediaRecorder(cameraStream, options);
+                mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = async () => {
+                    const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                    await core.saveCache('lastVideoBlob', videoBlob);
+                    await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
+                    const currentRoll = core.state?.currentRoll || 0;
+                    handleRecordingFinish(videoBlob, currentRoll);
+                    recordedChunks = [];
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                nodes.btnRecordToggle.textContent = ' 녹화중지 ';
+                nodes.btnRecordToggle.classList.add('recording');
+            } catch (e) { console.error('녹화 시작 에러:', e); }
         } else {
-            rawAngle = this.getIntersectionAngle(this.lines[this.lines.length - 1], this.currentLine);
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            isRecording = false;
+            nodes.btnRecordToggle.textContent = ' 녹화시작 ';
+            nodes.btnRecordToggle.classList.remove('recording');
         }
+    });
 
-        const result = this.getCorrectedAngle(rawAngle);
-        this.broadcastAngle(result);
-    }
-
-    calculateFinalAngle() {
-        if (this.lines.length === 0) return;
+    nodes.btnCapture?.addEventListener('click', () => {
+        const video = nodes.mainVideo;
+        const drawCanvas = nodes.drawCanvas;
         
-        let rawAngle = (this.lines.length >= 2) 
-            ? this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1])
-            : this.getLineAngle(this.lines);
+        const offscreen = document.createElement('canvas');
+        offscreen.width = video.videoWidth;
+        offscreen.height = video.videoHeight;
+        const ctx = offscreen.getContext('2d');
 
-        const result = this.getCorrectedAngle(rawAngle);
-        this.broadcastAngle(result);
+        ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+        ctx.drawImage(drawCanvas, 0, 0, offscreen.width, offscreen.height);
+
+        ctx.fillStyle = "white";
+        ctx.font = "bold 24px Arial";
+        const angleText = nodes.angleReport?.innerText.split('\n') || "0.0°";
+        ctx.fillText(`국궁 자세 분석: ${angleText}`, 20, offscreen.height - 30);
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const a = document.createElement('a');
+        a.href = offscreen.toDataURL('image/png');
+        a.download = `kukgung_analysis_${timestamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    });
+    // 6. 비디오 타임라인 및 비디오 제어 컨트롤러 파트
+    nodes.mainVideo.addEventListener('loadedmetadata', () => {
+        const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
+        currentFrameTime = 1 / detectedFPS;
+        nodes.videoSlider.max = nodes.mainVideo.duration || 100;
+        nodes.videoSlider.step = 0.0001;
+        resizeCanvasToDisplay();
+    });
+
+    nodes.mainVideo.addEventListener('timeupdate', () => {
+        if (!isNaN(nodes.mainVideo.currentTime)) nodes.videoSlider.value = nodes.mainVideo.currentTime;
+    });
+
+    nodes.videoSlider.addEventListener('input', () => {
+        nodes.mainVideo.pause();
+        nodes.btnPlayPause.textContent = ' 재생 ';
+        nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
+    });
+
+    nodes.btnPlayPause.addEventListener('click', () => {
+        if (nodes.mainVideo.paused) { nodes.mainVideo.play(); nodes.btnPlayPause.textContent = ' 일시정지 '; }
+        else { nodes.mainVideo.pause(); nodes.btnPlayPause.textContent = ' 재생 '; }
+    });
+
+    // 프레임 버튼 물리 롱프레스 제어
+    let longPressTimer = null, repeatInterval = null;
+    function startFrameRepeat(dir) {
+        clearFrameRepeat();
+        longPressTimer = setTimeout(() => {
+            repeatInterval = setInterval(() => {
+                nodes.mainVideo.pause();
+                nodes.btnPlayPause.textContent = ' 재생 ';
+                nodes.mainVideo.currentTime = dir === 'next' 
+                    ? Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime)
+                    : Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
+            }, 60);
+        }, 300);
+    }
+    function clearFrameRepeat() { clearInterval(repeatInterval); clearTimeout(longPressTimer); }
+
+    nodes.btnFramePrev.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); nodes.mainVideo.pause(); nodes.btnPlayPause.textContent = ' 재생 ';
+        nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
+        startFrameRepeat('prev');
+    });
+    nodes.btnFrameNext.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); nodes.mainVideo.pause(); nodes.btnPlayPause.textContent = ' 재생 ';
+        nodes.mainVideo.currentTime = Math.min(nodes.mainVideo.duration, nodes.mainVideo.currentTime + currentFrameTime);
+        startFrameRepeat('next');
+    });
+    window.addEventListener('pointerup', clearFrameRepeat);
+
+    // 7. 대관식 및 비디오 파일 강제 임포트 브릿지
+    nodes.btnOpen.addEventListener('click', () => nodes.videoInput.click());
+    nodes.videoInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        const targetFile = files[0];
+        await core.saveCache('lastVideoBlob', targetFile);
+        nodes.mainVideo.src = URL.createObjectURL(targetFile);
+        nodes.mainVideo.load();
+        setActiveMenu(nodes.btnOpen);
+        if (window.bowAnalyzer) window.bowAnalyzer.clearLines();
+    });
+
+    nodes.btnMove.addEventListener('click', () => { setActiveMenu(nodes.btnMove); window.bowAnalyzer?.setMode('move'); });
+    nodes.btnDraw.addEventListener('click', () => { setActiveMenu(nodes.btnDraw); window.bowAnalyzer?.setMode('draw'); });
+
+    function setActiveMenu(activeBtn) {
+        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnCapture, nodes.btnDownloadVideo].forEach(btn => btn?.classList.remove('active'));
+        activeBtn?.classList.add('active');
     }
 
-    getLineAngle(line) {
-        if (!line || !line.start || !line.end) return 0;
-        const dx = line.end.x - line.start.x;
-        const dy = line.end.y - line.start.y;
-        return (Math.atan2(-dy, dx) * 180 / Math.PI + 360) % 180;
-    }
+    nodes.btnGoRecord.addEventListener('click', async () => {
+        nodes.mainVideo.pause(); nodes.sceneAnalyze.classList.remove('active'); nodes.sceneRecord.classList.add('active');
+        await startCamera();
+    });
+    nodes.btnGoAnalyze.addEventListener('click', () => {
+        stopCamera(); nodes.sceneRecord.classList.remove('active'); nodes.sceneAnalyze.classList.add('active');
+        setActiveMenu(nodes.btnMove); window.bowAnalyzer?.setMode('move');
+    });
 
-    getIntersectionAngle(l1, l2) {
-        if (!l1 || !l2) return 0;
-        let diff = Math.abs(this.getLineAngle(l1) - this.getLineAngle(l2));
-        return diff > 90 ? 180 - diff : diff;
-    }
+    nodes.panelHandle.addEventListener('click', () => {
+        core.state.isPanelOpen = !core.state.isPanelOpen;
+        nodes.unifiedPanel.classList.toggle('collapsed', !core.state.isPanelOpen);
+    });
 
-    broadcastAngle(result) {
-        window.dispatchEvent(new CustomEvent('bowAngleUpdate', {
-            detail: { angle: result.final, raw: result.visual, roll: result.roll }
-        }));
-
-        const report = document.getElementById('angle-report');
-        if (report) {
-            report.innerHTML = `
-                <div style="font-size:24px; font-weight:bold; color:#00ff00;">${result.final}°</div>
-                <div style="font-size:11px; color:#aaa; margin-top:2px;">(측정: ${result.visual}° / 보정: ${result.roll}°)</div>
-            `;
+    window.addEventListener('bowGyroUpdate', (e) => {
+        const { roll, isLevel } = e.detail;
+        if (isNaN(roll)) return;
+        core.state.currentRoll = roll;
+        if (nodes.sceneRecord.classList.contains('active') && nodes.gyroHorizonLine) {
+            nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
+            nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
+            nodes.gyroHorizonLine.classList.toggle('perfect-level', isLevel);
+            if (nodes.gyroVerticalLine) nodes.gyroVerticalLine.classList.toggle('perfect-level', isLevel);
         }
-    }
-
-    drawSingleLineAbsoluteAngle(line, scaleX) {
-        if (!line || !line.start || !line.end) return;
-        const rawAngle = this.getLineAngle(line);
-        const result = this.getCorrectedAngle(rawAngle);
-        
-        this.ctx.save();
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-        this.ctx.shadowBlur = 4;
-        this.ctx.font = `bold ${Math.max(11, (12 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
-
-        const textX = line.start.x + (12 / this.transform.scale);
-        const textY = line.start.y - (12 / this.transform.scale);
-        this.ctx.fillText(`${result.final}°`, textX, textY);
-        this.ctx.restore();
-    }
-
-    drawInlineAngleArc(line1, line2, scaleX) {
-        if (!line1 || !line2) return;
-
-        const l1 = Array.isArray(line1) ? line1[line1.length - 1] : line1;
-        const l2 = Array.isArray(line2) ? line2[line2.length - 1] : line2;
-        if (!l1 || !l2 || !l1.start || !l1.end || !l2.start || !l2.end) return;
-
-        const a1 = Math.atan2((l1.start.y - l1.end.y), l1.start.x - l1.end.x);
-        const a2 = Math.atan2((l2.end.y - l2.start.y), l2.end.x - l2.start.x);
-        const rawDeg = this.getIntersectionAngle(l1, l2);
-        const result = this.getCorrectedAngle(rawDeg);
-
-        this.ctx.save();
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-        this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
-        const radius = (40 * scaleX) / this.transform.scale;
-        this.ctx.arc(l1.end.x, l1.end.y, radius, -a1, -a2, a1 > a2);
-        this.ctx.stroke();
-        
-        this.ctx.fillStyle = '#34C759';
-        this.ctx.font = `bold ${Math.max(13, (14 * scaleX) / this.transform.scale)}px -apple-system, BlinkMacSystemFont, "SF Pro Text"`;
-        this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        this.ctx.shadowBlur = 5;
-        this.ctx.fillText(`사잇각 ${result.final}°`, l1.end.x + (20 / this.transform.scale), l1.end.y - (20 / this.transform.scale));
-        this.ctx.restore();
-    }
-
-    render() {
-        if (!this.ctx || !this.canvas) return;
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.save();
-        
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const canvasScaleY = this.canvas.height / rect.height;
-
-        this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
-        this.ctx.scale(this.transform.scale, this.transform.scale);
-        this.ctx.lineWidth = (3 * scaleX) / this.transform.scale;
-
-        this.lines.forEach((line, idx) => {
-            const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
-            this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00ff00';
-            this.ctx.fillStyle = isEditing ? '#FF9500' : '#00ff00';
-            this.drawSingleLine(line);
-            this.drawSingleLineAbsoluteAngle(line, scaleX);
-        });
-
-        if (this.lines.length >= 2) {
-            this.drawInlineAngleArc(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1], scaleX);
-        } else if (this.lines.length === 1 && this.currentLine) {
-            this.drawInlineAngleArc(this.lines, this.currentLine, scaleX);
-        }
-
-        if (this.currentLine) {
-            if (this.isAngleSnapped) {
-                this.ctx.strokeStyle = '#007AFF';
-                this.ctx.fillStyle = '#007AFF';
-            } else {
-                this.ctx.strokeStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
-                this.ctx.fillStyle = this.isSnapped ? '#34C759' : '#FFFFFF';
-            }
-            this.drawSingleLine(this.currentLine);
-            this.drawSingleLineAbsoluteAngle(this.currentLine, scaleX);
-        }
-        this.ctx.restore();
-    }
-
-    drawSingleLine(line) {
-        if (!line || !line.start || !line.end) return;
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x, line.start.y);
-        this.ctx.lineTo(line.end.x, line.end.y);
-        this.ctx.stroke();
-
-        const pinSize = (8 * scaleX) / this.transform.scale;
-        this.ctx.save();
-        this.ctx.lineWidth = (1.0 * scaleX) / this.transform.scale;
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(line.start.x - pinSize, line.start.y);
-        this.ctx.lineTo(line.start.x + pinSize, line.start.y);
-        this.ctx.moveTo(line.start.x, line.start.y - pinSize);
-        this.ctx.lineTo(line.start.x, line.start.y + pinSize);
-        this.ctx.stroke();
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(line.end.x - pinSize, line.end.y);
-        this.ctx.lineTo(line.end.x + pinSize, line.end.y);
-        this.ctx.moveTo(line.end.x, line.end.y - pinSize);
-        this.ctx.lineTo(line.end.x, line.end.y + pinSize);
-        this.ctx.stroke();
-
-        this.ctx.restore();
-    }
-}
-
-window.bowAnalyzer = new BowAnalyzer();
+    });
+});
