@@ -1,6 +1,8 @@
 /**
  * js/analyzer.js - [Part 1]
- * 국궁 고각 분석 시스템 - 초기화 기능 보강 및 자석 스냅 엔진 탑재 완결판 (v20.1)
+ * - 국궁 고각 분석 시스템 락 프리 최종 완결판
+ * (v20.0 - 3 ) 가로세로 분할 박스 완전 가둠 완결 버전
+ * - [업데이트] 디바이스 기울기(Phone Roll) 실시간 하드웨어 역보정 엔진 탑재판
  */
 
 class BowAnalyzer {
@@ -20,7 +22,7 @@ class BowAnalyzer {
 
         // 더블 탭 삭제 제어를 위한 정밀 타임 스탬프 및 좌표 추적 변수
         this.lastTapTime = 0;
-        this.tapThreshold = 300; // 0.3초 이내 연속 터치 시 더블 탭 인정
+        this.tapThreshold = 300; // 0.3 초 이내 연속 터치 시 더블 탭 인정
         this.lastTapCoords = { x: 0, y: 0 };
 
         // 선 정점 편집 미세 수정을 위한 상태 변수
@@ -39,40 +41,12 @@ class BowAnalyzer {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
 
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove);
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp);
-        this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
-
         this.canvas.addEventListener('pointerdown', this.handlePointerDown);
         this.canvas.addEventListener('pointermove', this.handlePointerMove);
         this.canvas.addEventListener('pointerup', this.handlePointerUp);
         this.canvas.addEventListener('pointercancel', this.handlePointerUp);
-        
-        this.render();
     }
 
-    // [신규 보강] 선분만 확실하게 청소하고 리포트 및 이벤트를 즉시 초기화하는 메서드
-    clearLines() {
-        this.lines = [];          // 선분 데이터 비우기
-        this.currentLine = null;  // 현재 그리던 선 바인딩 해제
-        this.editingLineIndex = -1;
-        this.editingVertexType = null;
-        this.movingLineIndex = -1;
-        this.isAngleSnapped = false;
-        
-        this.render();            // 캔버스 다시 그리기 (빈 상태로)
-        
-        // 각도 리포트 초기화
-        const report = document.getElementById('angle-report');
-        if (report) report.innerHTML = '<div style="color:#aaa; font-size:13px; font-weight:normal; text-align:center;">분석 대기 중</div>';
-        
-        // 전역 이벤트 브로드캐스트 초기화 알림
-        window.dispatchEvent(new CustomEvent('bowAngleUpdate', { 
-            detail: { final: 0, visual: 0, roll: 0 } 
-        }));
-    }
-    // js/analyzer.js - [Part 2]
     updateTransform(scale, offsetX, offsetY) {
         this.transform.scale = scale;
         this.transform.offsetX = offsetX;
@@ -83,6 +57,17 @@ class BowAnalyzer {
     setMode(mode) {
         this.toolMode = mode;
         this.render();
+    }
+
+    clearLines() {
+        this.lines = [];
+        this.currentLine = null;
+        this.editingLineIndex = -1;
+        this.editingVertexType = null;
+        this.movingLineIndex = -1;
+        this.isAngleSnapped = false;
+        this.render();
+        this.calculateFinalAngle(); // 0점 기반 보정치 전송 클리어
     }
 
     undoLastLine() {
@@ -109,6 +94,7 @@ class BowAnalyzer {
         return { x: canvasX, y: canvasY };
     }
 
+    // 점과 선분 사이의 최단거리 측정 기하 연산 함수
     getDistanceToLine(x, y, line) {
         if (!line || !line.start || !line.end) return Infinity;
         const A = x - line.start.x;
@@ -131,6 +117,7 @@ class BowAnalyzer {
         return Math.hypot(x - xx, y - yy);
     }
 
+    // 드로잉 시 주변 정점에 자석처럼 들러붙는 마감 함수
     findCloseEndpoint(x, y) {
         const baseRadius = window.isStylusActive ? 35 : this.snapThreshold;
         const targetRadius = baseRadius / this.transform.scale;
@@ -144,7 +131,6 @@ class BowAnalyzer {
         }
         return null;
     }
-
     handlePointerDown(event) {
         if (this.toolMode !== 'draw') return;
         if (event.pointerType === 'pen') {
@@ -223,7 +209,7 @@ class BowAnalyzer {
             this.currentLine = { start: startPt, end: { x: coords.x, y: coords.y } };
         }
     }
-    // js/analyzer.js - [Part 3]
+
     snapToAbsoluteAngles(basePt, targetX, targetY) {
         const dx = targetX - basePt.x;
         const dy = targetY - basePt.y;
@@ -335,7 +321,7 @@ class BowAnalyzer {
             }
             this.currentLine.end = { x: targetX, y: targetY };
             this.render();
-            this.calculateAnglesInline();
+            this.calculateAnglesInline(); // 실시간 드로잉 보정 연산 바인딩
         }
     }
 
@@ -362,19 +348,26 @@ class BowAnalyzer {
         this.render();
         this.calculateFinalAngle();
     }
-    // js/analyzer.js - [Part 4]
+    /**
+     * [추가] 촬영 당시 스마트폰 기울기(Roll)를 가져와 고각을 보정합니다.
+     */
     getCorrectedAngle(visualAngle) {
         const video = window.bowAppNodes?.mainVideo;
         const phoneRoll = parseFloat(video?.dataset?.phoneRoll || 0);
-        const finalAngle = visualAngle + phoneRoll;
         
-        return { 
-            visual: visualAngle.toFixed(1), 
-            roll: phoneRoll.toFixed(1), 
-            final: finalAngle.toFixed(1) 
+        // 보정 공식: 실제 고각 = 화면상 측정 각도 + 스마트폰 기울기(Roll)
+        const corrected = visualAngle + phoneRoll;
+        
+        return {
+            visual: visualAngle.toFixed(1),
+            roll: phoneRoll.toFixed(1),
+            final: corrected.toFixed(1)
         };
     }
 
+    /**
+     * [수정] 드로잉 진행 중 실시간 앵글 피드백 연산 연동
+     */
     calculateAnglesInline() {
         if (!this.currentLine) return;
         let rawAngle = 0;
@@ -389,12 +382,17 @@ class BowAnalyzer {
         this.broadcastAngle(result);
     }
 
+    /**
+     * [수정] 확정 최종 각도 계산 및 보정치 전송 로직
+     */
     calculateFinalAngle() {
-        if (this.lines.length === 0) return;
+        let rawAngle = 0;
         
-        let rawAngle = (this.lines.length >= 2) 
-            ? this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1])
-            : this.getLineAngle(this.lines);
+        if (this.lines.length >= 2) {
+            rawAngle = this.getIntersectionAngle(this.lines[this.lines.length - 2], this.lines[this.lines.length - 1]);
+        } else if (this.lines.length === 1) {
+            rawAngle = this.getLineAngle(this.lines[0]);
+        }
 
         const result = this.getCorrectedAngle(rawAngle);
         this.broadcastAngle(result);
@@ -404,29 +402,43 @@ class BowAnalyzer {
         if (!line || !line.start || !line.end) return 0;
         const dx = line.end.x - line.start.x;
         const dy = line.end.y - line.start.y;
-        return (Math.atan2(-dy, dx) * 180 / Math.PI + 360) % 180;
+        let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
+        if (angle < 0) angle += 360;
+        return Number((angle % 180).toFixed(1));
     }
 
-    getIntersectionAngle(l1, l2) {
-        if (!l1 || !l2) return 0;
-        let diff = Math.abs(this.getLineAngle(l1) - this.getLineAngle(l2));
-        return diff > 90 ? 180 - diff : diff;
+    getIntersectionAngle(line1, line2) {
+        if (!line1 || !line2 || !line1.start || !line1.end || !line2.start || !line2.end) return 0;
+        const angle1 = Math.atan2(-(line1.end.y - line1.start.y), line1.end.x - line1.start.x);
+        const angle2 = Math.atan2(-(line2.end.y - line2.start.y), line2.end.x - line2.start.x);
+        let diff = Math.abs(angle1 - angle2) * (180 / Math.PI);
+        if (diff > 180) diff = 360 - diff;
+        return Number(Math.abs(diff).toFixed(1));
     }
 
+    /**
+     * [수정] 외부 각도 업데이트 브로드캐스트 및 인터페이스 렌더링
+     */
     broadcastAngle(result) {
-        window.dispatchEvent(new CustomEvent('bowAngleUpdate', {
-            detail: { angle: result.final, raw: result.visual, roll: result.roll }
-        }));
-
+        const angleEvent = new CustomEvent('bowAngleUpdate', {
+            detail: { 
+                angle: result.final,    // 보정된 최종 고각
+                raw: result.visual,     // 화면상 측정값
+                roll: result.roll       // 적용된 보정치
+            }
+        });
+        window.dispatchEvent(angleEvent);
+        
+        // 플로팅 UI 리포트 멀티라인 패널 디자인 구조화
         const report = document.getElementById('angle-report');
         if (report) {
             report.innerHTML = `
-                <div style="font-size:24px; font-weight:bold; color:#00ff00;">${result.final}°</div>
-                <div style="font-size:11px; color:#aaa; margin-top:2px;">(측정: ${result.visual}° / 보정: ${result.roll}°)</div>
+                <div class="final-angle" style="font-size:20px; font-weight:bold; color:#00FF66;">${result.final}°</div>
+                <div class="sub-info" style="font-size:11px; opacity:0.75; margin-top:2px;">(측정: ${result.visual}° / 보정: ${result.roll}°)</div>
             `;
         }
     }
-    // js/analyzer.js - [Part 5]
+
     drawSingleLineAbsoluteAngle(line, scaleX) {
         if (!line || !line.start || !line.end) return;
         const rawAngle = this.getLineAngle(line);
@@ -440,6 +452,7 @@ class BowAnalyzer {
 
         const textX = line.start.x + (12 / this.transform.scale);
         const textY = line.start.y - (12 / this.transform.scale);
+        // 개별 라인 텍스트는 최종 보정 각도로 표기 처리
         this.ctx.fillText(`${result.final}°`, textX, textY);
         this.ctx.restore();
     }
@@ -476,19 +489,18 @@ class BowAnalyzer {
         if (!this.ctx || !this.canvas) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
-        
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
         const canvasScaleY = this.canvas.height / rect.height;
 
         this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
         this.ctx.scale(this.transform.scale, this.transform.scale);
-        this.ctx.lineWidth = (3 * scaleX) / this.transform.scale;
+        this.ctx.lineWidth = (2 * scaleX) / this.transform.scale;
 
         this.lines.forEach((line, idx) => {
             const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
-            this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00ff00';
-            this.ctx.fillStyle = isEditing ? '#FF9500' : '#00ff00';
+            this.ctx.strokeStyle = isEditing ? '#FF9500' : '#00FF66';
+            this.ctx.fillStyle = isEditing ? '#FF9500' : '#00FF66';
             this.drawSingleLine(line);
             this.drawSingleLineAbsoluteAngle(line, scaleX);
         });
@@ -544,5 +556,4 @@ class BowAnalyzer {
         this.ctx.restore();
     }
 }
-
 window.bowAnalyzer = new BowAnalyzer();
