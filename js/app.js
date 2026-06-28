@@ -1,7 +1,7 @@
 /**
  * js/app.js
  * - (v18.6 - window.load ) 국궁 자세 분석 시스템 마스터 컨트롤러 마스터 완결본 물리 렌더 안정 정렬판
- * - [업데이트] 녹화 중지 시 자동 파일 저장 및 분석 모드 자동 연동 최적화 버전
+ * - [업데이트] 녹화 중지 시 자동 파일 저장 및 결과 스크린샷 캡쳐 병합 레이어 처리 버전
  */
 
 window.bowAppNodes = {};
@@ -34,6 +34,8 @@ window.addEventListener('load', () => {
     nodes.btnOpen = document.getElementById('btn-open');
     nodes.btnMove = document.getElementById('btn-move');
     nodes.btnDraw = document.getElementById('btn-draw');
+    // [추가] 결과 캡쳐 버튼 DOM 매핑
+    nodes.btnCapture = document.getElementById('btn-capture');
     nodes.btnReset = document.getElementById('btn-reset');
     nodes.videoInput = document.getElementById('video-input');
 
@@ -284,7 +286,7 @@ window.addEventListener('load', () => {
                     if (e.data && e.data.size > 0) recordedChunks.push(e.data);
                 };
 
-                // [수정 포인트] 로컬 캐싱과 새로 보강된 자동 저장 연동 핸들러 바인딩 완료
+                // 로컬 캐싱과 새로 보강된 자동 저장 연동 핸들러 바인딩 완료
                 mediaRecorder.onstop = async () => {
                     const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
                     
@@ -319,11 +321,57 @@ window.addEventListener('load', () => {
         }
     });
 
+    /**
+     * [추가] 분석 화면 캡쳐 및 저장 기능
+     * 비디오 프레임 + 분석 선분 레이어를 병합하여 이미지로 저장합니다.
+     */
+    function captureAnalysisScene() {
+        const video = nodes.mainVideo;
+        const drawCanvas = nodes.drawCanvas;
+        
+        // 1. 병합용 임시 캔버스 생성
+        const offscreen = document.createElement('canvas');
+        offscreen.width = video.videoWidth;
+        offscreen.height = video.videoHeight;
+        const ctx = offscreen.getContext('2d');
+
+        // 2. 비디오 프레임 그리기
+        ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+
+        // 3. 분석 선분 레이어 병합
+        // drawCanvas가 화면 크기에 맞춰져 있을 수 있으므로 비디오 크기에 맞게 스케일링하여 그림
+        ctx.drawImage(drawCanvas, 0, 0, offscreen.width, offscreen.height);
+
+        // 4. 워터마크 또는 고각 정보 추가
+        ctx.fillStyle = "white";
+        ctx.font = "bold 24px Arial";
+        const angleText = document.getElementById('angle-report')?.innerText || "";
+        ctx.fillText(`국궁 자세 분석: ${angleText}`, 20, offscreen.height - 30);
+
+        // 5. 이미지 저장 (다운로드)
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const dataUrl = offscreen.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `kukgung_analysis_${timestamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        
+        console.log('[시스템] 분석 화면 캡쳐 완료');
+    }
+
     function setActiveMenu(activeBtn) {
-        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnDownloadVideo].forEach(btn => {
+        // [수정] 배열 내에 nodes.btnCapture 토글 비활성화 조건 추가
+        [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnCapture, nodes.btnDownloadVideo].forEach(btn => {
             if (btn) btn.classList.remove('active');
         });
         if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    // 버튼 이벤트 연결
+    if (nodes.btnCapture) {
+        nodes.btnCapture.addEventListener('click', captureAnalysisScene);
     }
 
     if (nodes.btnDownloadVideo) {
