@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * - (v20.5) 국궁 자세 분석 시스템 - 120fps 강제 최적화 및 모니터링 통합 마스터 컨트롤러 완결판
+ * - (v20.6) 국궁 자세 분석 시스템 - 프리징 해결 및 고성능 안정화 통합 마스터 컨트롤러 완결판
  */
 
 window.bowAppNodes = {};
@@ -10,43 +10,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const gesture = window.bowAppGesture;
     const nodes = window.bowAppNodes;
 
-    // 1. DOM 공용 핵심 인프라 노드 매핑 (오류 격리막 작동)
+    // 1. [이식] DOM 노드 매핑 (안전한 카멜케이스 자동 맵핑 공정 및 예외 격리막)
     try {
-        nodes.sceneRecord = document.getElementById('scene-record');
-        nodes.sceneAnalyze = document.getElementById('scene-analyze');
-        nodes.btnGoAnalyze = document.getElementById('btn-go-analyze');
-        nodes.btnGoRecord = document.getElementById('btn-go-record');
+        const ids = [
+            'scene-record', 'scene-analyze', 'btn-go-analyze', 'btn-go-record',
+            'camera-preview', 'btn-record-toggle', 'record-status', 'gyro-horizon-line', 'gyro-vertical-line',
+            'video-viewport', 'main-video', 'draw-canvas', 'unified-panel', 'panel-handle',
+            'btn-open', 'btn-move', 'btn-draw', 'btn-capture', 'btn-reset', 'video-input', 'btn-download-video',
+            'video-slider', 'btn-frame-prev', 'btn-play-pause', 'btn-frame-next', 'angle-report'
+        ];
+        // 하이픈(-) 패턴을 찾아 자바스크립트 표준 카멜케이스 속성명으로 치환 후 기계적 매핑
+        ids.forEach(id => {
+            const nodeKey = id.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            nodes[nodeKey] = document.getElementById(id);
+        });
 
-        nodes.cameraPreview = document.getElementById('camera-preview');
-        nodes.btnRecordToggle = document.getElementById('btn-record-toggle');
-        nodes.recordStatus = document.getElementById('record-status');
-        
-        nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
-        nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
-
-        nodes.videoViewport = document.getElementById('video-viewport');
-        nodes.mainVideo = document.getElementById('main-video');
-        nodes.drawCanvas = document.getElementById('draw-canvas');
-        nodes.unifiedPanel = document.getElementById('unified-panel');
-        nodes.panelHandle = document.getElementById('panel-handle');
-
-        nodes.btnOpen = document.getElementById('btn-open');
-        nodes.btnMove = document.getElementById('btn-move');
-        nodes.btnDraw = document.getElementById('btn-draw');
-        nodes.btnCapture = document.getElementById('btn-capture');
-        nodes.btnReset = document.getElementById('btn-reset');
-        nodes.videoInput = document.getElementById('video-input');
-        nodes.btnDownloadVideo = document.getElementById('btn-download-video');
-
-        nodes.videoSlider = document.getElementById('video-slider');
-        nodes.btnFramePrev = document.getElementById('btn-frame-prev');
-        nodes.btnPlayPause = document.getElementById('btn-play-pause');
-        nodes.btnFrameNext = document.getElementById('btn-frame-next');
-        nodes.angleReport = document.getElementById('angle-report');
-
-        console.log('[시스템] DOM 노드 매핑 완료');
+        console.log('[시스템] 고도화 DOM 카멜케이스 매핑 엔진 컴파일 완료');
     } catch (e) {
-        console.error('[오류] DOM 매핑 실패:', e);
+        console.error('[오류] DOM 인프라 기계식 자동 매핑 실패:', e);
     }
 
     let selectedFPS = 120;
@@ -55,72 +36,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    let currentRoll = 0; 
-    let actualFPS = 0; // [이식] 하드웨어가 실제로 확보한 프레임 레이트 모니터링 변수 수렴
-    // 2. [강력 수정] 120fps 강제 요청 및 실제 값 모니터링 기하 구조 엔진
+    let currentRoll = 0;
+    let actualFPS = 0; // 하드웨어가 실시간으로 확보한 최종 모니터링 프레임 레이트 변수
+    // 2. [개선] 프리징 없는 안전한 카메라 초기화 및 하이브리드 프레임 제약 조건
     async function initCamera() {
         if (cameraStream) stopCamera();
+        console.log('[시스템] 프리징 해제 디바이스 카메라 최적화 시동...');
         
-        // [이식] 지원하는 가장 높은 고속 촬영 성능을 하드웨어 레벨에서 정확히 차례대로 대조하는 시퀀스
-        const fpsTargets =; 
-        let success = false;
-
-        for (const target of fpsTargets) {
-            try {
-                let videoConstraints = {
-                    facingMode: { ideal: "environment" },
-                    frameRate: { exact: target }, // [이식] ideal 대신 exact를 강제 매핑하여 최고 하드웨어 프레임 획득 유도
+        try {
+            // [이식] exact 제약의 하드웨어 크래시를 방지하기 위해 ideal 범위를 지정, 하드웨어 성능 한계를 유연하게 유도
+            const constraints = {
+                video: {
+                    facingMode: 'environment',
+                    frameRate: { ideal: 120, min: 24 }, // 120을 표방하되 구형 단말기 기기 한계 완전 수용
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
-                };
+                },
+                audio: false
+            };
 
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: videoConstraints,
-                    audio: false
-                });
-                nodes.cameraPreview.srcObject = cameraStream;
-                
-                const track = cameraStream.getVideoTracks()[0];
-                actualFPS = track.getSettings().frameRate || target; // 동적 확보된 리드아웃 FPS 백업
-                console.log(`[시스템] 카메라 연결 성공: ${actualFPS}fps 확보`);
-                
-                await nodes.cameraPreview.play();
-                if (window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
-                    await window.bowGyroSensor.start();
-                }
-                success = true;
-                selectedFPS = typeof actualFPS === 'number' ? actualFPS : target;
-                break; // 프레임 확보 완결 시 즉각 루프 탈출
-            } catch (e) {
-                console.warn(`[경고] ${target}fps 요청 실패, 다음 단계 시도...`);
-            }
-        }
-
-        if (!success) {
+            cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            nodes.cameraPreview.srcObject = cameraStream;
+            
+            const track = cameraStream.getVideoTracks()[0];
+            const settings = track.getSettings();
+            actualFPS = settings.frameRate || "확인 중";
+            selectedFPS = typeof actualFPS === 'number' ? actualFPS : 120;
+            
+            console.log(`[시스템] 카메라 미디어 스트림 연결 성공: ${actualFPS}fps 확보`);
+            
+            // [이식] 모바일 및 iOS 사파리 환경에서 비디오 비동기 가동 시 프리징 현상을 원천 차단하는 오버레이 속성 강제 각인
+            nodes.cameraPreview.setAttribute('autoplay', '');
+            nodes.cameraPreview.setAttribute('muted', '');
+            nodes.cameraPreview.setAttribute('playsinline', '');
+            
             try {
-                // exact 제약이 완전 무력화될 때를 대비한 하이브리드 폴백 구조 연동
-                cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', frameRate: { ideal: 120 } },
-                    audio: false
-                });
-                nodes.cameraPreview.srcObject = cameraStream;
-                actualFPS = cameraStream.getVideoTracks()[0].getSettings().frameRate || "알 수 없음";
+                // play() 메소드를 철저히 비동기로 격리 유도하여 웹앱 런타임 블로킹 해결
                 await nodes.cameraPreview.play();
-            } catch (errFallback) {
-                if (nodes.recordStatus) nodes.recordStatus.textContent = '카메라 장치 로드 최종 실패.';
-                console.error('[오류] 고속 촬영 하드웨어 커넥션 최종 크래시:', errFallback);
-                alert('고속 촬영 모드를 시작할 수 없습니다. 권한 혹은 기기 사양을 확인하세요.');
-                return;
+            } catch (e) {
+                console.warn('[경고] 브라우저 정책에 의한 자동 재생 차단 감지, 사용자 상호작용 트리거 대기');
             }
-        }
 
-        // [이식] 현재 기기가 실제로 연동해 뿜어내고 있는 FPS 메타 정보를 프론트엔드 모니터링 UI 단에 출력
-        if (nodes.recordStatus) {
-            nodes.recordStatus.innerHTML = `대기 중 <span style="color:#00ff00; font-size:10px;">(현재 기기: ${actualFPS} FPS)</span>`;
+            // 센서 시동 시작
+            if (window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
+                await window.bowGyroSensor.start();
+            }
+            
+            // [이식] 디바이스가 연동한 최적의 FPS 상태 정보를 모니터링 인터페이스로 수렴
+            if (nodes.recordStatus) {
+                nodes.recordStatus.innerHTML = `대기 중 <span style="color:#00ff00; font-size:10px;">(기기 지원: ${actualFPS} FPS)</span>`;
+            }
+            
+            currentFrameTime = 1 / (typeof actualFPS === 'number' ? actualFPS : 120);
+            setTimeout(resizeCanvasToDisplay, 150);
+        } catch (err) {
+            console.error('[오류] 카메라 초기화 하드웨어 디스크립터 로드 최종 실패:', err);
+            if (nodes.recordStatus) nodes.recordStatus.innerText = "카메라 연결 실패";
         }
-        
-        currentFrameTime = 1 / (typeof actualFPS === 'number' ? actualFPS : 30);
-        setTimeout(resizeCanvasToDisplay, 150);
     }
 
     function stopCamera() {
@@ -146,15 +118,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.bowAnalyzer.render();
         }
     }
-    // 3. 녹화 종료 후 모니터링 기반 동적 타임라인 및 확장자 파일 다운로드 스크립트
+    // 3. 녹화 종료 후 모니터링 연동 타임라인 분석 변환 다운로더
     function handleRecordingFinish(blob, phoneRollAtRecord = 0) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         
-        // [이식] 실제 동작 모니터링 결과 계산된 정밀 프레임값을 파일 시스템 다운로드 네이밍에 실시간 투영
+        // [이식] 실제 동작 결과 도출된 고유 프레임 연산 정보를 타임스탬프와 파일 확장자 명명 규칙에 유기적 투영
+        const fpsMark = typeof actualFPS === 'number' ? Math.round(actualFPS) : "120";
         const currentMimeType = mediaRecorder?.mimeType || 'video/webm';
-        const isMp4Format = currentMimeType.includes('mp4');
-        const ext = isMp4Format ? '.mp4' : '.webm';
-        const fileName = `kukgung_${actualFPS}fps_${timestamp}${ext}`;
+        const ext = currentMimeType.includes('mp4') ? '.mp4' : '.webm';
+        const fileName = `kukgung_${fpsMark}fps_${timestamp}${ext}`;
 
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -163,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        console.log(`[시스템] 모니터링 연동 고속 다운로드 완료: ${fileName}`);
+        console.log(`[시스템] 프리징 해결 고성능 비디오 물리 저장 완결: ${fileName}`);
 
         if (nodes.mainVideo.src && nodes.mainVideo.src.startsWith('blob:')) {
             URL.revokeObjectURL(nodes.mainVideo.src);
@@ -199,18 +171,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.bowAnalyzer.render();
             }
 
-            console.log('[시스템] 고속 시계열 데이터 파싱 및 분석 레이어 빌드업 완료');
+            console.log('[시스템] 동적 시계열 모니터링 분석 레이어 동기화 완료');
             setTimeout(resizeCanvasToDisplay, 100);
         };
     }
 
-    // 로컬 인덱스드 세션 캐시 하드 부팅 디그레이데이션 방어선 복구 유지
+    // 로컬 인덱스드 부트 데이터 백업 세션 복구 유지 보수
     if (core && typeof core.initDB === 'function') {
         core.initDB().then(async () => {
             try {
                 await core.restoreLastSession(nodes.mainVideo, nodes.drawCanvas);
             } catch (e) {
-                console.warn('[System] 안전 모드 부트 예외 필터 처리 완료');
+                console.warn('[System] 세션 부팅 복구 예외 레이어 무력화 대응 완료');
             }
             if (nodes.mainVideo && !isNaN(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
                 nodes.videoSlider.max = nodes.mainVideo.duration;
@@ -218,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
-    // 4. [수정] 녹화 설정 (기기별 최적 코덱 자동 선택 및 8Mbps 대역폭 부스팅 증폭 실행)
+    // 4. [수정] 기기 지원 최적 코덱 동적 탐색 및 6Mbps 데이터 스트림 인코더 스펙 빌드업
     nodes.btnRecordToggle?.addEventListener('click', () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -229,28 +201,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             recordedChunks = [];
             const stream = nodes.cameraPreview?.srcObject;
             if (!stream) {
-                alert('초고속 레코더용 비디오 스트림 트랙을 탐색할 수 없습니다.');
+                console.error('[오류] 캡처 타겟 스트림 컨텍스트가 존재하지 않습니다.');
                 return;
             }
 
-            // [이식] 하드웨어 다각화 파편화에 완벽 대응하는 최적 인코딩 가용 포맷 순차 검색 선별 레이어
-            const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8'];
-            let selectedType = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
-
-            // [이식] 120프레임 압축 무손실에 준하는 8Mbps 초고화질 대역폭 증폭 스펙 고정
-            const options = {
-                mimeType: selectedType,
-                videoBitsPerSecond: 8000000 
+            // [이식] 하드웨어 파편화 환경에서 가장 구동률이 우수한 웹 비디오 수렴용 코덱 포맷 순차 레이어 선별
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+            
+            // [이식] 고속 프레임 유입 데이터 파편 처리를 유연하고 안전하게 견뎌내도록 6Mbps 대역폭 인코딩 옵션 강제 결합
+            const options = { 
+                mimeType, 
+                videoBitsPerSecond: 6000000 
             };
 
             try {
-                if (selectedType) {
-                    mediaRecorder = new MediaRecorder(stream, options);
-                } else {
-                    mediaRecorder = new MediaRecorder(stream);
-                }
+                mediaRecorder = new MediaRecorder(stream, options);
             } catch (e) {
-                console.warn('[경고] 고품질 인코더 엔진 가동 실패, 디바이스 네이티브 기본 설정으로 컴파일합니다.');
+                console.warn('[경고] 지정 코덱 포맷 인코더 구성 실패, 시스템 네이티브 기본 설정으로 바이패스 우회합니다.');
                 mediaRecorder = new MediaRecorder(stream);
             }
 
@@ -260,30 +227,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
 
                 mediaRecorder.onstop = async () => {
-                    const actualRecordedType = mediaRecorder.mimeType || selectedType || 'video/webm';
-                    const videoBlob = new Blob(recordedChunks, { type: actualRecordedType });
+                    const actualRecordedMime = mediaRecorder.mimeType || mimeType || 'video/webm';
+                    const videoBlob = new Blob(recordedChunks, { type: actualRecordedMime });
 
                     if (core && typeof core.saveCache === 'function') {
                         await core.saveCache('lastVideoBlob', videoBlob);
-                        await core.saveCache('lastRecordedMime', actualRecordedType);
+                        await core.saveCache('lastRecordedMime', actualRecordedMime);
                     }
                     
                     handleRecordingFinish(videoBlob, currentRoll);
                     recordedChunks = [];
                 };
 
-                // 고속 이미지 데이터 파편 누락 프리징을 물리 제어하는 100ms 파티션 정밀 캡처 타임 가동
+                // 데이터 파편 유실에 의한 브라우저 멈춤을 원천 해결하는 100ms 버퍼 슬라이싱 스케줄러 가동
                 mediaRecorder.start(100); 
                 isRecording = true;
                 nodes.btnRecordToggle.textContent = '녹화중지';
                 nodes.btnRecordToggle.classList.add('recording');
                 
-                // [이식] 녹화 구동과 동시에 실시간 실제 촬영 프레임 숫자를 화면 상단 모니터링 엔진에 지속 각인
+                // [이식] 실시간 확보 작동 프레임 정보를 모니터링 폰트로 UI 상단 레이아웃에 전방위 인젝션
                 if (nodes.recordStatus) {
                     nodes.recordStatus.innerHTML = `<span style="color:red;">● 녹화 중</span> <span style="font-size:10px;">(${actualFPS} FPS)</span>`;
                 }
             } catch (e) {
-                console.error('[오류] 8Mbps 초고화질 코어 미디어 레코더 시동 크래시:', e);
+                console.error('[오류] 고성능 6Mbps 레코더 가동 크래시:', e);
             }
         } else {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -293,7 +260,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             nodes.btnRecordToggle.textContent = '녹화시작';
             nodes.btnRecordToggle.classList.remove('recording');
             if (nodes.recordStatus) {
-                nodes.recordStatus.innerHTML = `대기 중 <span style="color:#00ff00; font-size:10px;">(현재 기기: ${actualFPS} FPS)</span>`;
+                nodes.recordStatus.innerHTML = `대기 중 <span style="color:#00ff00; font-size:10px;">(기기 지원: ${actualFPS} FPS)</span>`;
             }
         }
     });
@@ -319,7 +286,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         setTimeout(resizeCanvasToDisplay, 100);
     });
-    // 5. 프레임 캡쳐 그래픽 오버레이 엔진 및 비디오 플레이백 프론트엔드 연동 디바이스 인터페이스
+    // 5. 이미지 캡쳐 그래픽 병합 알고리즘 및 슬라이더 타임 인터페이스 동기화
     nodes.btnCapture?.addEventListener('click', () => {
         const video = nodes.mainVideo;
         const drawCanvas = nodes.drawCanvas;
@@ -336,7 +303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ctx.fillStyle = "white";
         ctx.font = "bold 24px Arial";
         const angleText = nodes.angleReport?.innerText.split('\n') || "0.0°";
-        ctx.fillText(`국궁 강제 최적화 분석: ${angleText}`, 20, offscreen.height - 30);
+        ctx.fillText(`국궁 고성능 최적화 분석: ${angleText}`, 20, offscreen.height - 30);
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const link = document.createElement('a');
@@ -401,7 +368,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             nodes.btnPlayPause.textContent = '재생';
         }
     });
-    // 6. 1/120초 역산 프레임 탐색 매크로 인프라 및 자이로 수평계 리얼타임 컬러 이펙트
+    // 6. 초정밀 타임 세션 프레임 매크로 매커니즘 및 자이로 수평계 동적 컬러 피드백 ㄷ자 루프 결합
     let longPressTimer = null;
     let repeatInterval = null;
 
@@ -444,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('pointerup', clearFrameRepeat);
     window.addEventListener('pointercancel', clearFrameRepeat);
 
-    // 자이로 실시간 오차 복구 바인딩 피드백 컬러 필터 ㄷ자 루프 완벽 연동
+    // [이식] 실시간 수평계 오차 가변 트랜스폼 회전 및 임계점 판정 피드백 컬러 필터 매핑 (ㄷ자 루프 완벽 복구)
     window.addEventListener('bowGyroUpdate', (e) => {
         const { roll, isLevel } = e.detail;
         if (isNaN(roll)) return;
@@ -457,15 +424,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 nodes.gyroHorizonLine.style.transform = `translate(-50%, -50%) rotate(${roll}deg)`;
                 nodes.gyroHorizonLine.setAttribute('data-angle', `${roll}°`);
                 
-                // 완벽 수평 상태 조건에 연동하는 실시간 칼라 다이나믹 매핑 (그린/레드 컬러 변형 액션)
+                // [이식] 완벽 수평 피드백 기준에 맞춰 실시간 변조되는 멈춤 없는 배경색 핸들러 기법 주입 (그린/레드 컬러 변형)
                 nodes.gyroHorizonLine.style.backgroundColor = isLevel ? '#00ff00' : '#ff4444';
                 nodes.gyroHorizonLine.classList.toggle('perfect-level', isLevel);
             }
             if (nodes.gyroVerticalLine) {
+                // [이식] 수직선 색상 정밀 동기화 레이어 결합
                 nodes.gyroVerticalLine.style.backgroundColor = isLevel ? '#00ff00' : '#ff4444';
                 nodes.gyroVerticalLine.classList.toggle('perfect-level', isLevel);
             }
-            // 녹화 준비 상태일 때 트리거 버튼 보더라인 하이라이트 동기화
+            // 녹화 준비 상태일 때 트리거 보더라인 실시간 강조 가변 매핑
             if (nodes.btnRecordToggle && !isRecording) {
                 nodes.btnRecordToggle.style.borderColor = isLevel ? '#00ff00' : '#ff4444';
             }
@@ -481,7 +449,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.bowAnalyzer && core) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
 
-    // 업로드 동영상 제어 아키텍처 결합
+    // 업로드 파일 인터페이스 비동기 가동 구조 결합
     nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
     nodes.videoInput?.addEventListener('change', async (e) => {
         const files = e.target.files; if (!files || files.length === 0) return;
@@ -505,7 +473,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     nodes.panelHandle?.addEventListener('click', () => { if (!core || !core.state) return; core.state.isPanelOpen = !core.state.isPanelOpen; nodes.unifiedPanel?.classList.toggle('collapsed', !core.state.isPanelOpen); });
     nodes.btnDownloadVideo?.addEventListener('click', async () => { try { const savedBlob = await core.loadCache('lastVideoBlob'); if (!savedBlob) { alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.'); return; } const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm'; const ext = actualMime.includes('mp4') ? '.mp4' : '.webm'; const url = URL.createObjectURL(savedBlob); const a = document.createElement('a'); a.href = url; a.download = `kukgung_video_${Date.now()}${ext}`; a.click(); URL.revokeObjectURL(url); } catch (err) { console.error(err); } });
 
-    // 시스템 병렬 비동기 부팅 런타임 이그제큐션 트리거 작동
+    // [이식] 비동기 비블로킹 순차 컴파일 및 실행 순서의 확실한 보장
     await initCamera();
     resizeCanvasToDisplay();
     window.addEventListener('resize', resizeCanvasToDisplay);
