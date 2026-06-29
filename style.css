@@ -1,6 +1,7 @@
 /**
- * style.css
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v18.8 - 크리스탈 에어 글래스 마감 버전)
+ * style.css - [Part 1]
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.2 - 크리스탈 에어 글래스 마감 버전)
+ * [변경사항] 오버레이 각도 리포터 인라인 블랙 에어 패널 및 레코딩 펄스 스케일링 하드웨어 가속 보정 통합
  */
 
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
@@ -73,8 +74,9 @@ body, html {
 .background-grid-layer {
     display: none !important;
 }
+/* style.css - [Part 2] */
 
-/* 시인성 높은 십자 가이드라인 (촬영화면 전용) */
+/* 시인성 높은 십자 가이드라인 (촬영 화면 전용) */
 #scene-record .center-crosshair-v {
     left: 50%;
     top: 0;
@@ -97,7 +99,7 @@ body, html {
     z-index: 5;
 }
 
-/* 5. 초정밀 실물 수평계 자이로 UI 및 실시간 각도 숫자 매핑 */
+/* 4. 초정밀 실물 수평계 자이로 UI 및 실시간 각도 숫자 매핑 */
 #gyro-horizon-line {
     position: absolute;
     top: 50%;
@@ -145,7 +147,21 @@ body, html {
     color: #FFFFFF;
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
-/* 6. 우측 상단 플로팅 각도 리포트 */
+
+/* 5. [추가 이식 완료] 비디오 화면 위에 겹쳐서 보일 각도 리포트 패널 스타일 사양 */
+#angle-report {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.6) !important;
+    color: #00ff00 !important;
+    padding: 15px;
+    border-radius: 8px;
+    z-index: 100; /* 비디오 및 드로잉 마스크 레이어 최상위 점유 선언 */
+    pointer-events: none; /* 하단 핀치 투 줌 터치 이벤트 관통 우회 허용 */
+}
+
+/* 백업 가이드용 우측 상단 플로팅 명세 */
 .floating-report {
     position: absolute;
     top: calc(24px + env(safe-area-inset-top));
@@ -158,8 +174,9 @@ body, html {
     font-variant-numeric: tabular-nums;
     font-family: "SF Pro Display", -apple-system, sans-serif;
 }
+/* style.css - [Part 3] */
 
-/* 7. 하단 패널 영역 (💡답답함을 원천 정화한 크리스탈 에어 글래스 35% 마감 패치) */
+/* 6. 하단 패널 영역 (답답함을 원천 정화한 크리스탈 에어 글래스 35% 마감 패치) */
 .unified-panel-box {
     position: absolute;
     bottom: 0;
@@ -216,7 +233,7 @@ body, html {
     background-color: transparent;
 }
 
-/* 8. 분석 화면용 4대 텍스트 메뉴 바 및 녹화 FPS 메뉴 바 공용 규격 */
+/* 7. 분석 화면용 4대 텍스트 메뉴 바 및 녹화 FPS 메뉴 바 공용 규격 */
 .text-menu-bar {
     display: flex;
     width: 100%;
@@ -224,6 +241,8 @@ body, html {
     padding: 3px;
     background-color: rgba(255, 255, 255, 0.12);
     border-radius: 13px;
+    gap: 4px;
+    align-items: center;
 }
 
 .menu-btn, .fps-btn {
@@ -238,6 +257,16 @@ body, html {
     cursor: pointer;
     text-align: center;
     transition: all 0.2s ease;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.menu-group {
+    display: inline-flex;
+    flex: 2;
+    gap: 4px;
+    height: 38px;
 }
 
 .menu-btn.active, .fps-btn.active {
@@ -246,7 +275,7 @@ body, html {
     font-weight: 700;
 }
 
-/* 9. 비디오 슬라이더 타임라인 */
+/* 8. 비디오 슬라이더 타임라인 */
 .timeline-container {
     width: 100%;
     padding: 0 4px;
@@ -273,7 +302,7 @@ body, html {
     cursor: pointer;
 }
 
-/* 10. 비디오 제어바 */
+/* 9. 비디오 제어바 */
 .video-control-bar {
     display: flex;
     justify-content: center;
@@ -295,7 +324,7 @@ body, html {
     color: #34C759;
 }
 
-/* 11. 촬영 컨트롤 */
+/* 10. 촬영 컨트롤 */
 .status-text {
     color: #FFFFFF;
     font-size: 13px;
@@ -324,12 +353,21 @@ body, html {
     transition: all 0.2s ease;
 }
 
+/* [추가 이식 완료] 녹화 활성화 시 하드코어 레드 반전 및 물리 스케일 맥박 애니메이션 */
+#btn-record-toggle.recording {
+    background-color: #ff4444 !important;
+    border-color: #ff4444 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.5) !important;
+    animation: pulse 1.5s infinite !important;
+}
+
 .action-btn-main.recording {
     background: #FF3B30;
     border-color: #FF3B30;
     color: #FFFFFF;
     box-shadow: 0 0 20px rgba(255, 59, 48, 0.5);
-    animation: pulseGlow 1.5s infinite alternate;
+    animation: pulse 1.5s infinite;
 }
 
 .switch-btn {
@@ -345,9 +383,10 @@ body, html {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes pulseGlow {
-    from { transform: scale(1); }
-    to { transform: scale(1.04); }
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.9; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 .text-menu-bar-sync, #btn-record-move-sync {
