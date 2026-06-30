@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * - (v21.1) 국궁 자세 분석 시스템 - [열기] 파일 로더 버그 해결 및 S펜 원격 제어 통합 완결판
+ * - (v21.2) 국궁 자세 분석 시스템 - 타임라인 슬라이더 가로 풀(Full) 확장 및 S펜 원격 제어 통합 완결판
  */
 
 window.bowAppNodes = {};
@@ -46,7 +46,7 @@ async function startSystem() {
             nodes[key] = document.getElementById(id);
         }
 
-        console.log('[시스템] v21.1 파일 분석 연동형 DOM 인프라 바인딩 완료');
+        console.log('[시스템] v21.2 슬라이더 풀 렌더링 맵핑 엔진 바인딩 완료');
     } catch (e) {
         console.error('[오류] DOM 인프라 기계식 매핑 실패:', e);
     }
@@ -84,7 +84,7 @@ async function startSystem() {
                 await nodes.cameraPreview.play();
             }
             
-            const track = cameraStream.getVideoTracks()[0];
+            const track = cameraStream.getVideoTracks();
             const settings = track.getSettings();
             const capabilities = track.getCapabilities ? track.getCapabilities() : {};
             
@@ -149,7 +149,7 @@ async function startSystem() {
         }
     }
     // 3. [개선 완결] 외부 파일 업로드 및 실시간 촬영본 분석 모드 세션 정렬 인터페이스
-    let loadedFileFrameRateTarget = 120; // 외부 파일 업로드 시 타깃 프레임을 기억할 내부 브릿지 변수
+    let loadedFileFrameRateTarget = 120; 
 
     function handleRecordingFinish(blob, phoneRollAtRecord = 0) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -176,28 +176,39 @@ async function startSystem() {
         }
     }
 
-    // [버그 차단 핵심] 외부 로드와 촬영본 종료 시점에 가로세로 규격을 확실히 인지시킨 후 화면을 전환하는 공용 시퀀스
+    // [슬라이더 버그 수정 핵심] 가로폭 찌그러짐을 완벽히 차단하고 부모 너비 전체를 100% 강제 점유시키는 렌더러
     function triggerVideoAnalysisSetup() {
         if (!nodes.mainVideo) return;
         
         nodes.mainVideo.onloadedmetadata = () => {
-            // 순정 카메라 업로드 인지 락 우회 및 역산 타임 프레임 주기 계산
             let detectedFPS = nodes.mainVideo.videoFrameRate || loadedFileFrameRateTarget;
             currentFrameTime = 1 / detectedFPS;
             console.log(`[분석 커널] 타임라인 시계열 프레임 갱신 완료: ${detectedFPS} FPS`);
 
-            // [화면 굳음 해결] 컨테이너 가용 크기를 연산하여 분석 뷰포트 배치 고정
             nodes.sceneRecord?.classList.remove('active');
             nodes.sceneAnalyze?.classList.add('active');
+
+            // [추가 패치] 슬라이더를 감싸는 컨테이너와 슬라이더 자체의 가로 레이아웃 스타일을 물리적으로 꽉 채움
+            const timelineContainer = document.querySelector('.timeline-container');
+            if (timelineContainer) {
+                timelineContainer.style.width = '100%';
+                timelineContainer.style.maxWidth = '100%';
+                timelineContainer.style.boxSizing = 'border-box';
+                timelineContainer.style.padding = '0';
+                timelineContainer.style.margin = '12px 0';
+            }
+
+            if (nodes.videoSlider) {
+                nodes.videoSlider.style.width = '100%';
+                nodes.videoSlider.style.display = 'block';
+                nodes.videoSlider.max = nodes.mainVideo.duration || 100;
+                nodes.videoSlider.step = 0.0001;
+                nodes.videoSlider.value = 0;
+            }
 
             if (nodes.drawCanvas) {
                 nodes.drawCanvas.width = nodes.mainVideo.videoWidth || 1280;
                 nodes.drawCanvas.height = nodes.mainVideo.videoHeight || 720;
-            }
-
-            if (isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
-                nodes.videoSlider.max = nodes.mainVideo.duration;
-                nodes.videoSlider.step = 0.0001;
             }
 
             stopCamera();
@@ -210,7 +221,6 @@ async function startSystem() {
 
             nodes.mainVideo.currentTime = 0.1;
             
-            // 제스처 모듈 원점 강제 초기화 트리거를 호출하여 비디오 겉돎 및 안 보임 버그 소거
             if (window.bowAppGesture && typeof window.bowAppGesture.applyTransform === 'function') {
                 window.bowAppGesture.applyTransform();
             }
@@ -233,7 +243,7 @@ async function startSystem() {
             }
         });
     }
-    // 4. 500ms 단위 대용량 유입 버퍼 크래시 방어선 미디어 레코더 제어부
+    // 4. 프리징 원천 봉쇄용 500ms 데이터 수집 레코더 엔진 구동부
     nodes.btnRecordToggle?.addEventListener('click', () => {
         const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
@@ -302,7 +312,7 @@ async function startSystem() {
         }
         setTimeout(resizeCanvasToDisplay, 100);
     });
-    // 5. 프레임 이미지 캡쳐 오버레이 각인 및 플레이백 미디어 슬라이더 연동
+    // 5. 비디오 및 캔버스 그래픽 병합 캡쳐 훅 및 플레이백 제어 슬라이더 동기화
     nodes.btnCapture?.addEventListener('click', () => {
         if (!nodes.mainVideo || !nodes.drawCanvas) return;
         
@@ -366,7 +376,7 @@ async function startSystem() {
             nodes.btnPlayPause.textContent = '재생';
         }
     });
-    // 6. 초정밀 프레임 탐색 매크로, 자이로 수평계 복구 및 [열기 버그 정정 패치] 결합 레이어
+    // 6. 초정밀 타임 세션 프레임 탐색, 자이로 수평선 ㄷ자 교정 및 풀 와이드 슬라이더 빌더
     let longPressTimer = null;
     let repeatInterval = null;
 
@@ -441,33 +451,31 @@ async function startSystem() {
         if (window.bowAnalyzer && core) core.saveCache('lastLines', window.bowAnalyzer.lines);
     });
 
-    // [버그 정정 완결] 외부 고화질 동영상 소스 열기(업로드) 커널 구조 전면 재정렬
+    // 외부 동영상 소스 열기(업로드) 인터페이스 아키텍처 결합
     nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
     nodes.videoInput?.addEventListener('change', async (e) => {
         const files = e.target.files; 
         if (!files || files.length === 0) return;
         
-        if (core && typeof core.saveCache === 'function') await core.saveCache('lastVideoBlob', files[0]);
+        if (core && typeof core.saveCache === 'function') await core.saveCache('lastVideoBlob', files);
         
         if (nodes.mainVideo.src && nodes.mainVideo.src.startsWith('blob:')) {
             URL.revokeObjectURL(nodes.mainVideo.src);
         }
         
-        const targetFile = files[0];
+        const targetFile = files;
         const lowerName = targetFile.name.toLowerCase();
         
-        // 순정 카메라 120/240fps 파일 감지 우회 마킹 플래그 주입
         if (lowerName.includes('120') || lowerName.includes('slow')) loadedFileFrameRateTarget = 120;
         else if (lowerName.includes('240')) loadedFileFrameRateTarget = 240;
-        else loadedFileFrameRateTarget = 120; // 브라우저 60fps 강제 제약을 뚫기 위한 분석 엔진 스펙 업그레이드
+        else loadedFileFrameRateTarget = 120; 
 
-        // 미디어 소스 주입 직후 트리거 래퍼로 진입하여 프리징 및 리사이즈 에러 완벽 해결
         nodes.mainVideo.src = URL.createObjectURL(targetFile);
         nodes.mainVideo.load();
         triggerVideoAnalysisSetup();
     });
 
-    // [이식] S펜 블루투스 에어액션 무선 원격 제어 이벤트 훅 통합
+    // S펜 블루투스 에어액션 무선 원격 제어 이벤트 훅 통합
     window.addEventListener('keydown', (e) => {
         if (e.key === 'MediaPlayPause' || e.code === 'MediaPlayPause' || e.key === 'AudioVolumeUp') {
             e.preventDefault(); e.stopPropagation();
