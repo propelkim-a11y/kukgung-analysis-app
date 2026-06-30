@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * - (v21.1) - 국궁 자세 분석 시스템 프리징 해결 및 고성능 안정화 통합 마스터 컨트롤러 완결판 (업로드 수리 버전)
+ * - (v21.2) - 국궁 자세 분석 시스템 프리징 해결 및 WebM 듀레이션(Infinity) 버그 패치 통합 버전
  */
 
 window.bowAppNodes = {};
@@ -22,7 +22,7 @@ const ids = [
 ];
 // (-) 하이픈 패턴을 찾아 자바스크립트 표준 카멜케이스 속성명으로 치환 후 기계적 매핑
 ids.forEach(id => {
-const nodeKey = id.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+const nodeKey = id.replace(/-([a-z])/g, (g) => g.toUpperCase());
 nodes[nodeKey] = document.getElementById(id);
 });
 
@@ -59,7 +59,7 @@ audio: false
 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
 nodes.cameraPreview.srcObject = cameraStream;
 
-const track = cameraStream.getVideoTracks()[0];
+const track = cameraStream.getVideoTracks();
 const settings = track.getSettings();
 actualFPS = settings.frameRate || "확인 중";
 selectedFPS = typeof actualFPS === 'number' ? actualFPS : 120;
@@ -450,7 +450,7 @@ nodes.angleReport.innerHTML = `
 }
 if (window.bowAnalyzer && core) core.saveCache('lastLines', window.bowAnalyzer.lines);
 });
-// [수정] 업로드 파일 인터페이스 비동기 가동 구조 결합 (v21.1 수리 패치 영역)
+// [수정] 업로드 파일 인터페이스 비동기 가동 구조 결합 (v21.2 수리 패치 및 강제 듀레이션 계산 로직 융합)
 nodes.btnOpen?.addEventListener('click', () => {
 console.log('[시스템] 파일 선택창 호출');
 nodes.videoInput?.click();
@@ -471,15 +471,36 @@ const url = URL.createObjectURL(files[0]);
 nodes.mainVideo.src = url;
 nodes.mainVideo.load();
 
-// 3. 비디오 로드 완료 후 처리
-nodes.mainVideo.onloadeddata = () => {
-console.log('[시스템] 비디오 데이터 로드 완료');
-// 슬라이더 및 캔버스 초기화
+// 3. [수정] 비디오 로드 시 듀레이션을 강제로 계산하여 슬라이더에 주입 (WebM 무한대 버그 완결판)
+nodes.mainVideo.onloadeddata = async () => {
+console.log('[시스템] 비디오 메타데이터 로드됨');
+
+// WebM 듀레이션 무한대(Infinity) 문제 해결
+if (nodes.mainVideo.duration === Infinity) {
+console.log('[시스템] 듀레이션 무한대 감지. 실제 길이 측정 중...');
+nodes.mainVideo.currentTime = 1e101; // 비디오의 맨 끝으로 강제 이동 시도
+
+nodes.mainVideo.ontimeupdate = function() {
+this.ontimeupdate = null; // 이벤트 한 번만 실행
+nodes.mainVideo.currentTime = 0.1; // 다시 앞으로 복귀
+
+// 실제 길이를 슬라이더 및 전환 레이아웃에 적용
 if (nodes.videoSlider) {
-nodes.videoSlider.max = nodes.mainVideo.duration || 100;
+nodes.videoSlider.max = nodes.mainVideo.duration;
+nodes.videoSlider.step = 0.0001;
+nodes.videoSlider.value = 0;
+console.log('[시스템] 듀레이션 복구 완료:', nodes.mainVideo.duration.toFixed(2), '초');
+}
+};
+} else {
+// 정상적인 경우 즉시 적용
+if (nodes.videoSlider) {
+nodes.videoSlider.max = nodes.mainVideo.duration;
 nodes.videoSlider.step = 0.0001;
 nodes.videoSlider.value = 0;
 }
+}
+
 resizeCanvasToDisplay();
 
 // 장면 전환 (분석 화면으로)
