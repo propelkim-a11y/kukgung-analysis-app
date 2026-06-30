@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * - (v21.2) - 국궁 자세 분석 시스템 프리징 해결 및 WebM 듀레이션(Infinity) 버그 패치 통합 버전
+ * - (v21.3) - 국궁 자세 분석 시스템 프리징 방지 및 슬라이더 디바운싱 최적화 패치 통합 버전
  */
 
 window.bowAppNodes = {};
@@ -145,17 +145,32 @@ URL.revokeObjectURL(nodes.mainVideo.src);
 nodes.mainVideo.src = url;
 nodes.mainVideo.dataset.phoneRoll = phoneRollAtRecord;
 
+// 녹화본 메타데이터가 로드되었을 때의 동기화 공정 (수정된 안전 로직 적용)
 nodes.mainVideo.onloadedmetadata = () => {
+console.log('[시스템] 비디오 메타데이터 로드됨');
+
+const duration = nodes.mainVideo.duration;
+const isDurationValid = isFinite(duration) && duration > 0;
+
+if (nodes.videoSlider) {
+nodes.videoSlider.max = isDurationValid ? duration : 100;
+nodes.videoSlider.step = 0.0001;
+nodes.videoSlider.value = 0;
+}
+
+nodes.mainVideo.ondurationchange = () => {
+const newDuration = nodes.mainVideo.duration;
+if (isFinite(newDuration) && nodes.videoSlider) {
+nodes.videoSlider.max = newDuration;
+console.log('[시스템] 비디오 듀레이션 업데이트 완료:', newDuration.toFixed(2));
+}
+};
+
 const detectedFPS = nodes.mainVideo.videoFrameRate || (typeof actualFPS === 'number' ? actualFPS : selectedFPS);
 currentFrameTime = 1 / detectedFPS;
 
 nodes.drawCanvas.width = nodes.mainVideo.videoWidth;
 nodes.drawCanvas.height = nodes.mainVideo.videoHeight;
-
-if (isFinite(nodes.mainVideo.duration) && nodes.mainVideo.duration > 0) {
-nodes.videoSlider.max = nodes.mainVideo.duration;
-nodes.videoSlider.step = 0.0001;
-}
 
 stopCamera();
 if (window.bowGyroSensor && typeof window.bowGyroSensor.stop === 'function') {
@@ -339,13 +354,30 @@ await initCamera();
 });
 });
 
+// 파일 다이렉트 업로드 및 외부 비디오 로드를 위한 공용 loadedmetadata 핸들러 (수정된 안전 코드 적용)
 nodes.mainVideo?.addEventListener('loadedmetadata', () => {
+console.log('[시스템] 비디오 메타데이터 로드됨');
+
+const duration = nodes.mainVideo.duration;
+const isDurationValid = isFinite(duration) && duration > 0;
+
+if (nodes.videoSlider) {
+nodes.videoSlider.max = isDurationValid ? duration : 100;
+nodes.videoSlider.step = 0.0001;
+nodes.videoSlider.value = 0;
+}
+
+nodes.mainVideo.ondurationchange = () => {
+const newDuration = nodes.mainVideo.duration;
+if (isFinite(newDuration) && nodes.videoSlider) {
+nodes.videoSlider.max = newDuration;
+console.log('[시스템] 비디오 듀레이션 업데이트 완료:', newDuration.toFixed(2));
+}
+};
+
 const detectedFPS = nodes.mainVideo.videoFrameRate || (typeof actualFPS === 'number' ? actualFPS : selectedFPS);
 currentFrameTime = 1 / detectedFPS;
-if (nodes.videoSlider) {
-nodes.videoSlider.max = nodes.mainVideo.duration || 100;
-nodes.videoSlider.step = 0.0001;
-}
+
 resizeCanvasToDisplay();
 });
 
@@ -355,10 +387,14 @@ nodes.videoSlider.value = nodes.mainVideo.currentTime;
 }
 });
 
+// [수정] 슬라이더 조작 시 프리징 방지를 위한 requestAnimationFrame 디바운싱 처리 적용
 nodes.videoSlider?.addEventListener('input', () => {
-nodes.mainVideo.pause();
+if (!nodes.mainVideo.paused) nodes.mainVideo.pause();
 if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+
+requestAnimationFrame(() => {
 nodes.mainVideo.currentTime = parseFloat(nodes.videoSlider.value);
+});
 });
 
 nodes.btnPlayPause?.addEventListener('click', () => {
@@ -450,7 +486,7 @@ nodes.angleReport.innerHTML = `
 }
 if (window.bowAnalyzer && core) core.saveCache('lastLines', window.bowAnalyzer.lines);
 });
-// [수정] 업로드 파일 인터페이스 비동기 가동 구조 결합 (v21.2 수리 패치 및 강제 듀레이션 계산 로직 융합)
+// [수정] 업로드 파일 인터페이스 비동기 가동 구조 결합 (v21.3 수리 패치 영역)
 nodes.btnOpen?.addEventListener('click', () => {
 console.log('[시스템] 파일 선택창 호출');
 nodes.videoInput?.click();
@@ -459,47 +495,38 @@ nodes.videoInput?.click();
 nodes.videoInput?.addEventListener('change', async (e) => {
 const files = e.target.files;
 if (!files || files.length === 0) return;
-console.log('[시스템] 파일 로드 시작:', files[0].name);
+console.log('[시스템] 파일 로드 시작:', files.name);
 
 // 1. PWA 캐시 저장 (선택 사항)
 if (core && typeof core.saveCache === 'function') {
-await core.saveCache('lastVideoBlob', files[0]);
+await core.saveCache('lastVideoBlob', files);
 }
 
 // 2. 비디오 소스 주입 및 로드
-const url = URL.createObjectURL(files[0]);
+const url = URL.createObjectURL(files);
 nodes.mainVideo.src = url;
 nodes.mainVideo.load();
 
-// 3. [수정] 비디오 로드 시 듀레이션을 강제로 계산하여 슬라이더에 주입 (WebM 무한대 버그 완결판)
-nodes.mainVideo.onloadeddata = async () => {
-console.log('[시스템] 비디오 메타데이터 로드됨');
+// 3. 비디오 로드 완료 후 처리 (안전한 신규 onloadedmetadata 구조 통합)
+nodes.mainVideo.onloadeddata = () => {
+console.log('[시스템] 비디오 데이터 로드 완료');
 
-// WebM 듀레이션 무한대(Infinity) 문제 해결
-if (nodes.mainVideo.duration === Infinity) {
-console.log('[시스템] 듀레이션 무한대 감지. 실제 길이 측정 중...');
-nodes.mainVideo.currentTime = 1e101; // 비디오의 맨 끝으로 강제 이동 시도
+const duration = nodes.mainVideo.duration;
+const isDurationValid = isFinite(duration) && duration > 0;
 
-nodes.mainVideo.ontimeupdate = function() {
-this.ontimeupdate = null; // 이벤트 한 번만 실행
-nodes.mainVideo.currentTime = 0.1; // 다시 앞으로 복귀
-
-// 실제 길이를 슬라이더 및 전환 레이아웃에 적용
 if (nodes.videoSlider) {
-nodes.videoSlider.max = nodes.mainVideo.duration;
+nodes.videoSlider.max = isDurationValid ? duration : 100;
 nodes.videoSlider.step = 0.0001;
 nodes.videoSlider.value = 0;
-console.log('[시스템] 듀레이션 복구 완료:', nodes.mainVideo.duration.toFixed(2), '초');
+}
+
+nodes.mainVideo.ondurationchange = () => {
+const newDuration = nodes.mainVideo.duration;
+if (isFinite(newDuration) && nodes.videoSlider) {
+nodes.videoSlider.max = newDuration;
+console.log('[시스템] 비디오 듀레이션 업데이트 완료:', newDuration.toFixed(2));
 }
 };
-} else {
-// 정상적인 경우 즉시 적용
-if (nodes.videoSlider) {
-nodes.videoSlider.max = nodes.mainVideo.duration;
-nodes.videoSlider.step = 0.0001;
-nodes.videoSlider.value = 0;
-}
-}
 
 resizeCanvasToDisplay();
 
