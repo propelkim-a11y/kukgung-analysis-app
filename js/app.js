@@ -7,7 +7,7 @@
 // 시스템 글로벌 콘텍스트 객체 정의
 const KUKGUNG_SYSTEM = {
     state: {
-        currentScene: 'intro', // intro -> capture -> result
+        currentScene: 'intro', // intro -> capture
         isCameraReady: false,
         isLevel: false,
         gyroData: { alpha: 0, beta: 0, gamma: 0 },
@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sceneIntro = document.getElementById('scene-intro');
     const sceneCapture = document.getElementById('scene-capture');
 
-    // 1. 인트로 보드 퀵 스타트 진입 인터랙션 처리
-    if (btnQuickStart) {
+    // 1. 인트로 보드 퀵 스타트 진입 인터랙션 처리 (Null 방어막 적용)
+    if (btnQuickStart && sceneIntro && sceneCapture) {
         btnQuickStart.addEventListener('click', () => {
             // 인트로 가리기 및 분석 화면 전환
             sceneIntro.classList.remove('active');
@@ -38,9 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
             
             console.log("[System Process] 시사(始射) 모드 개시 - 하드웨어 활성화 인터페이스 로드.");
             
-            // 시스템 센서 및 카메라 가동 엔진 가동
+            // 시스템 센서 및 카메라 가동 엔진 가동 (2번 박스 함수 호출)
             initHardwarePipeline();
         });
+    } else {
+        console.error("[Fatal Error] 인트로 버튼이나 화면 레이아웃 HTML 요소를 찾을 수 없습니다. ID를 확인하세요.");
     }
 });
 /**
@@ -56,10 +58,10 @@ function initHardwarePipeline() {
     // 하드웨어 연동 1단계: 카메라 스트림 활성화
     initCameraStream();
     
-    // 하드웨어 연동 2단계: 모바일 자이로스코프 센서 연동
+    // 하드웨어 연동 2단계: 모바일 자이로스코프 센서 연동 (3번 박스)
     initOrientationSensor();
     
-    // UI 이벤트 리스너 추가 바인딩 (자세 캡쳐 버튼 등)
+    // UI 이벤트 리스너 추가 바인딩 (4번 박스)
     initCaptureInterface();
 }
 
@@ -68,7 +70,10 @@ function initHardwarePipeline() {
  */
 function initCameraStream() {
     const video = document.getElementById('webcam');
-    if (!video) return;
+    if (!video) {
+        console.warn("[Hardware Warning] 'webcam' 비디오 엘리먼트가 없어 스트림을 연결하지 않습니다.");
+        return;
+    }
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const constraints = {
@@ -130,7 +135,6 @@ function handleOrientationMetrics(event) {
     KUKGUNG_SYSTEM.state.gyroData = { alpha, beta, gamma };
 
     // 디바이스 종단 배치 각도에 기반한 수평 안정도(isLevel) 판별식 계산
-    // 스마트폰이 가로로 바로 섰을 때의 기준 허용 오차 필터링 처리
     const isLevelStable = Math.abs(gamma) < 3.0 && Math.abs(beta - 90) < 5.0;
     KUKGUNG_SYSTEM.state.isLevel = isLevelStable;
 
@@ -157,15 +161,16 @@ function handleOrientationMetrics(event) {
 function initCaptureInterface() {
     const btnCapture = document.getElementById('btn-capture');
     if (btnCapture) {
-        btnCapture.addEventListener('click', () => {
+        // 중복 바인딩 방지를 위해 기존 리스너 클리어 후 재등록 효과
+        btnCapture.onclick = () => {
             if (!KUKGUNG_SYSTEM.state.isCameraReady) {
                 alert("카메라 스트림이 초기화되지 않았습니다.");
                 return;
             }
             
             console.log("[Trigger Log] User triggered posture capture frame.");
-            executeCoreKukgungAnalysis();
-        });
+            executeCoreKukgungAnalysis(); // (5번 박스 실행)
+        };
     }
 }
 
@@ -197,14 +202,13 @@ function executeCoreKukgungAnalysis() {
     if (!video || !canvas) return;
 
     const ctx = canvas.getContext('2d');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;   // 비디오 해상도 미확보 시 기본 fallback 값 지정
+    canvas.height = video.videoHeight || 480;
 
     // 1단계: 실시간 카메라 백버퍼 프레임 동기화 스냅샷 드로잉
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // 2단계: 가상의 활 시위 조준선 알고리즘 파싱 시뮬레이션
-    // 전통 시사 타깃 고각 스펙트럼 추출 37.79° or 52.21° 가상 수렴
     const simulatedAngle = (Math.random() > 0.5 ? 37.79 : 52.21) + (Math.random() * 2 - 1);
     
     // 3단계: 추출된 데이터를 분석 레포트 히스토리 구조에 저장
@@ -215,7 +219,7 @@ function executeCoreKukgungAnalysis() {
     };
     KUKGUNG_SYSTEM.state.analysisHistory.push(currentMetrics);
 
-    // 가상 그래픽 오버레이 가시화 드로잉 모듈 킥오프
+    // 가상 그래픽 오버레이 가시화 드로잉 모듈 킥오프 (6번 박스)
     renderAnalysisGraphics(ctx, canvas.width, canvas.height, currentMetrics);
 }
 /**
@@ -248,7 +252,7 @@ function renderAnalysisGraphics(ctx, w, h, metrics) {
     ctx.fillRect(20, 20, 280, 90);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px -apple-system';
+    ctx.font = 'bold 16px -apple-system, sans-serif';
     ctx.fillText(`궁도 자세 결과 리포트`, 35, 45);
 
     ctx.font = '14px monospace';
