@@ -55,7 +55,16 @@ body, html {
     background: radial-gradient(circle at center, #12121a 0%, var(--bg-dark-core) 100%);
     padding: 4rem 2rem 2.5rem 2rem;
 }
-
+.intro-header {
+    display: flex;                  /* 정렬을 위한 Flexbox 활성화 */
+    flex-direction: column;         /* 내용물을 위에서 아래로 배치 */
+    justify-content: center;        /* 세로 기준 정중앙 정렬 */
+    align-items: center;            /* 가로 기준 정중앙 정렬 */
+    min-height: 100vh;              /* 화면 전체 높이(원하지 않으면 삭제 가능) */
+    text-align: center;             /* 텍스트 자체도 가운데 정렬 */
+    box-sizing: border-box;
+    padding: 20px;
+}
 /* 상단 전통 타이포그래피 영역 */
 .intro-header .sub-title {
     font-size: 1.2rem; /* 약 19px */
