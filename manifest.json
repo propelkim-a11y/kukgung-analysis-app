@@ -1,5 +1,5 @@
 {
-  "name": "궁체 분석 시스템",
+  "name": "궁체분석 시스템",
   "short_name": "궁체분석",
   "start_url": "/kukgung-analysis-app/index.html",
   "display": "standalone",
