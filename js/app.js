@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
- * - (v20.5) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [수정] 분석화면 파일 열기(FileList index 타겟팅 및 기존 Blob 메모리 누수 방어) 완결본
+ * - (v20.6) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
+ * - [수정] 최초 인트로 진입 및 파일 열기 시 드로잉 엔진(BowAnalyzer) 조기 안착 패치 버전
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -452,24 +452,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 기본 이벤트 내비게이션 파일 등록 바인더
     nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
     
-    // [버그 수정 완료 단락] FileList 무결성 타겟팅 및 안전 세션 연동 파이프라인
+    // 파일 변경(change) 핸들러 - 터치 리스너 조기 바인딩 보완 단락
     nodes.videoInput?.addEventListener('change', async (e) => {
         const files = e.target.files; 
         if (!files || files.length === 0) return;
         
-        const targetFile = files[0]; // FileList 내 첫 번째 실제 파일 객체를 정밀 추출
+        const targetFile = files[0];
         
         if (core && typeof core.saveCache === 'function') {
-            await core.saveCache('lastVideoBlob', targetFile); // 단일 파일 객체 스냅샷 바이너리 백업
+            await core.saveCache('lastVideoBlob', targetFile);
         }
         
-        // 메모리 누수 방어: 이전 가상 URL 리소스가 존재하면 소거
         if (nodes.mainVideo.src && nodes.mainVideo.src.startsWith('blob:')) {
             URL.revokeObjectURL(nodes.mainVideo.src);
         }
         
-        nodes.mainVideo.src = URL.createObjectURL(targetFile); // 정상 변환 처리 주사
+        nodes.mainVideo.src = URL.createObjectURL(targetFile);
         nodes.mainVideo.load();
+        
+        // [핵심 패치] 비디오 로드 시 캔버스 드로잉 커널을 즉시 동기화 바인딩
+        if (window.bowAnalyzer && nodes.drawCanvas) {
+            window.bowAnalyzer.init(nodes.drawCanvas);
+        }
         
         nodes.mainVideo.addEventListener('loadeddata', () => {
             if (nodes.videoSlider) { 
@@ -551,11 +555,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // [인트로 라이프사이클 바인딩] 최초 로드 시 하드웨어 구동을 정지하고 대기 제어
+    // [인트로 라이프사이클 바인딩] 앱 실행 초기화 구동 파이프라인
     nodes.btnStartApp?.addEventListener('click', async () => {
         stopGyehunRotation(); // 앱 진입 시 백그라운드 오버헤드 완벽 차단
         nodes.sceneIntro.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
+        
+        // [핵심 패치] 인트로 통과 직후 드로잉 모듈 리스너를 조기에 결합 안착시킴
+        if (window.bowAnalyzer && nodes.drawCanvas) {
+            window.bowAnalyzer.init(nodes.drawCanvas);
+        }
+        
         // 사용자가 인트로를 통과한 물리적 시점에 안전하게 카메라 커널 시동
         await initCamera();
         resizeCanvasToDisplay();
