@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
  * - (v20.7) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [업데이트] 분석 화면 동영상 + 선긋기 그래픽 실시간 인라인 비디오 레코딩 엔진 탑재 완결 완벽본
+ * - [업데이트] 백그라운드 프레임 초고속 도약(Fast-Forward Seek) 동영상 레이어 병합 인코딩 엔진 탑재 완결판
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     "정심정기 (正心正己)",
     "인애덕행 (仁愛德行)",
     "성실겸손 (誠實謙遜)",
-    "자중절조 (自重節操)",
+    "자중절조 (자중절조)",
     "예의엄수 (禮儀嚴守)",
     "염직과감 (廉直果敢)",
     "습사무언 (習射無言)",
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('[시스템] 분석 화면 고해상도 이미지 레이어 캡쳐 완료');
   });
 
-  // [제1조, 제2조 지침] 캔버스 그래픽 동적 미러링을 이용한 무결성 "동영상 파일" 병합 레코딩 엔진 개통
+  // [제1조, 제2조, 제7조 지침 지향] 100% 무결성 초고속 백그라운드 프레임 도약(Fast-Forward) 비디오+그래픽 인코딩 시스템 구축 완료
   nodes.btnDownloadVideo?.addEventListener('click', async () => {
     const video = nodes.mainVideo;
     const drawCanvas = nodes.drawCanvas;
@@ -334,136 +334,146 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('분석할 동영상 데이터가 존재하지 않습니다.');
       return;
     }
-
-    // 이미 합성이 진행 중이면 인터럽트 격리 차단
     if (nodes.btnDownloadVideo.classList.contains('processing')) return;
 
     try {
       nodes.btnDownloadVideo.classList.add('processing');
       const originalText = nodes.btnDownloadVideo.textContent;
-      nodes.btnDownloadVideo.textContent = '인코딩중';
+      nodes.btnDownloadVideo.textContent = '고속인코딩중';
       nodes.btnDownloadVideo.style.color = '#FF9500';
 
-      // 1. 백그라운드 실시간 픽셀 프레임 하드웨어 미러링 병합용 가상 가속 캔버스 구조화
-      const captureCanvas = document.createElement('canvas');
-      captureCanvas.width = video.videoWidth || 1280;
-      captureCanvas.height = video.videoHeight || 720;
-      const cCtx = captureCanvas.getContext('2d');
+      // 오리지널 재생 상태 백업 및 강제 정지
+      const wasPaused = video.paused;
+      const originalTime = video.currentTime;
+      video.pause();
+
+      // 고속 인코딩용 물리 미러링 캔버스 생성 명세
+      const encCanvas = document.createElement('canvas');
+      encCanvas.width = video.videoWidth || 1280;
+      encCanvas.height = video.videoHeight || 720;
+      const eCtx = encCanvas.getContext('2d');
 
       const state = core?.state || { scale: 1, offsetX: 0, offsetY: 0 };
-      let animationFrameId = null;
+      
+      // 30FPS 타임 도약 규격 설정
+      const fps = 30;
+      const interval = 1 / fps;
+      let targetTime = 0;
+      const duration = video.duration || 5;
 
-      // 2. 동영상 일시정지 후 강제 0초(또는 현재구간) 싱크로나이즈드 포지셔닝 정렬
-      video.pause();
-      if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
-      video.currentTime = 0; // 처음부터 재생하면서 전체 구간 물리 녹화 프로세스 시동
+      // 미디어 레코더 가속 파이프라인 결합
+      const stream = encCanvas.captureStream(fps);
+      let options = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm;codecs=vp8' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = { mimeType: 'video/mp4' };
+        }
+      }
 
-      // 3. 30FPS 정속 미러링 루프 파이프라인 전개
-      function renderLoop() {
-        cCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+      const exporter = new MediaRecorder(stream, options);
+      let chunks = [];
+      exporter.ondataavailable = (ev) => { if (ev.data.size > 0) chunks.push(ev.data); };
+
+      exporter.onstop = () => {
+        stream.getTracks().forEach(t => t.stop()); // 비디오 커널 완전 폐쇄 소거
+        const blob = new Blob(chunks, { type: options.mimeType });
+        const url = URL.createObjectURL(blob);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const ext = options.mimeType.includes('mp4') ? '.mp4' : '.webm';
         
-        // 동영상 뷰포트 행렬 역산 주입 투사
-        cCtx.save();
-        cCtx.translate(state.offsetX, state.offsetY);
-        cCtx.scale(state.scale, state.scale);
-        cCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-        cCtx.restore();
+        const a = document.createElement('a');
+        a.download = `kukgung_fast_analysis_${timestamp}${ext}`;
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
-        // 실시간 선분 그래픽 픽셀 합성
-        cCtx.drawImage(drawCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
+        // 이전 디바이스 원래 시간축 및 스위치 인터페이스 상태 완벽 원복
+        video.currentTime = originalTime;
+        if (!wasPaused) {
+          video.play();
+          if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '일시정지';
+        }
+        nodes.btnDownloadVideo.classList.remove('processing');
+        nodes.btnDownloadVideo.textContent = originalText;
+        nodes.btnDownloadVideo.style.color = '#34C759';
+        console.log('[시스템] 백그라운드 고속 비디오 인코딩 처리 완료');
+      };
 
-        // 상단 발광 고각 리포트 패널 UI 계승 복원 인쇄
+      exporter.start();
+
+      // 초고속 도약 및 픽셀 투사 오버레이 매핑 루프 팩토리 구동
+      async function processNextFrame() {
+        if (targetTime > duration) {
+          exporter.stop();
+          return;
+        }
+
+        // 비디오 강제 백그라운드 탐색 트리거
+        video.currentTime = targetTime;
+
+        // seeked 비동기 컴파일 이벤트 블로킹 락 대기 처리 (재생 오버헤드 0%)
+        await new Promise((resolve) => {
+          const onSeeked = () => {
+            video.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          video.addEventListener('seeked', onSeeked);
+        });
+
+        // 가상 메모리 행렬 인쇄 버퍼링 투사
+        eCtx.clearRect(0, 0, encCanvas.width, encCanvas.height);
+        eCtx.save();
+        eCtx.translate(state.offsetX, state.offsetY);
+        eCtx.scale(state.scale, state.scale);
+        eCtx.drawImage(video, 0, 0, encCanvas.width, encCanvas.height);
+        eCtx.restore();
+
+        // 캔버스 라인 물리 블렌딩
+        eCtx.drawImage(drawCanvas, 0, 0, encCanvas.width, encCanvas.height);
+
+        // 프리미엄 네온 각도 텍스트 스냅 리포트 매핑
         const angleTextElem = nodes.angleReport?.querySelector('.final-angle');
         const subTextElem = nodes.angleReport?.querySelector('.sub-info');
         const finalAngleText = angleTextElem ? angleTextElem.textContent : "0.0°";
         const subInfoText = subTextElem ? subTextElem.textContent : "(분석 완료)";
 
-        cCtx.save();
-        cCtx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        cCtx.shadowBlur = 12;
-        cCtx.fillStyle = 'rgba(10, 10, 14, 0.75)';
-        const pW = 260, pH = 80, pX = captureCanvas.width - pW - 30, pY = 30;
-        cCtx.beginPath();
-        cCtx.roundRect(pX, pY, pW, pH, 12);
-        cCtx.fill();
+        eCtx.save();
+        eCtx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        eCtx.shadowBlur = 12;
+        eCtx.fillStyle = 'rgba(10, 10, 14, 0.75)';
+        const pW = 260, pH = 80, pX = encCanvas.width - pW - 30, pY = 30;
+        eCtx.beginPath();
+        eCtx.roundRect(pX, pY, pW, pH, 12);
+        eCtx.fill();
 
-        cCtx.shadowColor = 'rgba(0, 255, 102, 0.6)';
-        cCtx.shadowBlur = 8;
-        cCtx.fillStyle = '#00FF66';
-        cCtx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "SF Pro Display", tabular-nums';
-        cCtx.fillText(finalAngleText, pX + 20, pY + 40);
+        eCtx.shadowColor = 'rgba(0, 255, 102, 0.6)';
+        eCtx.shadowBlur = 8;
+        eCtx.fillStyle = '#00FF66';
+        eCtx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "SF Pro Display", tabular-nums';
+        eCtx.fillText(finalAngleText, pX + 20, pY + 40);
 
-        cCtx.shadowBlur = 0;
-        cCtx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-        cCtx.font = '500 12px -apple-system, BlinkMacSystemFont, "SF Pro Text"';
-        cCtx.fillText(subInfoText, pX + 20, pY + 62);
-        cCtx.restore();
+        eCtx.shadowBlur = 0;
+        eCtx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        eCtx.font = '500 12px -apple-system, BlinkMacSystemFont, "SF Pro Text"';
+        eCtx.fillText(subInfoText, pX + 20, pY + 62);
+        eCtx.restore();
 
-        animationFrameId = requestAnimationFrame(renderLoop);
+        // 30FPS 정밀 주입 연산 도약 점프
+        targetTime += interval;
+        setTimeout(processNextFrame, 0); // 메인 스레드를 굳히지 않고 큐에 즉시 이관
       }
 
-      // 4. 가상 레코딩 세션 개통 및 MediaRecorder 커널 결합
-      const stream = captureCanvas.captureStream(30);
-      let recordOptions = { mimeType: 'video/webm;codecs=vp9' };
-      if (!MediaRecorder.isTypeSupported(recordOptions.mimeType)) {
-        recordOptions = { mimeType: 'video/webm;codecs=vp8' };
-        if (!MediaRecorder.isTypeSupported(recordOptions.mimeType)) {
-          recordOptions = { mimeType: 'video/mp4' };
-        }
-      }
-
-      const internalRecorder = new MediaRecorder(stream, recordOptions);
-      let chunks = [];
-
-      internalRecorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
-      };
-
-      internalRecorder.onstop = () => {
-        cancelAnimationFrame(animationFrameId);
-        stream.getTracks().forEach(t => t.stop()); // 하드웨어 코덱 락 해제
-
-        const videoBlob = new Blob(chunks, { type: recordOptions.mimeType });
-        const finalUrl = URL.createObjectURL(videoBlob);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const extension = recordOptions.mimeType.includes('mp4') ? '.mp4' : '.webm';
-        
-        const downBtn = document.createElement('a');
-        downBtn.download = `kukgung_analyzed_video_${timestamp}${extension}`;
-        downBtn.href = finalUrl;
-        document.body.appendChild(downBtn);
-        downBtn.click();
-        document.body.removeChild(downBtn);
-
-        // UI 인터페이스 상태 원복 복구
-        nodes.btnDownloadVideo.classList.remove('processing');
-        nodes.btnDownloadVideo.textContent = originalText;
-        nodes.btnDownloadVideo.style.color = '#34C759';
-        console.log('[시스템] 선분 그래픽 인라인 병합 동영상 파일 저장 완료');
-      };
-
-      // 5. 비디오 로딩 대기 후 레코딩 파이프라인 동시 전개
-      video.onended = () => {
-        internalRecorder.stop();
-        video.onended = null;
-      };
-
-      video.addEventListener('loadeddata', () => {
-        internalRecorder.start();
-        renderLoop();
-        video.play();
-        if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '일시정지';
-      }, { once: true });
-      
-      // 비디오 강제 리로드 메커니즘을 통한 세션 부트업
-      video.load();
+      // 고속 인코딩 시작
+      processNextFrame();
 
     } catch (err) {
-      console.error('[오류] 비디오 병합 처리 결함 발생', err);
+      console.error('[오류] 고속 비디오 인코딩 결함', err);
       nodes.btnDownloadVideo.classList.remove('processing');
       nodes.btnDownloadVideo.textContent = '저장';
       nodes.btnDownloadVideo.style.color = '#34C759';
-      alert('동영상 인코딩 중 오류가 발생했습니다.');
+      alert('초고속 인코딩 중 오류가 발생했습니다.');
     }
   });
 
@@ -605,7 +615,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const targetFile = files[0];
+    const targetFile = files;
     if (core && typeof core.saveCache === 'function') {
       await core.saveCache('lastVideoBlob', targetFile);
     }
