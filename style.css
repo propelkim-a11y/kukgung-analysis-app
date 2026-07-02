@@ -1,6 +1,6 @@
 /**
  * style.css - [Part 1]
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.4 - 하단 Safe Area 메타 브랜딩 패치 버전)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.6 - 동적 계훈 카루셀 가속화 패치 버전)
  */
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
 * {
@@ -95,12 +95,22 @@ body, html {
  animation: logoRotate 6s linear infinite;
  box-shadow: 0 0 20px rgba(0, 255, 102, 0.1), inset 0 0 20px rgba(0, 255, 102, 0.05);
 }
+/* 궁도구계훈 배치 레이어 - 다수 글자 인입에 대응하는 가독성 고도화 튜닝 */
 .logo-core {
- font-size: 54px;
- font-weight: 300;
+ font-size: 20px;
+ font-weight: 700;
  color: #00FF66;
- text-shadow: 0 0 25px rgba(0, 255, 102, 0.75);
- transform: translateY(-2px);
+ text-shadow: 0 0 15px rgba(0, 255, 102, 0.6);
+ letter-spacing: -0.3px;
+ transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+ width: 85%;
+ text-align: center;
+ word-break: keep-all;
+ line-height: 1.3;
+}
+.logo-core.fade-out-action {
+ opacity: 0;
+ transform: scale(0.92);
 }
 .intro-footer-action {
  width: 100%;
@@ -131,7 +141,6 @@ body, html {
  box-shadow: 0 0 15px rgba(0, 255, 102, 0.3) !important;
  animation: neonPulse 2s infinite ease-in-out !important;
 }
-/* [신설] 저작권 및 버전 관리 메타 정보 에어 그룹 스타일 명세 */
 .intro-metadata-group {
  display: flex;
  flex-direction: column;
