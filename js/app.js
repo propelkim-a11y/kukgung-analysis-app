@@ -57,16 +57,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
  // [신설] 궁도구계훈 순환 롤링 데이터셋 & 타이머 핸들러 구조
  const gyehunList = [
- "",
- "정심정기 (正心正己)",
  "인애덕행 (仁愛德行)",
  "성실겸손 (誠實謙遜)",
  "자중절조 (自重節操)",
  "예의엄수 (禮儀嚴守)",
  "염직과감 (廉直果敢)",
  "습사무언 (習射無言)",
+ "정심정기 (正心正己)",
  "불원승자 (不怨勝者)",
- "막만타궁 (莫彎他弓)"
+ "막완타궁 (莫玩他弓)"
  ];
  let gyehunIndex = 0;
  let gyehunTimer = null;
