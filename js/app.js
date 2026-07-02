@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
  * - (v20.7) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [업데이트] 백그라운드 프레임 초고속 도약(Fast-Forward Seek) 동영상 레이어 병합 인코딩 엔진 탑재 완결판
+ * - [버그 패치] 열기(File Input) 핸들러의 파일 객체 인덱싱(files[0]) 무결성 완결 버전
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     "정심정기 (正心正己)",
     "인애덕행 (仁愛德行)",
     "성실겸손 (誠實謙遜)",
-    "자중절조 (자중절조)",
+    "자중절조 (自重節操)",
     "예의엄수 (禮儀嚴守)",
     "염직과감 (廉直果敢)",
     "습사무언 (習射無言)",
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('[시스템] 분석 화면 고해상도 이미지 레이어 캡쳐 완료');
   });
 
-  // [제1조, 제2조, 제7조 지침 지향] 100% 무결성 초고속 백그라운드 프레임 도약(Fast-Forward) 비디오+그래픽 인코딩 시스템 구축 완료
+  // [초고속 백그라운드 프레임 도약 저장 커널 명세]
   nodes.btnDownloadVideo?.addEventListener('click', async () => {
     const video = nodes.mainVideo;
     const drawCanvas = nodes.drawCanvas;
@@ -342,12 +342,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       nodes.btnDownloadVideo.textContent = '고속인코딩중';
       nodes.btnDownloadVideo.style.color = '#FF9500';
 
-      // 오리지널 재생 상태 백업 및 강제 정지
       const wasPaused = video.paused;
       const originalTime = video.currentTime;
       video.pause();
 
-      // 고속 인코딩용 물리 미러링 캔버스 생성 명세
       const encCanvas = document.createElement('canvas');
       encCanvas.width = video.videoWidth || 1280;
       encCanvas.height = video.videoHeight || 720;
@@ -355,13 +353,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const state = core?.state || { scale: 1, offsetX: 0, offsetY: 0 };
       
-      // 30FPS 타임 도약 규격 설정
       const fps = 30;
       const interval = 1 / fps;
       let targetTime = 0;
       const duration = video.duration || 5;
 
-      // 미디어 레코더 가속 파이프라인 결합
       const stream = encCanvas.captureStream(fps);
       let options = { mimeType: 'video/webm;codecs=vp9' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -376,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       exporter.ondataavailable = (ev) => { if (ev.data.size > 0) chunks.push(ev.data); };
 
       exporter.onstop = () => {
-        stream.getTracks().forEach(t => t.stop()); // 비디오 커널 완전 폐쇄 소거
+        stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunks, { type: options.mimeType });
         const url = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -389,7 +385,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         a.click();
         document.body.removeChild(a);
 
-        // 이전 디바이스 원래 시간축 및 스위치 인터페이스 상태 완벽 원복
         video.currentTime = originalTime;
         if (!wasPaused) {
           video.play();
@@ -403,17 +398,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       exporter.start();
 
-      // 초고속 도약 및 픽셀 투사 오버레이 매핑 루프 팩토리 구동
       async function processNextFrame() {
         if (targetTime > duration) {
           exporter.stop();
           return;
         }
 
-        // 비디오 강제 백그라운드 탐색 트리거
         video.currentTime = targetTime;
 
-        // seeked 비동기 컴파일 이벤트 블로킹 락 대기 처리 (재생 오버헤드 0%)
         await new Promise((resolve) => {
           const onSeeked = () => {
             video.removeEventListener('seeked', onSeeked);
@@ -422,7 +414,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           video.addEventListener('seeked', onSeeked);
         });
 
-        // 가상 메모리 행렬 인쇄 버퍼링 투사
         eCtx.clearRect(0, 0, encCanvas.width, encCanvas.height);
         eCtx.save();
         eCtx.translate(state.offsetX, state.offsetY);
@@ -430,10 +421,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         eCtx.drawImage(video, 0, 0, encCanvas.width, encCanvas.height);
         eCtx.restore();
 
-        // 캔버스 라인 물리 블렌딩
         eCtx.drawImage(drawCanvas, 0, 0, encCanvas.width, encCanvas.height);
 
-        // 프리미엄 네온 각도 텍스트 스냅 리포트 매핑
         const angleTextElem = nodes.angleReport?.querySelector('.final-angle');
         const subTextElem = nodes.angleReport?.querySelector('.sub-info');
         const finalAngleText = angleTextElem ? angleTextElem.textContent : "0.0°";
@@ -460,12 +449,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         eCtx.fillText(subInfoText, pX + 20, pY + 62);
         eCtx.restore();
 
-        // 30FPS 정밀 주입 연산 도약 점프
         targetTime += interval;
-        setTimeout(processNextFrame, 0); // 메인 스레드를 굳히지 않고 큐에 즉시 이관
+        setTimeout(processNextFrame, 0);
       }
 
-      // 고속 인코딩 시작
       processNextFrame();
 
     } catch (err) {
@@ -532,7 +519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 6. / 초정밀 프레임 전 후진 롱프레스 터치 제어 및 자이로 수평계 복구 핵심 바인딩
+  // 6. 초정밀 프레임 전 후진 롱프레스 터치 제어 및 자이로 수평계 복구 핵심 바인딩
   let longPressTimer = null;
   let repeatInterval = null;
   function startFrameRepeat(direction) {
@@ -610,12 +597,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 기본 이벤트 내비게이션 파일 등록 바인더
   nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
 
-  // 파일 변경 핸들러 터치 리스너 조기 바인딩 보완 단락
+  // [버그 완전 박멸 패치 단락] 파일 변경(change) - 불러오기 시 배열 인덱싱 files[0] 무결성 동기화 조치
   nodes.videoInput?.addEventListener('change', async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const targetFile = files;
+    // files 배열 전체가 아닌 0번째 물리 단일 파일 객체만을 엄밀하게 추출 격리
+    const targetFile = files[0];
     if (core && typeof core.saveCache === 'function') {
       await core.saveCache('lastVideoBlob', targetFile);
     }
@@ -624,6 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       URL.revokeObjectURL(nodes.mainVideo.src);
     }
 
+    // 정상적으로 바인딩된 물리 임시 가상 Blob URL 개통 및 주입
     nodes.mainVideo.src = URL.createObjectURL(targetFile);
     nodes.mainVideo.load();
 
