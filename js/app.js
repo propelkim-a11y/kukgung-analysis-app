@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
  * - (v20.7) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [업데이트] 분석 화면 비디오 및 캔버스 선분 그래픽 레이어 병합 저장 엔진 탑재 완결본
+ * - [업데이트] 분석 화면 동영상 + 선긋기 그래픽 실시간 인라인 비디오 레코딩 엔진 탑재 완결 완벽본
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     "정심정기 (正心正己)",
     "인애덕행 (仁愛德行)",
     "성실겸손 (誠實謙遜)",
-    "자중절조 ( 自重節操)",
+    "자중절조 (自重節操)",
     "예의엄수 (禮儀嚴守)",
     "염직과감 (廉直果敢)",
     "습사무언 (習射無言)",
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('[시스템] 분석 화면 고해상도 이미지 레이어 캡쳐 완료');
   });
 
-  // [제1조 지침 핵심 고도화] 분석화면 내 선분 드로잉 + 백그라운드 동영상 + 실시간 네온 앵글 리포트 통합 무결성 저장 시스템
+  // [제1조, 제2조 지침] 캔버스 그래픽 동적 미러링을 이용한 무결성 "동영상 파일" 병합 레코딩 엔진 개통
   nodes.btnDownloadVideo?.addEventListener('click', async () => {
     const video = nodes.mainVideo;
     const drawCanvas = nodes.drawCanvas;
@@ -335,72 +335,135 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // 이미 합성이 진행 중이면 인터럽트 격리 차단
+    if (nodes.btnDownloadVideo.classList.contains('processing')) return;
+
     try {
-      // 1. 고해상도 오프스크린 픽셀 가속 병합용 가상 크리스탈 패널 생성
-      const mergedCanvas = document.createElement('canvas');
-      mergedCanvas.width = video.videoWidth || 1280;
-      mergedCanvas.height = video.videoHeight || 720;
-      const mCtx = mergedCanvas.getContext('2d');
+      nodes.btnDownloadVideo.classList.add('processing');
+      const originalText = nodes.btnDownloadVideo.textContent;
+      nodes.btnDownloadVideo.textContent = '인코딩중';
+      nodes.btnDownloadVideo.style.color = '#FF9500';
 
-      // 2. 물리 뷰포트 행렬 역산 스케일 데이터 추출
+      // 1. 백그라운드 실시간 픽셀 프레임 하드웨어 미러링 병합용 가상 가속 캔버스 구조화
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = video.videoWidth || 1280;
+      captureCanvas.height = video.videoHeight || 720;
+      const cCtx = captureCanvas.getContext('2d');
+
       const state = core?.state || { scale: 1, offsetX: 0, offsetY: 0 };
+      let animationFrameId = null;
+
+      // 2. 동영상 일시정지 후 강제 0초(또는 현재구간) 싱크로나이즈드 포지셔닝 정렬
+      video.pause();
+      if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생';
+      video.currentTime = 0; // 처음부터 재생하면서 전체 구간 물리 녹화 프로세스 시동
+
+      // 3. 30FPS 정속 미러링 루프 파이프라인 전개
+      function renderLoop() {
+        cCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+        
+        // 동영상 뷰포트 행렬 역산 주입 투사
+        cCtx.save();
+        cCtx.translate(state.offsetX, state.offsetY);
+        cCtx.scale(state.scale, state.scale);
+        cCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        cCtx.restore();
+
+        // 실시간 선분 그래픽 픽셀 합성
+        cCtx.drawImage(drawCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
+
+        // 상단 발광 고각 리포트 패널 UI 계승 복원 인쇄
+        const angleTextElem = nodes.angleReport?.querySelector('.final-angle');
+        const subTextElem = nodes.angleReport?.querySelector('.sub-info');
+        const finalAngleText = angleTextElem ? angleTextElem.textContent : "0.0°";
+        const subInfoText = subTextElem ? subTextElem.textContent : "(분석 완료)";
+
+        cCtx.save();
+        cCtx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        cCtx.shadowBlur = 12;
+        cCtx.fillStyle = 'rgba(10, 10, 14, 0.75)';
+        const pW = 260, pH = 80, pX = captureCanvas.width - pW - 30, pY = 30;
+        cCtx.beginPath();
+        cCtx.roundRect(pX, pY, pW, pH, 12);
+        cCtx.fill();
+
+        cCtx.shadowColor = 'rgba(0, 255, 102, 0.6)';
+        cCtx.shadowBlur = 8;
+        cCtx.fillStyle = '#00FF66';
+        cCtx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "SF Pro Display", tabular-nums';
+        cCtx.fillText(finalAngleText, pX + 20, pY + 40);
+
+        cCtx.shadowBlur = 0;
+        cCtx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        cCtx.font = '500 12px -apple-system, BlinkMacSystemFont, "SF Pro Text"';
+        cCtx.fillText(subInfoText, pX + 20, pY + 62);
+        cCtx.restore();
+
+        animationFrameId = requestAnimationFrame(renderLoop);
+      }
+
+      // 4. 가상 레코딩 세션 개통 및 MediaRecorder 커널 결합
+      const stream = captureCanvas.captureStream(30);
+      let recordOptions = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(recordOptions.mimeType)) {
+        recordOptions = { mimeType: 'video/webm;codecs=vp8' };
+        if (!MediaRecorder.isTypeSupported(recordOptions.mimeType)) {
+          recordOptions = { mimeType: 'video/mp4' };
+        }
+      }
+
+      const internalRecorder = new MediaRecorder(stream, recordOptions);
+      let chunks = [];
+
+      internalRecorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+      };
+
+      internalRecorder.onstop = () => {
+        cancelAnimationFrame(animationFrameId);
+        stream.getTracks().forEach(t => t.stop()); // 하드웨어 코덱 락 해제
+
+        const videoBlob = new Blob(chunks, { type: recordOptions.mimeType });
+        const finalUrl = URL.createObjectURL(videoBlob);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const extension = recordOptions.mimeType.includes('mp4') ? '.mp4' : '.webm';
+        
+        const downBtn = document.createElement('a');
+        downBtn.download = `kukgung_analyzed_video_${timestamp}${extension}`;
+        downBtn.href = finalUrl;
+        document.body.appendChild(downBtn);
+        downBtn.click();
+        document.body.removeChild(downBtn);
+
+        // UI 인터페이스 상태 원복 복구
+        nodes.btnDownloadVideo.classList.remove('processing');
+        nodes.btnDownloadVideo.textContent = originalText;
+        nodes.btnDownloadVideo.style.color = '#34C759';
+        console.log('[시스템] 선분 그래픽 인라인 병합 동영상 파일 저장 완료');
+      };
+
+      // 5. 비디오 로딩 대기 후 레코딩 파이프라인 동시 전개
+      video.onended = () => {
+        internalRecorder.stop();
+        video.onended = null;
+      };
+
+      video.addEventListener('loadeddata', () => {
+        internalRecorder.start();
+        renderLoop();
+        video.play();
+        if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '일시정지';
+      }, { once: true });
       
-      // 3. 비디오 백그라운드 프레임 투사
-      mCtx.save();
-      mCtx.translate(state.offsetX, state.offsetY);
-      mCtx.scale(state.scale, state.scale);
-      mCtx.drawImage(video, 0, 0, mergedCanvas.width, mergedCanvas.height);
-      mCtx.restore();
+      // 비디오 강제 리로드 메커니즘을 통한 세션 부트업
+      video.load();
 
-      // 4. 선분 드로잉 지오메트리 레이어 알파 블렌딩 병합
-      mCtx.drawImage(drawCanvas, 0, 0, mergedCanvas.width, mergedCanvas.height);
-
-      // 5. 우상단 프리미엄 나이티브 비주얼 네온 리포트 오버레이 인쇄 명세 구현
-      const angleTextElem = nodes.angleReport?.querySelector('.final-angle');
-      const subTextElem = nodes.angleReport?.querySelector('.sub-info');
-      const finalAngleText = angleTextElem ? angleTextElem.textContent : "0.0°";
-      const subInfoText = subTextElem ? subTextElem.textContent : "(분석 대기 중)";
-
-      mCtx.save();
-      mCtx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      mCtx.shadowBlur = 12;
-      mCtx.fillStyle = 'rgba(10, 10, 14, 0.75)';
-      
-      // 우상단 카드 패널 마감 규격 배치
-      const panelW = 260;
-      const panelH = 80;
-      const panelX = mergedCanvas.width - panelW - 30;
-      const panelY = 30;
-      
-      mCtx.beginPath();
-      mCtx.roundRect(panelX, panelY, panelW, panelH, 12);
-      mCtx.fill();
-
-      // 고정폭 폰트 가독성 시스템 적용 네온 발광 주입
-      mCtx.shadowColor = 'rgba(0, 255, 102, 0.6)';
-      mCtx.shadowBlur = 8;
-      mCtx.fillStyle = '#00FF66';
-      mCtx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "SF Pro Display", tabular-nums';
-      mCtx.fillText(finalAngleText, panelX + 20, panelY + 40);
-
-      mCtx.shadowBlur = 0;
-      mCtx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-      mCtx.font = '500 12px -apple-system, BlinkMacSystemFont, "SF Pro Text"';
-      mCtx.fillText(subInfoText, panelX + 20, panelY + 62);
-      mCtx.restore();
-
-      // 6. 무결성 완성본 물리 레이어 이미지 다운로드 처리 파이프라인 트리거
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const extBtn = document.createElement('a');
-      extBtn.download = `kukgung_merged_analysis_${timestamp}.png`;
-      extBtn.href = mergedCanvas.toDataURL('image/png');
-      document.body.appendChild(extBtn);
-      extBtn.click();
-      document.body.removeChild(extBtn);
-      console.log('[시스템] 동영상 위 드로잉 및 고각 리포트 레이어 병합 완료');
     } catch (err) {
-      console.error('[오류] 병합 레이어 저장 중 결함 발생', err);
-      alert('저장 처리 중 오류가 발생했습니다.');
+      console.error('[오류] 비디오 병합 처리 결함 발생', err);
+      nodes.btnDownloadVideo.classList.remove('processing');
+      nodes.btnDownloadVideo.textContent = '저장';
+      nodes.btnDownloadVideo.style.color = '#34C759';
+      alert('동영상 인코딩 중 오류가 발생했습니다.');
     }
   });
 
@@ -459,7 +522,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 6. 초정밀 프레임 전 후진 롱프레스 터치 제어 및 자이로 수평계 복구 핵심 바인딩
+  // 6. / 초정밀 프레임 전 후진 롱프레스 터치 제어 및 자이로 수평계 복구 핵심 바인딩
   let longPressTimer = null;
   let repeatInterval = null;
   function startFrameRepeat(direction) {
@@ -592,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function setActiveMenu(activeBtn) {
     [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnCapture, nodes.btnDownloadVideo].forEach(btn => btn?.classList.remove('active'));
-    activeBtn?.classList.add('add');
+    activeBtn?.classList.add('active');
   }
 
   nodes.btnGoRecord?.addEventListener('click', async () => {
