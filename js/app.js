@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  "습사무언 (習射無言)",
  "정심정기 (正心正己)",
  "불원승자 (不怨勝者)",
- "막완타궁 (莫玩他弓)"
+ "막만타궁 (莫彎他弓)"
  ];
  let gyehunIndex = 0;
  let gyehunTimer = null;
