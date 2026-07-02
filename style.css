@@ -1,6 +1,6 @@
 /**
  * style.css - [Part 1]
- * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.3 - 크리스탈 에어 글래스 마감 및 인트로 가속화 버전)
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.4 - 하단 Safe Area 메타 브랜딩 패치 버전)
  */
 /* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
 * {
@@ -51,7 +51,7 @@ body, html {
  flex-direction: column;
  justify-content: space-between;
  align-items: center;
- padding: calc(60px + env(safe-area-inset-top)) 32px calc(50px + env(safe-area-inset-bottom)) 32px;
+ padding: calc(60px + env(safe-area-inset-top)) 32px calc(24px + env(safe-area-inset-bottom)) 32px;
  text-align: center;
 }
 .intro-header {
@@ -74,16 +74,6 @@ body, html {
  color: #FFFFFF;
  letter-spacing: -0.5px;
  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
-}
-.intro-version {
- font-size: 12px;
- font-weight: 600;
- color: rgba(255, 255, 255, 0.35);
- font-variant-numeric: tabular-nums;
- background: rgba(255, 255, 255, 0.06);
- padding: 2px 8px;
- border-radius: 6px;
- border: 0.5px solid rgba(255, 255, 255, 0.1);
 }
 /* style.css - [Part 2] */
 .intro-center-logo {
@@ -141,6 +131,32 @@ body, html {
  box-shadow: 0 0 15px rgba(0, 255, 102, 0.3) !important;
  animation: neonPulse 2s infinite ease-in-out !important;
 }
+/* [신설] 저작권 및 버전 관리 메타 정보 에어 그룹 스타일 명세 */
+.intro-metadata-group {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 4px;
+ margin-top: 8px;
+ font-family: "SF Pro Text", -apple-system, sans-serif;
+ font-variant-numeric: tabular-nums;
+ letter-spacing: -0.3px;
+}
+.meta-copyright {
+ font-size: 11px;
+ font-weight: 500;
+ color: rgba(255, 255, 255, 0.3);
+}
+.meta-version {
+ font-size: 10px;
+ font-weight: 600;
+ color: #34C759;
+ opacity: 0.55;
+ background: rgba(52, 199, 89, 0.06);
+ padding: 1px 6px;
+ border-radius: 4px;
+ border: 0.5px solid rgba(52, 199, 89, 0.15);
+}
 @keyframes logoRotate {
  0% { transform: rotate(0deg); }
  100% { transform: rotate(360deg); }
@@ -150,7 +166,7 @@ body, html {
  50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(0, 255, 102, 0.5); opacity: 0.9; }
  100% { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 102, 0.3); opacity: 1; }
 }
-
+/* style.css - [Part 3] */
 /* 4. 상단 비디오/카메라 영역 화면 전체 100% 독점 */
 .viewport-container {
  position: absolute;
@@ -182,7 +198,6 @@ body, html {
 .background-grid-layer {
  display: none !important;
 }
-/* style.css - [Part 3] */
 /* 시인성 높은 십자 가이드라인 (촬영 화면 전용) */
 #scene-record .center-crosshair-v {
  left: 50%;
@@ -246,6 +261,7 @@ body, html {
  color: #FFFFFF;
  text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
+/* style.css - [Part 4] */
 /* 6. 비디오 화면 위에 겹쳐서 보일 각도 리포트 패널 스타일 사양 */
 #angle-report {
  position: absolute;
@@ -270,7 +286,6 @@ body, html {
  font-variant-numeric: tabular-nums;
  font-family: "SF Pro Display", -apple-system, sans-serif;
 }
-/* style.css - [Part 4] */
 /* 7. 하단 패널 영역 (크리스탈 에어 글래스 35% 마감 패치) */
 .unified-panel-box {
  position: absolute;
@@ -320,6 +335,7 @@ body, html {
  height: 44px;
  background-color: transparent;
 }
+/* style.css - [Part 5] */
 /* 8. 메뉴 바 및 버튼 공용 규격 */
 .text-menu-bar {
  display: flex;
@@ -382,7 +398,6 @@ body, html {
  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
  cursor: pointer;
 }
-/* style.css - [Part 5] */
 .video-control-bar {
  display: flex;
  justify-content: center;
