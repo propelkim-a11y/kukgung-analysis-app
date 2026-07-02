@@ -1,6 +1,6 @@
 /**
  * js/app.js
- * - (v20.4) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러 + 수평계 복구 및 인트로 세션 라이프사이클 통합본
+ * - (v20.5) 궁체 분석 시스템 프리징 방지 마스터 컨트롤러 + 수평계 복구 및 비디오/선분 복합 병합 저장 엔진 통합본
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -55,17 +55,17 @@ document.addEventListener('DOMContentLoaded', async () => {
  let isRecording = false;
  let currentRoll = 0; // 촬영 시점의 기울기 실시간 백업용 변수
 
- // [신설] 궁도구계훈 순환 롤링 데이터셋 & 타이머 핸들러 구조
+ // 궁도구계훈 순환 롤링 데이터셋 & 타이머 핸들러 구조
  const gyehunList = [
- "정심정기 (正心正己)",
  "인애덕행 (仁愛德行)",
  "성실겸손 (誠實謙遜)",
  "자중절조 (自重節操)",
  "예의엄수 (禮儀嚴守)",
  "염직과감 (廉直果敢)",
  "습사무언 (習射無言)",
+ "정심정기 (正心正己)",
  "불원승자 (不怨勝者)",
- "막만타궁 (莫彎他弓)"
+ "막완타궁 (莫玩他弓)"
  ];
  let gyehunIndex = 0;
  let gyehunTimer = null;
@@ -78,8 +78,8 @@ document.addEventListener('DOMContentLoaded', async () => {
  gyehunIndex = (gyehunIndex + 1) % gyehunList.length;
  nodes.logoCore.textContent = gyehunList[gyehunIndex];
  nodes.logoCore.style.opacity = '1';
- }, 600); // 페이드 아웃 후 자연스럽게 교체 시동
- }, 3000); // 3초 간격 순환 메커니즘
+ }, 600);
+ }, 3000);
  }
 
  function stopGyehunRotation() {
@@ -113,7 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
  }
  console.log('[시스템] 카메라 연동 및 자동 재생 성공');
- // 카메라 세션 개통 직후 수평계 센서 가동 시작 (권한 처리 최적화)
  if (window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
  await window.bowGyroSensor.start();
  }
@@ -172,7 +171,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  URL.revokeObjectURL(nodes.mainVideo.src);
  }
  nodes.mainVideo.src = url;
- // 촬영을 종료한 바로 그 시점의 보정된 최종 롤 각도를 비디오 데이터셋에 박제
  nodes.mainVideo.dataset.phoneRoll = phoneRollAtRecord;
  nodes.mainVideo.onloadedmetadata = () => {
  const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
@@ -201,7 +199,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  };
  }
 
- // 데이터베이스 개통 및 최종 세션 복구 안정 장치
  if (core && typeof core.initDB === 'function') {
  core.initDB().then(async () => {
  try {
@@ -246,7 +243,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  await core.saveCache('lastVideoBlob', videoBlob);
  await core.saveCache('lastRecordedMime', mediaRecorder.mimeType);
  }
- // 세션 상태의 오차율을 방지하기 위해 백업된 최신 currentRoll 전달
  handleRecordingFinish(videoBlob, currentRoll);
  recordedChunks = [];
  };
@@ -293,7 +289,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  setTimeout(resizeCanvasToDisplay, 100);
  });
 
- // 5. 이미지 캡쳐 레이어 병합 및 고성능 프레임 탐색 엔진
  nodes.btnCapture?.addEventListener('click', () => {
  const video = nodes.mainVideo;
  const drawCanvas = nodes.drawCanvas;
@@ -370,7 +365,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  }
  });
 
- // 6. 초정밀 프레임 전/후진 롱프레스 터치 제어 및 자이로 수평계 복구 핵심 바인딩
  let longPressTimer = null;
  let repeatInterval = null;
  function startFrameRepeat(direction) {
@@ -416,7 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  const { roll, isLevel } = e.detail;
  if (isNaN(roll)) return;
  
- currentRoll = roll; // 실시간 가변 롤값 변수 동기화
+ currentRoll = roll;
  if (core && core.state) core.state.currentRoll = roll;
  if (nodes.sceneRecord?.classList.contains('active')) {
  if (nodes.gyroHorizonLine) {
@@ -444,7 +438,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  if (window.bowAnalyzer && core) core.saveCache('lastLines', window.bowAnalyzer.lines);
  });
 
- // 기본 이벤트 내비게이션 파일 등록 바인더
  nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
  nodes.videoInput?.addEventListener('change', async (e) => {
  const files = e.target.files; if (!files || files.length === 0) return;
@@ -467,36 +460,103 @@ document.addEventListener('DOMContentLoaded', async () => {
  nodes.btnGoRecord?.addEventListener('click', async () => { nodes.mainVideo.pause(); if (nodes.btnPlayPause) nodes.btnPlayPause.textContent = '재생'; nodes.sceneAnalyze.classList.remove('active'); nodes.sceneRecord.classList.add('active'); await initCamera(); });
  nodes.btnGoAnalyze?.addEventListener('click', () => { stopCamera(); nodes.sceneRecord.classList.remove('active'); nodes.sceneAnalyze.classList.add('active'); setActiveMenu(nodes.btnMove); if (window.bowAnalyzer) window.bowAnalyzer.setMode('move'); setTimeout(resizeCanvasToDisplay, 100); });
  nodes.panelHandle?.addEventListener('click', () => { if (!core || !core.state) return; core.state.isPanelOpen = !core.state.isPanelOpen; nodes.unifiedPanel?.classList.toggle('collapsed', !core.state.isPanelOpen); });
+ // [신설/변경] 오프스크린 가속화 컨텍스트 기반 동영상+선분(가이드라인) 복합 재인코딩 저장 엔진
+ nodes.btnDownloadVideo?.addEventListener('click', async () => {
+ const video = nodes.mainVideo;
+ const canvas = nodes.drawCanvas;
+ if (!video || !video.src) {
+ alert('병합할 동영상 소스가 없습니다.');
+ return;
+ }
  
- nodes.btnDownloadVideo?.addEventListener('click', async () => { 
- try { 
- const savedBlob = await core.loadCache('lastVideoBlob'); 
- if (!savedBlob) { alert('추출할 촬영 비디오 데이터가 존재하지 않습니다.'); return; } 
- const actualMime = await core.loadCache('lastRecordedMime') || 'video/webm'; 
- const ext = actualMime.includes('mp4') ? '.mp4' : '.webm'; 
- const url = URL.createObjectURL(savedBlob); 
- const a = document.createElement('a'); 
+ const originalText = nodes.btnDownloadVideo.textContent;
+ nodes.btnDownloadVideo.textContent = "인코딩중..";
+ nodes.btnDownloadVideo.style.color = "#FF9500";
+ nodes.btnDownloadVideo.disabled = true;
+
+ try {
+ // 1. 백그라운드 프레임 병합용 하드웨어 가속 캔버스 세팅
+ const mergeCanvas = document.createElement('canvas');
+ mergeCanvas.width = video.videoWidth || 1280;
+ mergeCanvas.height = video.videoHeight || 720;
+ const mctx = mergeCanvas.getContext('2d');
+
+ // 2. 초당 30프레임 규격의 미디어 캡처 스트림 유도
+ const stream = mergeCanvas.captureStream(30);
+ let options = { mimeType: 'video/webm;codecs=vp9' };
+ if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+ options = { mimeType: 'video/webm;codecs=vp8' };
+ }
+ 
+ const mergeRecorder = new MediaRecorder(stream, options);
+ const chunks = [];
+ mergeRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+ 
+ mergeRecorder.onstop = () => {
+ const mergedBlob = new Blob(chunks, { type: options.mimeType });
+ const url = URL.createObjectURL(mergedBlob);
+ const a = document.createElement('a');
  a.href = url;
- a.download = `kukgung_video_${Date.now()}${ext}`; 
- a.click(); 
- URL.revokeObjectURL(url); 
- } catch (err) { 
- console.error(err); 
- } 
+ a.download = `kukgung_analyzed_video_${Date.now()}.webm`;
+ a.click();
+ URL.revokeObjectURL(url);
+ 
+ // UI 상태 복구 및 락 해제
+ nodes.btnDownloadVideo.textContent = originalText;
+ nodes.btnDownloadVideo.style.color = "#34C759";
+ nodes.btnDownloadVideo.disabled = false;
+ console.log("[시스템] 복합 분석 비디오 최종 인코딩 컴파일 완료");
+ };
+
+ // 3. 비디오 동기화 재생 프레임 캡처 루프 가동
+ video.pause();
+ video.currentTime = 0; // 처음부터 정속 녹화 수립
+
+ video.onseeked = function drawLoop() {
+ if (video.paused || video.ended) return;
+ 
+ // 비디오 본체 프레임 사사
+ mctx.drawImage(video, 0, 0, mergeCanvas.width, mergeCanvas.height);
+ // 사수가 작도한 투명 선분/각도 레이어 위에 정밀 1:1 오버레이 매핑
+ mctx.drawImage(canvas, 0, 0, mergeCanvas.width, mergeCanvas.height);
+ 
+ if (!video.ended) {
+ requestAnimationFrame(drawLoop);
+ }
+ };
+
+ // 비디오가 종료되면 레코더를 닫고 추출을 마감하는 이벤트 캡슐
+ video.onended = () => {
+ mergeRecorder.stop();
+ video.onended = null;
+ video.onseeked = null;
+ };
+
+ // 엔진 가동 및 레코딩 동시 트리거
+ mergeRecorder.start();
+ await video.play();
+
+ } catch (err) {
+ console.error("[인코딩 오류]", err);
+ alert("하드웨어 가속 인코딩에 실패했습니다. 기기 사양을 확인하세요.");
+ nodes.btnDownloadVideo.textContent = originalText;
+ nodes.btnDownloadVideo.style.color = "#34C759";
+ nodes.btnDownloadVideo.disabled = false;
+ }
  });
 
- // [인트로 라이프사이클 바인딩]: 최초 로드 시 하드웨어 구동을 정지하고 대기 제어
+ // 인트로 시작하기 액션 바인딩
  nodes.btnStartApp?.addEventListener('click', async () => {
- stopGyehunRotation(); // 앱 진입 시 백그라운드 오버헤드 완벽 차단
+ stopGyehunRotation();
  nodes.sceneIntro.classList.remove('active');
  nodes.sceneRecord.classList.add('active');
- // 사용자가 인트로를 통과한 물리적 시점에 안전하게 카메라 커널 시동
  await initCamera();
  resizeCanvasToDisplay();
  });
 
- // 초기 레이아웃 동기화 및 바인딩 완료
  resizeCanvasToDisplay();
  window.addEventListener('resize', resizeCanvasToDisplay);
- if (window.bowAppGesture && typeof window.bowAppGesture.init === 'function') window.bowAppGesture.init(nodes.videoViewport, nodes.mainVideo);
+ if (window.bowAppGesture && typeof window.bowAppGesture.init === 'function') {
+ window.bowAppGesture.init(nodes.videoViewport, nodes.mainVideo);
+ }
 });
