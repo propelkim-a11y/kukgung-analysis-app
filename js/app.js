@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  try {
  nodes.sceneIntro = document.getElementById('scene-intro');
  nodes.btnStartApp = document.getElementById('btn-start-app');
+ nodes.logoCore = document.querySelector('.logo-core');
  
  nodes.sceneRecord = document.getElementById('scene-record');
  nodes.sceneAnalyze = document.getElementById('scene-analyze');
@@ -53,6 +54,43 @@ document.addEventListener('DOMContentLoaded', async () => {
  let recordedChunks = [];
  let isRecording = false;
  let currentRoll = 0; // 촬영 시점의 기울기 실시간 백업용 변수
+
+ // [신설] 궁도구계훈 순환 롤링 데이터셋 & 타이머 핸들러 구조
+ const gyehunList = [
+ "인애덕행 (仁愛德行)",
+ "성실겸손 (誠實謙遜)",
+ "자중절조 (自重節操)",
+ "예의엄수 (禮儀嚴守)",
+ "염직과감 (廉直果敢)",
+ "습사무언 (習射無言)",
+ "정심정기 (正心正己)",
+ "불원승자 (不怨勝者)",
+ "막완타궁 (莫玩他弓)"
+ ];
+ let gyehunIndex = 0;
+ let gyehunTimer = null;
+
+ function startGyehunRotation() {
+ if (!nodes.logoCore) return;
+ gyehunTimer = setInterval(() => {
+ nodes.logoCore.style.opacity = '0';
+ setTimeout(() => {
+ gyehunIndex = (gyehunIndex + 1) % gyehunList.length;
+ nodes.logoCore.textContent = gyehunList[gyehunIndex];
+ nodes.logoCore.style.opacity = '1';
+ }, 600); // 페이드 아웃 후 자연스럽게 교체 시동
+ }, 3000); // 3초 간격 순환 메커니즘
+ }
+
+ function stopGyehunRotation() {
+ if (gyehunTimer) {
+ clearInterval(gyehunTimer);
+ gyehunTimer = null;
+ }
+ }
+
+ // 최초 인트로 진입 시 구계훈 롤링 엔진 즉시 시동
+ startGyehunRotation();
  // 2. 가변 해상도/FPS 대응 카메라 및 센서 초기화 함수 (플레이백 보장)
  async function initCamera() {
  if (cameraStream) stopCamera();
@@ -268,7 +306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  ctx.drawImage(drawCanvas, 0, 0, offscreen.width, offscreen.height);
  ctx.fillStyle = "white";
  ctx.font = "bold 24px Arial";
- const angleText = nodes.angleReport?.innerText.split('\n')[0] || "0.0°";
+ const angleText = nodes.angleReport?.innerText.split('\n') || "0.0°";
  ctx.fillText(`국궁 자세 분석: ${angleText}`, 20, offscreen.height - 30);
  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
  const link = document.createElement('a');
@@ -410,8 +448,8 @@ document.addEventListener('DOMContentLoaded', async () => {
  nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
  nodes.videoInput?.addEventListener('change', async (e) => {
  const files = e.target.files; if (!files || files.length === 0) return;
- if (core && typeof core.saveCache === 'function') await core.saveCache('lastVideoBlob', files[0]);
- nodes.mainVideo.src = URL.createObjectURL(files[0]);
+ if (core && typeof core.saveCache === 'function') await core.saveCache('lastVideoBlob', files);
+ nodes.mainVideo.src = URL.createObjectURL(files);
  nodes.mainVideo.load();
  nodes.mainVideo.addEventListener('loadeddata', () => {
  if (nodes.videoSlider) { nodes.videoSlider.max = nodes.mainVideo.duration; nodes.videoSlider.step = 0.0001; }
@@ -449,6 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
  // [인트로 라이프사이클 바인딩]: 최초 로드 시 하드웨어 구동을 정지하고 대기 제어
  nodes.btnStartApp?.addEventListener('click', async () => {
+ stopGyehunRotation(); // 앱 진입 시 백그라운드 오버헤드 완벽 차단
  nodes.sceneIntro.classList.remove('active');
  nodes.sceneRecord.classList.add('active');
  // 사용자가 인트로를 통과한 물리적 시점에 안전하게 카메라 커널 시동
