@@ -1,7 +1,7 @@
 /**
  * js/app.js - [Part 1]
- * - (v20.6) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [수정] 최초 인트로 진입 및 파일 열기 시 드로잉 엔진(BowAnalyzer) 조기 안착 패치 버전
+ * - (v20.7) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
+ * - [수정] 인트로 진입 즉시 1번 훈(정심정기) 선제 강제 주입 및 롤링 인덱스 정방향 정렬 완결본
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isRecording = false;
     let currentRoll = 0; // 촬영 시점의 기울기 실시간 백업용 변수
 
-    // & 신설 궁도구계훈 순환 롤링 데이터셋 타이머 핸들러 구조
+    // & 궁도구계훈 순환 롤링 데이터셋 타이머 핸들러 구조
     const gyehunList = [
         "정심정기 (正心正己)",
         "인애덕행 (仁愛德行)",
@@ -73,14 +73,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function startGyehunRotation() {
         if (!nodes.logoCore) return;
+        
+        // [초기 무결성 패치] 타이머 대기 시간 없이 즉시 1번 항목인 "정심정기"를 노출
+        gyehunIndex = 0;
+        nodes.logoCore.textContent = gyehunList[gyehunIndex];
+        nodes.logoCore.style.opacity = '1';
+        
         gyehunTimer = setInterval(() => {
-            nodes.logoCore.style.opacity = '0';
+            nodes.logoCore.style.opacity = '0'; // 애니메이션 페이드아웃 발동
             setTimeout(() => {
+                // 정확하게 0번 다음인 1번(인애덕행)부터 자연스러운 순방향 흐름 정렬
                 gyehunIndex = (gyehunIndex + 1) % gyehunList.length;
                 nodes.logoCore.textContent = gyehunList[gyehunIndex];
-                nodes.logoCore.style.opacity = '1';
-            }, 600); // 페이드 아웃 후 자연스럽게 교체 시동
-        }, 3000); // 3초 간격 순환 메커니즘
+                nodes.logoCore.style.opacity = '1'; // 다시 완전한 발광 네온 인입
+            }, 600); // .logo-core CSS transition 오차율 페이싱 싱크 보정
+        }, 3000); // 3초 정속 순환 메커니즘 사수
     }
 
     function stopGyehunRotation() {
@@ -470,7 +477,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         nodes.mainVideo.src = URL.createObjectURL(targetFile);
         nodes.mainVideo.load();
         
-        // [핵심 패치] 비디오 로드 시 캔버스 드로잉 커널을 즉시 동기화 바인딩
         if (window.bowAnalyzer && nodes.drawCanvas) {
             window.bowAnalyzer.init(nodes.drawCanvas);
         }
@@ -561,7 +567,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         nodes.sceneIntro.classList.remove('active');
         nodes.sceneRecord.classList.add('active');
         
-        // [핵심 패치] 인트로 통과 직후 드로잉 모듈 리스너를 조기에 결합 안착시킴
         if (window.bowAnalyzer && nodes.drawCanvas) {
             window.bowAnalyzer.init(nodes.drawCanvas);
         }
