@@ -1,55 +1,15 @@
-/**
- * sw.js (Service Worker) - PC/모바일 호환 완결판 (v18.0)
- */
-
-// 💡 [굳음 박멸 핵심] 캐시 네임스페이스 버전을 격상하여 모바일 디스크의 고착 데이터를 강제 청소합니다.
-const CACHE_NAME = 'bow-archery-v18-0'; 
-
-const ASSETS_TO_CACHE = [
-    'index.html',
-    'style.css',
-    'manifest.json',
-    'icon-192.png',
-    'icon-512.png',
-    'js/sensor.js',
-    'js/analyzer.js',
-    'js/app_core.js',
-    'js/app_gesture.js',
-    'js/app.js'
-];
-// 인스톨 세션: 최신 버전 에셋 강제 캐싱 파이프라인 가동
+// 서비스 워커 설치 이벤트 (최초 앱 등록)
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('[PWA] v18.0 최신 에셋 캐싱 완료.');
-            return cache.addAll(ASSETS_TO_CACHE);
-        })
-    );
-    self.skipWaiting(); 
+  // 기다리지 않고 즉시 활성화하여 PWA 자격 획득
+  self.skipWaiting();
 });
 
-// 액티베이트 세션: 굳어버린 구버전(v16, v17 등) 캐시 인프라 즉시 완전 파괴 소거
+// 서비스 워커 활성화 이벤트
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
-                        console.log('[PWA] 구버전 인프라 전면 삭제 완료:', cache);
-                        return caches.delete(cache);
-                    }
-                })
-            );
-        })
-    );
-    self.clients.claim(); 
+  event.waitUntil(self.clients.claim());
 });
 
-// 패치 세션: 정적 자원 실시간 프록싱
+// 실시간 네트워크 요청 가로채기 (오직 PWA 설치 조건 충족용 빈 패치)
 self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
-        })
-    );
+  // 필요한 경우 추후 오프라인 캐싱 로직을 여기에 작성할 수 있습니다.
 });
