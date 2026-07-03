@@ -78,86 +78,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     " ( 막만타궁 莫彎他弓)"
   ];
   let gyehunIndex = 0;
-/**
- * js/app.js - [Part 1]
- * - (v20.7 - HighRes Engine) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [ ] (File Input) 버그 패치 열기 핸들러의 파일 객체 인덱싱 무결성 완결 버전
- * - [ ] FHD/4K 해상도 확장 하드웨어 성능을 최대로 끌어올리는 이상향 트래킹 탑재
- */
-window.bowAppNodes = {};
-document.addEventListener('DOMContentLoaded', async () => {
-  const core = window.bowAppCore;
-  const gesture = window.bowAppGesture;
-  const nodes = window.bowAppNodes;
-
-  // 1. DOM 공용 핵심 인프라 노드 매핑 오류 격리막 작동
-  try {
-    nodes.sceneIntro = document.getElementById('scene-intro');
-    nodes.btnStartApp = document.getElementById('btn-start-app');
-    nodes.logoCore = document.querySelector('.logo-core');
-
-    nodes.sceneRecord = document.getElementById('scene-record');
-    nodes.sceneAnalyze = document.getElementById('scene-analyze');
-    nodes.btnGoAnalyze = document.getElementById('btn-go-analyze');
-    nodes.btnGoRecord = document.getElementById('btn-go-record');
-    nodes.cameraPreview = document.getElementById('camera-preview');
-    nodes.btnRecordToggle = document.getElementById('btn-record-toggle');
-    nodes.recordStatus = document.getElementById('record-status');
-
-    // [UI] 수평계 요소 인프라 바인딩
-    nodes.gyroHorizonLine = document.getElementById('gyro-horizon-line');
-    nodes.gyroVerticalLine = document.getElementById('gyro-vertical-line');
-    nodes.videoViewport = document.getElementById('video-viewport');
-    nodes.mainVideo = document.getElementById('main-video');
-    nodes.drawCanvas = document.getElementById('draw-canvas');
-    nodes.unifiedPanel = document.getElementById('unified-panel');
-    nodes.panelHandle = document.getElementById('panel-handle');
-    
-    // 분석 화면 내 메뉴 노드
-    nodes.btnOpen = document.getElementById('btn-open');
-    nodes.btnMove = document.getElementById('btn-move');
-    nodes.btnDraw = document.getElementById('btn-draw');
-    
-    // 💡 [지침 제1조] 분석 템플릿 입출력 신설 인프라 노드 안전 바인딩
-    nodes.btnSaveTemplate = document.getElementById('btn-save-template');
-    nodes.btnLoadTemplate = document.getElementById('btn-load-template');
-    nodes.templateInput = document.getElementById('template-input');
-
-    nodes.btnCapture = document.getElementById('btn-capture');
-    nodes.btnReset = document.getElementById('btn-reset');
-    nodes.videoInput = document.getElementById('video-input');
-    nodes.btnDownloadVideo = document.getElementById('btn-download-video');
-    nodes.videoSlider = document.getElementById('video-slider');
-    nodes.btnFramePrev = document.getElementById('btn-frame-prev');
-    nodes.btnPlayPause = document.getElementById('btn-play-pause');
-    nodes.btnFrameNext = document.getElementById('btn-frame-next');
-    nodes.angleReport = document.getElementById('angle-report');
-    console.log('[ ] DOM 시스템 핵심 인프라 노드 매핑 완료');
-  } catch (e) {
-    console.error('[ ] DOM 오류 인프라 매핑 실패', e);
-  }
-
-  let selectedFPS = 30;
-  let currentFrameTime = 1 / 30;
-  let cameraStream = null;
-  let mediaRecorder = null;
-  let recordedChunks = [];
-  let isRecording = false;
-  let currentRoll = 0; // 촬영 시점의 기울기 실시간 백업용 변수
-
-  // 궁도구계훈 순환 롤링 데이터셋 타이머 핸들러 구조
-  const gyehunList = [
-    " ( 정심정기 正心正己)",
-    " ( 인애덕행 仁愛德行)",
-    " ( 성실겸손 誠實謙遜)",
-    " ( 자중절조 自重절操)",
-    " ( 예의엄수 禮儀嚴守)",
-    " ( 염직과감 廉直果敢)",
-    " ( 습사무언 習射無言)",
-    " ( 불원승자 不怨勝者)",
-    " ( 막만타궁 莫彎他弓)"
-  ];
-  let gyehunIndex = 0;
   let gyehunTimer = null;
 
   function startGyehunRotation() {
@@ -257,7 +177,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.bowAnalyzer.render();
     }
   }
-
   // 3. 녹화 종료 후 자동 저장 및 분석 화면 프레임 레이어 바인딩 핸들러
   function handleRecordingFinish(blob, phoneRollAtRecord = 0) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -275,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       URL.revokeObjectURL(nodes.mainVideo.src);
     }
     nodes.mainVideo.src = url;
-    //  하단 기하학 트랙 좌표 밀림 방지 락온: 촬영 종료 시점 보정 롤 각도 박제
+    // 하단 기하학 트랙 좌표 밀림 방지 락온: 촬영 종료 시점 보정 롤 각도 박제
     nodes.mainVideo.dataset.phoneRoll = phoneRollAtRecord;
     nodes.mainVideo.onloadedmetadata = () => {
       const detectedFPS = nodes.mainVideo.videoFrameRate || selectedFPS;
@@ -318,7 +237,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
-
   // 4. 미디어 레코더 구동 및 비디오 라인 리셋 로직
   nodes.btnRecordToggle?.addEventListener('click', () => {
     const isMobile = !/Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -402,7 +320,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const drawCanvas = nodes.drawCanvas;
     if (!video || !drawCanvas) return;
     const offscreen = document.createElement('canvas');
-    // FHD 고해상도 이미지 보장을 위해 폴백 크기를 규격으로 상향 처리
     offscreen.width = video.videoWidth || 1920;
     offscreen.height = video.videoHeight || 1080;
     const ctx = offscreen.getContext('2d');
@@ -709,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.target.value = '';
   });
 
-  // [변경] - files[0] 변경 버그 완전 박멸 패치 단락 파일 변경 불러오기 시 배열 인덱싱 무결성 동기화 조치
+  // [변경] - files 변경 버그 완전 박멸 패치 단락 파일 변경 불러오기 시 배열 인덱싱 무결성 동기화 조치
   nodes.videoInput?.addEventListener('change', async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -764,9 +681,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // 💡 [지침 제2조 방어책] 인트로 단계 등 특정 버튼이 미배치 상태(null)여도 스크립트 에러를 내지 않도록 완벽 필터 격리막 탑재
   function setActiveMenu(activeBtn) {
-    [nodes.btnOpen, nodes.btnMove, nodes.btnDraw, nodes.btnSaveTemplate, nodes.btnLoadTemplate, nodes.btnCapture, nodes.btnReset, nodes.btnDownloadVideo].forEach(btn => btn?.classList.remove('active'));
-    activeBtn?.classList.add('active');
+    const allButtons = [
+      nodes.btnOpen, nodes.btnMove, nodes.btnDraw, 
+      nodes.btnSaveTemplate, nodes.btnLoadTemplate, 
+      nodes.btnCapture, nodes.btnReset, nodes.btnDownloadVideo
+    ];
+    
+    allButtons.forEach(btn => {
+      if (btn && btn.classList) {
+        btn.classList.remove('active');
+      }
+    });
+    
+    if (activeBtn && activeBtn.classList) {
+      activeBtn.classList.add('active');
+    }
   }
 
   nodes.btnGoRecord?.addEventListener('click', async () => {
