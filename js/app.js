@@ -1,7 +1,8 @@
 /**
  * js/app.js - [Part 1]
- * - (v20.7) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
- * - [버그 패치] 열기(File Input) 핸들러의 파일 객체 인덱싱(files[0]) 무결성 완결 버전
+ * - (v20.7 - HighRes Engine) 국궁 자세 분석 시스템 프리징 방지 마스터 컨트롤러
+ * - [버그 패치] 열기(File Input) 핸들러의 파일 객체 인덱싱 무결성 완결 버전
+ * - [해상도 확장] 하드웨어 성능을 최대로 끌어올리는 FHD/4K 이상향 트래킹 탑재
  */
 window.bowAppNodes = {};
 document.addEventListener('DOMContentLoaded', async () => {
@@ -43,9 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     nodes.btnPlayPause = document.getElementById('btn-play-pause');
     nodes.btnFrameNext = document.getElementById('btn-frame-next');
     nodes.angleReport = document.getElementById('angle-report');
-    console.log('[시스템] DOM 핵심 인프라 노드 매핑 완료');
+    console.log('[ ] DOM 시스템 핵심 인프라 노드 매핑 완료');
   } catch (e) {
-    console.error('[오류] DOM 인프라 매핑 실패', e);
+    console.error('[ ] DOM 오류 인프라 매핑 실패', e);
   }
 
   let selectedFPS = 30;
@@ -74,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function startGyehunRotation() {
     if (!nodes.logoCore) return;
 
-    // 초기 무결성 패치 타이머 대기 시간 없이 즉시 0번 항목인 정심정기를 노출
+    // 0 초기 무결성 패치 타이머 대기 시간 없이 즉시 0번 항목인 정심정기를 노출
     gyehunIndex = 0;
     nodes.logoCore.textContent = gyehunList[gyehunIndex];
     nodes.logoCore.style.opacity = '1';
@@ -82,12 +83,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     gyehunTimer = setInterval(() => {
       nodes.logoCore.style.opacity = '0'; // 애니메이션 페이드아웃 발동
       setTimeout(() => {
-        // 정확하게 0번 다음인 1번 인애덕행 부터 자연스러운 순방향 흐름 정렬
+        // 0 1 정확하게 0번 다음인 1번 인애덕행 부터 자연스러운 순방향 흐름 정렬
         gyehunIndex = (gyehunIndex + 1) % gyehunList.length;
         nodes.logoCore.textContent = gyehunList[gyehunIndex];
         nodes.logoCore.style.opacity = '1'; // 다시 완전한 발광 네온 인입
       }, 600); // .logo-core CSS transition 오차율 페이싱 싱크 보정
-    }, 3000); // 3초 정속 순환 메커니즘 사수
+    }, 3000); // 3 초 정속 순환 메커니즘 사수
   }
 
   function stopGyehunRotation() {
@@ -105,13 +106,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cameraStream) stopCamera();
     try {
       const isPC = !/Android|iPhone|iPad/i.test(navigator.userAgent);
+      
+      // 디바이스 지원 한계 해제: 하드웨어가 내어줄 수 있는 최상의 해상도(UHD 4K/FHD)를 유연하게 타겟팅
       let videoConstraints = {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 3840, min: 1280 },
+        height: { ideal: 2160, min: 720 },
         frameRate: { ideal: selectedFPS }
       };
-      if (isPC) videoConstraints = { width: 1280, height: 720 };
+      if (isPC) videoConstraints = { width: 1920, height: 1080 };
+
       cameraStream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraints,
         audio: false
@@ -121,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (nodes.recordStatus) {
         nodes.recordStatus.textContent = `${selectedFPS} FPS 카메라 연동 완료`;
       }
-      console.log('[시스템] 카메라 연동 및 자동 재생 성공');
+      console.log('[ ] 시스템 카메라 연동 및 자동 재생 성공');
       // 카메라 세션 개통 직후 수평계 센서 가동 시작 권한 처리 최적화
       if (window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
         await window.bowGyroSensor.start();
@@ -138,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initCamera();
       } else {
         if (nodes.recordStatus) nodes.recordStatus.textContent = '카메라 장치 로드 실패.';
-        console.error('[오류] 카메라 초기화 실패', err);
+        console.error('[ ] 오류 카메라 초기화 실패', err);
         alert('카메라 및 센서 권한이 필요합니다. 설정에서 허용해 주세요.');
       }
     }
@@ -176,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    console.log(`[시스템] 자동 저장 및 미디어 물리 다운로드 완료 ${fileName}`);
+    console.log(`[ ] 시스템 자동 저장 및 미디어 물리 다운로드 완료 ${fileName}`);
 
     if (nodes.mainVideo.src && nodes.mainVideo.src.startsWith('blob:')) {
       URL.revokeObjectURL(nodes.mainVideo.src);
@@ -206,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.bowAnalyzer.init(nodes.drawCanvas);
         window.bowAnalyzer.render();
       }
-      console.log('[시스템] 분석 모드 자동 전환 및 비디오 로드 완료');
+      console.log('[ ] 시스템 분석 모드 자동 전환 및 비디오 로드 완료');
       setTimeout(resizeCanvasToDisplay, 100);
     };
   }
@@ -228,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 4. 미디어 레코더 구동 및 비디오 라인 리셋 로직
   nodes.btnRecordToggle?.addEventListener('click', () => {
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    const isMobile = !/Android|iPhone|iPad/i.test(navigator.userAgent);
     if (isMobile && window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
       window.bowGyroSensor.start();
     }
@@ -266,7 +270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         nodes.btnRecordToggle.classList.add('recording');
         if (nodes.recordStatus) nodes.recordStatus.innerText = "● 녹화 중";
       } catch (e) {
-        console.error('[오류] 녹화 시동 실패', e);
+        console.error('[ ] 오류 녹화 시동 실패', e);
       }
     } else {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -300,7 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="final-angle" style="font-size:20px; font-weight:bold; color:#00FF66;">0.0°</div>
         <div class="sub-info" style="font-size:11px; opacity:0.75; margin-top:2px;">(선분 초기화 완료)</div>`;
     }
-    console.log('[시스템] 분석 선분 및 화면 트랜스폼 리셋 완료');
+    console.log('[ ] 시스템 분석 선분 및 화면 트랜스폼 리셋 완료');
     setTimeout(resizeCanvasToDisplay, 100);
   });
   // 5. 이미지 캡쳐 레이어 병합 및 고성능 프레임 탐색 엔진
@@ -309,8 +313,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const drawCanvas = nodes.drawCanvas;
     if (!video || !drawCanvas) return;
     const offscreen = document.createElement('canvas');
-    offscreen.width = video.videoWidth || 1280;
-    offscreen.height = video.videoHeight || 720;
+    // 고해상도 이미지 보장을 위해 폴백 크기를 FHD 규격으로 상향 처리
+    offscreen.width = video.videoWidth || 1920;
+    offscreen.height = video.videoHeight || 1080;
     const ctx = offscreen.getContext('2d');
     ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
     ctx.drawImage(drawCanvas, 0, 0, offscreen.width, offscreen.height);
@@ -323,10 +328,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     link.download = `kukgung_analysis_${timestamp}.png`;
     link.href = offscreen.toDataURL('image/png');
     link.click();
-    console.log('[시스템] 분석 화면 고해상도 이미지 레이어 캡쳐 완료');
+    console.log('[ ] 시스템 분석 화면 고해상도 이미지 레이어 캡쳐 완료');
   });
 
-  // [초고속 백그라운드 프레임 도약 저장 커널 명세]
+  // 초고속 백그라운드 프레임 도약 저장 커널 명세
   nodes.btnDownloadVideo?.addEventListener('click', async () => {
     const video = nodes.mainVideo;
     const drawCanvas = nodes.drawCanvas;
@@ -347,12 +352,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       video.pause();
 
       const encCanvas = document.createElement('canvas');
-      encCanvas.width = video.videoWidth || 1280;
-      encCanvas.height = video.videoHeight || 720;
+      // 고해상도 고속 인코딩을 위해 캔버스 폴백 사양을 FHD 규격으로 상향
+      encCanvas.width = video.videoWidth || 1920;
+      encCanvas.height = video.videoHeight || 1080;
       const eCtx = encCanvas.getContext('2d');
-
       const state = core?.state || { scale: 1, offsetX: 0, offsetY: 0 };
-      
+
       const fps = 30;
       const interval = 1 / fps;
       let targetTime = 0;
@@ -377,7 +382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const url = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const ext = options.mimeType.includes('mp4') ? '.mp4' : '.webm';
-        
+
         const a = document.createElement('a');
         a.download = `kukgung_fast_analysis_${timestamp}${ext}`;
         a.href = url;
@@ -393,7 +398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         nodes.btnDownloadVideo.classList.remove('processing');
         nodes.btnDownloadVideo.textContent = originalText;
         nodes.btnDownloadVideo.style.color = '#34C759';
-        console.log('[시스템] 백그라운드 고속 비디오 인코딩 처리 완료');
+        console.log('[ ] 시스템 백그라운드 고속 비디오 인코딩 처리 완료');
       };
 
       exporter.start();
@@ -456,14 +461,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       processNextFrame();
 
     } catch (err) {
-      console.error('[오류] 고속 비디오 인코딩 결함', err);
+      console.error('[ ] 오류 고속 비디오 인코딩 결함', err);
       nodes.btnDownloadVideo.classList.remove('processing');
       nodes.btnDownloadVideo.textContent = '저장';
       nodes.btnDownloadVideo.style.color = '#34C759';
       alert('초고속 인코딩 중 오류가 발생했습니다.');
     }
   });
-
   const fpsButtons = document.querySelectorAll('.fps-btn');
   const cpuCores = navigator.hardwareConcurrency || 4;
   if (cpuCores <= 4) {
@@ -533,7 +537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           nodes.mainVideo.currentTime = Math.max(0, nodes.mainVideo.currentTime - currentFrameTime);
         }
-      }, 60);
+      }, 600);
     }, 300);
   }
 
@@ -560,7 +564,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('pointerup', clearFrameRepeat);
   window.addEventListener('pointercancel', clearFrameRepeat);
-
   // 자이로 실시간 오차 업데이트 및 동적 색상 매핑 제어 메커니즘
   window.addEventListener('bowGyroUpdate', (e) => {
     const { roll, isLevel } = e.detail;
@@ -597,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 기본 이벤트 내비게이션 파일 등록 바인더
   nodes.btnOpen?.addEventListener('click', () => nodes.videoInput?.click());
 
-  // [버그 완전 박멸 패치 단락] 파일 변경(change) - 불러오기 시 배열 인덱싱 files[0] 무결성 동기화 조치
+  // [변경] - files[0] 버그 완전 박멸 패치 단락 파일 변경 불러오기 시 배열 인덱싱 무결성 동기화 조치
   nodes.videoInput?.addEventListener('change', async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -612,7 +615,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       URL.revokeObjectURL(nodes.mainVideo.src);
     }
 
-    // 정상적으로 바인딩된 물리 임시 가상 Blob URL 개통 및 주입
+    // Blob URL 정상적으로 바인딩된 물리 임시 가상 개통 및 주입
     nodes.mainVideo.src = URL.createObjectURL(targetFile);
     nodes.mainVideo.load();
 
