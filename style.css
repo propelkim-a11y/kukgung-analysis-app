@@ -502,45 +502,64 @@ body, html {
 }
 
 /* ========================================================== */
-/* [수정] 카운터 위치 최적화 및 크기 슬림 다운(축소) 패치 */
+/* [긴급패치] 분석화면 터치 락(확대 안됨) 해제 및 메뉴 정상화 보정판 */
 /* ========================================================== */
-.intro-counter-box {
+
+/* 1. 인트로 화면 내부에서만 작동하도록 범위를 철저히 제한 (분석화면 간섭 원천차단) */
+#scene-intro .intro-counter-box {
   position: absolute;
-  top: 24%; /* 타이틀과 중앙 링 사이 적절한 위치 고정 */
+  top: 24%; 
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 15, 22, 0.6); /* 배경 투명도를 높여 더 자연스럽게 융합 */
-  border: 0.5px solid rgba(0, 255, 102, 0.3); /* 테두리 굵기를 얇게 하고 투명도 주입 */
-  padding: 4px 14px; /* 여백을 대폭 줄여 크기를 슬림하게 변경 */
-  border-radius: 8px; /* 상자 모서리를 둥글지 않고 정갈하게 축소 */
+  background: rgba(15, 15, 22, 0.7); 
+  border: 0.5px solid rgba(0, 255, 102, 0.3); 
+  padding: 4px 14px; 
+  border-radius: 8px; 
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 10000 !important;
+  /* z-index 범위를 인트로 씬 내부(9999) 계층 안으로 가둡니다. */
+  z-index: 10 !important; 
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); /* 과한 네온 효과를 빼고 깔끔한 그림자로 대체 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); 
   transition: all 0.2s ease;
+  /* 터치 이벤트가 인트로 레이어 밖으로 흐르지 않게 격리 */
+  pointer-events: auto !important; 
 }
 
-.intro-counter-box:hover {
+#scene-intro .intro-counter-box:hover {
   transform: translateX(-50%) scale(1.02);
 }
 
-/* 숫자 크기 축소 및 은은한 스타일 보정 */
-#intro-visitor-count {
-  font-size: 14px !important; /* 숫자가 작고 고급스럽게 보이도록 축소 */
+/* 숫자 스타일 정밀 범위 지정 */
+#scene-intro #intro-visitor-count {
+  font-size: 14px !important; 
   font-weight: 700 !important;
   color: #00FF66 !important;
-  text-shadow: 0 0 6px rgba(0, 255, 102, 0.4) !important; /* 빛 번짐 강도 완화 */
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.4) !important; 
   letter-spacing: 0.5px;
   margin-top: 1px;
 }
 
-/* 카운터 상단 라벨 글자 크기 축소 */
-.intro-counter-box span {
-  font-size: 9px !important; /* 초미니 캡션 스타일로 변경 */
+/* 라벨 스타일 정밀 범위 지정 */
+#scene-intro .intro-counter-box span {
+  font-size: 9px !important; 
   font-weight: 600 !important;
-  color: rgba(255, 255, 255, 0.4) !important; /* 시선을 방해하지 않게 톤다운 */
+  color: rgba(255, 255, 255, 0.4) !important; 
   letter-spacing: 0.5px !important;
+}
+
+/* 2. [핵심] 분석화면 비디오 가속 레이어 및 하단 메뉴 슬라이더 터치 권한 복원 */
+#scene-analyze, 
+#scene-analyze .unified-panel-box, 
+#scene-analyze .panel-slider-handle {
+  pointer-events: auto !important;
+  touch-action: cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* 캔버스 및 비디오 확대 크롭 동작을 위한 하드웨어 가속 보존 */
+#draw-canvas, #main-video {
+  touch-action: none !important; /* 브라우저 기본 스크롤은 막고 JS 핀치줌 허용 */
+  pointer-events: auto !important;
 }
