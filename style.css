@@ -507,3 +507,24 @@ body, html {
   font-weight: 600;
   font-variant-numeric: tabular-nums; /* 카운트 변경 시 글자 덜덜거림 방지 */
 }
+/* style.css 맨 최하단에 그대로 추가하세요 */
+
+/* 인트로 레이아웃 최적화 조회수 인프라 */
+.universal-counter-container {
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  letter-spacing: -0.2px;
+  z-index: 10000 !important;  /* 인트로 글래스 패널 위로 강제 무결성 점프 */
+}
+
+#global-view-count {
+  font-size: 11px;
+  color: #0071e3;            /* 애플 스타일 포인트 블루 */
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  background: rgba(0, 113, 227, 0.08); /* 블루 틴트 투명 박스로 입체감 가속 */
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
