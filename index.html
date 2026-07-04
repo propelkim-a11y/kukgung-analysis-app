@@ -27,7 +27,7 @@
         <div class="intro-metadata-group">
           <span class="meta-copyright">
             © 2026 해현-활터왔소. All Rights Reserved.
-            <!-- 💡 저작권 표시 라인 내부에 한 줄로 안착한 실시간 카운터 노드 -->
+            <!-- 💡 저작권 라인 안의 실시간 조회수 카운터 -->
             <span id="global-view-count">Views: --</span>
           </span>
           <span class="meta-version">Ver 6.53 (Stable)</span>
@@ -36,7 +36,7 @@
     </div>
   </div>
 
-  <!-- [SCENE 2] 분석 모드 화면 레이어 -->
+  <!-- [SCENE 2] 분석 모드 화면 레이어 (🚨 유실되었던 컨트롤러 핵심 인프라 전면 복구) -->
   <div id="scene-analyze" class="app-scene">
     <div id="video-viewport" class="viewport-container">
       <video id="main-video" playsinline muted loop></video>
@@ -47,9 +47,20 @@
         <div style="color:#aaa;">분석 대기 중</div>
       </div>
     </div>
+
+    <!-- 📊 [복구] 하단 비디오 타임라인 조작 및 기능 제어 바 영역 -->
+    <div class="control-panel-bar" style="width: 100%; padding: 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(15,15,20,0.85); backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.05); z-index: 100;">
+      <div class="control-left-group" style="display: flex; gap: 12px;">
+        <button id="btn-play-toggle" style="background: transparent; border: 1px solid #00FF66; color: #00FF66; padding: 6px 16px; border-radius: 20px; font-weight: 600; cursor: pointer;">재생 / 일시정지</button>
+        <button id="btn-reset-analysis" style="background: transparent; border: 1px solid #86868b; color: #86868b; padding: 6px 16px; border-radius: 20px; cursor: pointer;">초기화</button>
+      </div>
+      <div class="control-right-group">
+        <span style="font-size: 12px; color: #86868b;">하드웨어 센서 연동 중</span>
+      </div>
+    </div>
   </div>
 
-  <!-- 메인 제어 장치 자바스크립트 바인딩 -->
+  <!-- 마스터 비즈니스 로직 제어 스크립트 엔진 바인딩 -->
   <script src="js/app.js"></script>
 </body>
 </html>
