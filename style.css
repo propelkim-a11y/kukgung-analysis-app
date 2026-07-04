@@ -486,3 +486,16 @@ body, html {
  visibility: hidden !important;
  pointer-events: none !important;
 }
+/* ==========================================================================
+   조회수 카운터 안전 주입 엔진 (index.html 수정 없이 가상 요소로 결합)
+   ========================================================================== */
+
+/* 1. 저작권 글자 오른쪽에 공백을 주고 'Views: 84' 형태로 글자를 강제 주입 */
+.meta-copyright::after {
+  content: " Views: 84";      /* 📌 노출하고 싶은 시작 조회수 숫자를 적으세요 */
+  margin-left: 8px;           /* 저작권 문구와의 좌측 간격 */
+  color: #0071e3;             /* 애플 정품 포인트 블루 색상 */
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+}
