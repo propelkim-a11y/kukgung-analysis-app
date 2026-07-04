@@ -542,24 +542,44 @@ body, html {
   margin-top: 1px;
 }
 
-/* 라벨 스타일 정밀 범위 지정 */
+/* ========================================================== */
+/* [최종패치] 분석화면 조작간섭 0% 격리 및 미니멀 카운터 레이아웃 */
+/* ========================================================== */
+
+/* 인트로 화면이 켜져있을 때만 레이아웃을 생성하여 분석화면 터치 가로채기 방지 */
+#scene-intro .intro-counter-box {
+  position: absolute;
+  top: 24%; /* 메인 타이틀 아래, 중앙 링 위쪽 빈 공간 고정 */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 15, 22, 0.6); 
+  border: 0.5px solid rgba(0, 255, 102, 0.3); 
+  padding: 4px 14px; 
+  border-radius: 8px; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10 !important; /* 인트로 내부 레이어 순위만 가볍게 정렬 */
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); 
+  pointer-events: none; /* 터치 무시 설정을 통해 기저 레이어 간섭 완전 차단 */
+}
+
+/* 콤팩트 규격 숫자 폰트 매핑 */
+#scene-intro #intro-visitor-count {
+  font-size: 14px !important; 
+  font-weight: 700 !important;
+  color: #00FF66 !important;
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.4) !important; 
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+
+/* 초미니 상단 라벨 매핑 */
 #scene-intro .intro-counter-box span {
   font-size: 9px !important; 
   font-weight: 600 !important;
   color: rgba(255, 255, 255, 0.4) !important; 
   letter-spacing: 0.5px !important;
-}
-
-/* 2. [핵심] 분석화면 비디오 가속 레이어 및 하단 메뉴 슬라이더 터치 권한 복원 */
-#scene-analyze, 
-#scene-analyze .unified-panel-box, 
-#scene-analyze .panel-slider-handle {
-  pointer-events: auto !important;
-  touch-action: cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-/* 캔버스 및 비디오 확대 크롭 동작을 위한 하드웨어 가속 보존 */
-#draw-canvas, #main-video {
-  touch-action: none !important; /* 브라우저 기본 스크롤은 막고 JS 핀치줌 허용 */
-  pointer-events: auto !important;
 }
