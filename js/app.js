@@ -745,35 +745,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.bowAppGesture.init(nodes.videoViewport, nodes.mainVideo);
   }
 });
-// ==========================================================
-// [최종 교체용] js/app.js 최하단에 배치할 독립 실행형 카운터 엔진
-// ==========================================================
-async function initSafeGlobalCounter() {
-  const counterNode = document.getElementById('intro-visitor-count');
-  // 카운터를 그릴 HTML 태그가 없다면 다른 로직을 일절 건드리지 않고 즉시 종료 (안전장치)
-  if (!counterNode) return;
-
-  const namespace = "kukgung_analysis_app_2026_fixed";
-  const key = "intro_scene_views";
-
-  // API 서버가 응답하지 않을 때 웹앱 전체가 멈추는 것을 막기 위해 0.5초(500ms) 타임아웃 설정
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 500);
-
-  try {
-    
-    // 6자리 포맷팅 및 콤마 반영 (예: 000,123)
-    counterNode.textContent = String(totalCount).padStart(6, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.warn('[Counter] 외부 서버 지연으로 로컬 폴백 모드 전환 (분석화면 정상 보호됨)');
-    
-    // 서버 오류 시 사용자에게 마비 없이 보여줄 가상 로컬 누적 카운터
-    let localFallback = parseInt(localStorage.getItem('kukgung_visit_count_fallback') || '374', 10) + 1;
-    localStorage.setItem('kukgung_visit_count_fallback', localFallback);
-    counterNode.textContent = String(localFallback).padStart(6, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  }
-}
-
-// 인트로 라이프사이클 최종 시동 (분석 로직과 격리되어 단독 실행됨)
-initSafeGlobalCounter();
