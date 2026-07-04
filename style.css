@@ -501,21 +501,38 @@ body, html {
   pointer-events: none !important;
 }
 
-/* ========================================================== // 
-   (ADD) 인트로 조회수 카운터 전용 에어 크리스탈 테마 사양 결합 
-// ========================================================== */
+/* ========================================================== */
+/* [수정] 인트로 조회수 카운터 위치 고정 및 가독성 극대화 패치 */
+/* ========================================================== */
 .intro-counter-box {
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(52, 199, 89, 0.15);
-  padding: 6px 16px;
-  border-radius: 12px;
-  display: inline-block;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  transition: transform 0.3s ease, background-color 0.3s ease;
+  position: absolute;
+  top: 40px; /* 인트로 화면 상단 중앙부 근처로 절대 배치 이동 */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 10, 14, 0.75); /* 배경을 더 어둡게 하여 글자 대비 상승 */
+  border: 1px solid #34C759; /* 테두리를 완전한 초록색으로 변경 */
+  padding: 8px 20px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10000 !important; /* 다른 어떤 요소보다 위에 오도록 락온 */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 15px rgba(52, 199, 89, 0.2); /* 은은한 네온 불빛 인입 */
+  transition: all 0.3s ease;
 }
 
 .intro-counter-box:hover {
-  transform: scale(1.02);
-  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 0 25px rgba(52, 199, 89, 0.4);
+}
+
+/* 숫자 폰트 크기 및 색상 강제 최적화 */
+#intro-visitor-count {
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #00FF66 !important; /* 더 밝은 형광 초록색으로 보정 */
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.6) !important;
+  letter-spacing: 0.5px;
 }
