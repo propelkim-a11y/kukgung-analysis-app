@@ -486,3 +486,24 @@ body, html {
  visibility: hidden !important;
  pointer-events: none !important;
 }
+/* 범용 조회수 푸터 레이아웃 스타일 */
+.universal-counter-container {
+  height: 35px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 11px;
+  color: #86868b;            /* 애플 스타일 라이트 그레이 */
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  letter-spacing: -0.2px;    /* 고정밀 가독성을 위한 자간 압축 */
+  margin-top: 10px;
+  opacity: 0.8;
+}
+
+#global-view-count {
+  margin-left: 8px;
+  color: #0071e3;            /* 애플 정품 링크 블루 (새 프로젝트 포인트 컬러) */
+  font-weight: 600;
+  font-variant-numeric: tabular-nums; /* 카운트 변경 시 글자 덜덜거림 방지 */
+}
