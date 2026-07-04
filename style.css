@@ -517,14 +517,12 @@ body, html {
   z-index: 10000 !important;  /* 인트로 글래스 패널 위로 강제 무결성 점프 */
 }
 
+/* style.css 맨 최하단 양식 업데이트 */
+
 #global-view-count {
-  font-size: 11px;
-  color: #0071e3;            /* 애플 스타일 포인트 블루 */
+  margin-left: 8px;          /* 저작권 문구와의 좌측 간격 */
+  color: #0071e3;            /* 애플 스타일 메인 포인트 블루 */
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  opacity: 0.9;
-  background: rgba(0, 113, 227, 0.08); /* 블루 틴트 투명 박스로 입체감 가속 */
-  padding: 2px 8px;
-  border-radius: 4px;
-  display: inline-block;
+  display: inline-block;     /* 한 줄 배치를 위한 인라인 블록 고정 */
 }
