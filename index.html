@@ -11,37 +11,35 @@
   <meta name="theme-color" content="#050507">
   <link rel="stylesheet" href="style.css?v=20.6">
 </head>
-
-  <!-- 국궁 분석 앱 맞춤형 푸터 카운터 컴포넌트 이식 -->
-<footer class="universal-counter-container">
-  <span>Copyright © 2026 propelkim-a11y. All Rights Reserved.</span>
-  <span id="global-view-count">Views: --</span>
-</footer>
- 
 <body>
   <!-- ========================================================== -->
   <!-- [SCENE 0] 프리미엄 인트로 레이어 화면 궁도구계훈 카루셀 탑재 완결본 -->
   <!-- ========================================================== -->
-  <div id="scene-intro" class="app-scene active">
-    <div class="intro-glass-panel">
-      <div class="intro-header">
-        <div class="intro-subtitle">ARCHERY MECHANICS ANALYZER</div>
-        <h1 class="intro-title">궁체 분석 시스템</h1>
-      </div>
-      <div class="intro-center-logo">
-        <div class="logo-neon-ring"></div>
-        <div id="intro-训-display" class="logo-core">인애덕행</div>
-      </div>
-      <div class="intro-footer-action">
-        <p class="intro-notice-text">실시간 하드웨어 자이로 역보정 엔진 대기 중</p>
-        <button id="btn-start-app" class="action-btn-main neon-pulse-target">시스템 시작하기</button>
-        <div class="intro-metadata-group">
-          <span class="meta-copyright">© 2026 해현-활터왔소. All Rights Reserved.</span>
-          <span class="meta-version">Ver 6.53 (Stable)</span>
+<div id="scene-intro" class="app-scene active">
+  <div class="intro-glass-panel">
+    <div class="intro-header">
+      <div class="intro-subtitle">ARCHERY MECHANICS ANALYZER</div>
+      <h1 class="intro-title">궁체 분석 시스템</h1>
+    </div>
+    <div class="intro-center-logo">
+      <div class="logo-neon-ring"></div>
+      <div id="intro-训-display" class="logo-core">인애덕행</div>
+    </div>
+    <div class="">
+      <p class="intro-notice-text">실시간 하드웨어 자이로 역보정 엔진 대기 중</p>
+      <button id="btn-start-app" class="action-btn-main neon-pulse-target">시스템 시작하기</button>
+      <div class="intro-metadata-group">
+        <span class="meta-copyright">© 2026 해현-활터왔소. All Rights Reserved.</span>
+        <span class="meta-version">Ver 6.53 (Stable)</span>
+        
+        <!-- 💡 메타데이터 그룹 가장 최하단 자리에 조회수 안착 -->
+        <div class="universal-counter-container" style="margin-top: 10px; width: 100%; display: flex; justify-content: center;">
+          <span id="global-view-count">Views: --</span>
         </div>
       </div>
     </div>
   </div>
+</div>
 
   <!-- ========================================================== -->
   <!-- [SCENE 1] 촬영 모드 화면 -->
