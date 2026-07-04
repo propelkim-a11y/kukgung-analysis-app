@@ -39,41 +39,54 @@ class BowGyroSensor {
         this.isActive = false;
     }
 
-    handleOrientation(event) {
-        // 💡 [PC 뻗음 원천 차단] 자이로 하드웨어가 없는 PC 환경에서 null이나 NaN이 들어오면 연산을 스킵
-        let rawRoll = event.gamma;
-        let rawPitch = event.beta;
-        if (rawRoll === null || rawPitch === null || isNaN(rawRoll) || isNaN(rawPitch)) {
-            return;
-        }
+handleOrientation(event) {
+  let rawRoll = event.gamma;   // 좌우 기울기 (-90 ~ 90)
+  let rawPitch = event.beta;   // 앞뒤 기울기 (-180 ~ 180)
+  
+  if (rawRoll === null || rawPitch === null || isNaN(rawRoll) || isNaN(rawPitch)) {
+    return;
+  }
 
-        const orientation = window.orientation || 0;
-        let calculatedRoll = rawRoll;
-        let calculatedPitch = rawPitch;
+  // 현재 화면의 스크린 회전 각도 획득 (0: 세로, 90: 가로 왼쪽 회전, -90: 가로 오른쪽 회전, 180: 역방향 세로)
+  const orientation = window.orientation || 0;
+  let calculatedRoll = rawRoll;
+  let calculatedPitch = rawPitch;
 
-        if (orientation === 90) {
-            calculatedRoll = -rawPitch;
-            calculatedPitch = rawRoll;
-        } else if (orientation === -90) {
-            calculatedRoll = rawPitch;
-            calculatedPitch = -rawRoll;
-        }
+  // 디바이스 회전 방향에 따른 센서 축 하드웨어 역보정 알고리즘
+  switch (orientation) {
+    case 90: // 가로 모드 (홈버튼이 오른쪽 / 일반적인 촬영 방향)
+      calculatedRoll = -rawPitch;
+      calculatedPitch = rawRoll;
+      break;
+    case -90: // 반대 횡방향 가로 모드 (홈버튼이 왼쪽)
+      calculatedRoll = rawPitch;
+      calculatedPitch = -rawRoll;
+      break;
+    case 180: // 역방향 세로 모드 (폰을 거꾸로 들었을 때)
+      calculatedRoll = -rawRoll;
+      calculatedPitch = -rawPitch;
+      break;
+    case 0: // 일반 세로 모드
+    default:
+      calculatedRoll = rawRoll;
+      calculatedPitch = rawPitch;
+      break;
+  }
 
-        this.data.roll = this.data.roll + this.filterAlpha * (calculatedRoll - this.data.roll);
-        this.data.pitch = this.data.pitch + this.filterAlpha * (calculatedPitch - this.data.pitch);
+  // 필터를 적용하여 센서의 미세한 떨림 저감 (Low-Pass Filter)
+  this.data.roll = this.data.roll + this.filterAlpha * (calculatedRoll - this.data.roll);
+  this.data.pitch = this.data.pitch + this.filterAlpha * (calculatedPitch - this.data.pitch);
 
-        // 연산 결과 최종 안전 검증
-        if (isNaN(this.data.roll) || isNaN(this.data.pitch)) return;
+  if (isNaN(this.data.roll) || isNaN(this.data.pitch)) return;
 
-        const sensorUpdateEvent = new CustomEvent('bowGyroUpdate', {
-            detail: {
-                roll: Number(this.data.roll.toFixed(1)),
-                pitch: Number(this.data.pitch.toFixed(1)),
-                isLevel: Math.abs(this.data.roll) < 1.0 
-            }
-        });
-        window.dispatchEvent(sensorUpdateEvent);
+  const sensorUpdateEvent = new CustomEvent('bowGyroUpdate', {
+    detail: {
+      roll: Number(this.data.roll.toFixed(1)),
+      pitch: Number(this.data.pitch.toFixed(1)),
+      isLevel: Math.abs(this.data.roll) < 1.0
     }
+  });
+  window.dispatchEvent(sensorUpdateEvent);
 }
 
 window.bowGyroSensor = new BowGyroSensor();
