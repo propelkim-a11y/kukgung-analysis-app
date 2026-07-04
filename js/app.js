@@ -723,14 +723,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     nodes.unifiedPanel?.classList.toggle('collapsed', !core.state.isPanelOpen);
   });
 
-  // 인트로 라이프사이클 바인딩 앱 실행 초기화 구동 파이프라인
-  nodes.btnStartApp?.addEventListener('click', async () => {
-    stopGyehunRotation(); // 앱 진입 시 백그라운드 오버헤드 완벽 차단
-    nodes.sceneIntro.classList.remove('active');
-    nodes.sceneRecord.classList.add('active');
-
-    if (window.bowAnalyzer && nodes.drawCanvas) {
-      window.bowAnalyzer.init(nodes.drawCanvas);
+  // 🔥 [수정] 사용자가 버튼을 클릭한 '이 시점'에 자이로 센서 권한을 먼저 요청합니다.
+  if (window.bowGyroSensor && typeof window.bowGyroSensor.start === 'function') {
+    const gyroAllowed = await window.bowGyroSensor.start();
+    if (!gyroAllowed) {
+      console.warn('[Sensor] 자이로 센서 권한이 거부되었거나 지원되지 않는 환경입니다.');
     }
 
     // 사용자가 인트로를 통과한 물리적 시점에 안전하게 카메라 커널 시동
