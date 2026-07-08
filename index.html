@@ -12,53 +12,37 @@
   <link rel="stylesheet" href="style.css?v=20.6">
 </head>
 <body>
- <!-- ========================================================== -->
-<!-- [SCENE 0] 프리미엄 인트로 레이어 화면 (국궁 탄도 시뮬레이터 스타일 모달 적용) -->
-<!-- ========================================================== -->
-<div id="scene-intro" class="app-scene active" style="background-color: #050507; display: flex; justify-content: center; align-items: center; height: 100vh;">
-  <!-- 중앙 팝업 모달 카드 -->
-  <div class="intro-modal-card" style="background: #ffffff; width: 90%; max-width: 480px; padding: 32px 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; font-family: sans-serif;">
-    
-    <!-- 상단 아이콘 및 타이틀 -->
-    <div class="modal-header" style="margin-bottom: 24px;">
-      <div style="font-size: 40px; margin-bottom: 12px;">🚀</div>
-      <h1 class="intro-title" style="color: #111111; font-size: 24px; font-weight: 700; margin: 0 0 4px 0;">국궁 자세 분석 시스템</h1>
-      <div class="intro-subtitle" style="color: #666666; font-size: 11px; letter-spacing: 1px;">ARCHERY MECHANICS ANALYZER</div>
-    </div>
+  <!-- ========================================================== -->
+  <!-- [SCENE 0] 프리미엄 인트로 레이어 화면 궁도구계훈 카루셀 탑재 완결본 -->
+  <!-- ========================================================== -->
+  <div id="scene-intro" class="app-scene active">
+    <div class="intro-glass-panel">
+      <div class="intro-header">
+        <div class="intro-subtitle">ARCHERY MECHANICS ANALYZER</div>
+        <h1 class="intro-title">궁체 분석 시스템</h1>
+      </div>
+      <div class="intro-center-logo">
+        <div class="logo-neon-ring"></div>
+        <div id="intro-训-display" class="logo-core">인애덕행</div>
+      </div>
+      <div class="intro-footer-action">
 
-    <!-- 중앙 핵심 가치 및 조회수 배지 -->
-    <div class="intro-center-logo" style="margin-bottom: 20px;">
-      <div id="intro-训-display" class="logo-core" style="font-size: 16px; color: #007AFF; font-weight: bold; margin-bottom: 12px;">집중·인애덕행</div>
-      <div style="display: flex; justify-content: center;">
-        <a href="https://github.com">
-          <img alt="Hits" src="https://hits.sh"/>
-        </a>
+            <!-- 💡 조회수 배지를 안내 문구 바로 위에 추가 -->
+        <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+            <a href="https://github.com">
+               <img alt="Hits" src="https://hits.sh/github.com/propelkim-a11y/kukgung-analysis-app.svg?style=flat-square&label=Users&extraCount=97&color=9f9f9f"/>
+            </a>
+        </div>
+        
+        <p class="intro-notice-text">실시간 하드웨어 자이로 역보정 엔진 대기 중</p>
+        <button id="btn-start-app" class="action-btn-main neon-pulse-target">시스템 시작하기</button>
+        <div class="intro-metadata-group">
+          <span class="meta-copyright">© 2026 해현-활터왔소. All Rights Reserved.</span>
+          <span class="meta-version">Ver 6.53 (Stable)</span>
+        </div>
       </div>
     </div>
-
-    <!-- 시스템 공지사항 박스 (이미지 스타일 구현) -->
-    <div class="notice-box" style="background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: left; margin-bottom: 24px; border: 1px solid #eaeaea;">
-      <h4 style="color: #ff3b30; margin: 0 0 10px 0; font-size: 14px; display: flex; align-items: center; gap: 4px;">📢 시스템 공지사항</h4>
-      <ul style="margin: 0; padding-left: 16px; color: #444444; font-size: 12px; line-height: 1.6;">
-        <li><strong>기능 추가:</strong> 자이로 역보정 엔진 및 실시간 각도 리포트가 연동되었습니다.</li>
-        <li><strong>사용 안내:</strong> 촬영 모드에서 수평을 맞춘 후 녹화를 진행하여 정밀한 궁체 변위를 테스트해 보세요.</li>
-        <li>본 프로그램은 국궁 표준 궁형 데이터를 기반으로 제작된 분석 시뮬레이터입니다.</li>
-      </ul>
-    </div>
-
-    <!-- 하단 액션 버튼 및 메타데이터 -->
-    <div class="intro-footer-action">
-      <p class="intro-notice-text" style="color: #8e8e93; font-size: 11px; margin-bottom: 12px;">실시간 하드웨어 자이로 역보정 엔진 대기 중</p>
-      <button id="btn-start-app" class="action-btn-main neon-pulse-target" style="width: 100%; background: #007AFF; color: #ffffff; border: none; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s;">시뮬레이터 시작하기</button>
-      
-      <div class="intro-metadata-group" style="margin-top: 20px; display: flex; justify-content: space-between; color: #aeaeae; font-size: 11px;">
-        <span class="meta-copyright">© 2026 해현 활터왔소</span>
-        <span class="meta-version">Ver 6.53 (Stable)</span>
-      </div>
-    </div>
-
   </div>
-</div>
 
   <!-- ========================================================== -->
   <!-- [SCENE 1] 촬영 모드 화면 -->
