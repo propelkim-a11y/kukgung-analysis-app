@@ -225,7 +225,7 @@ class BowAnalyzer {
     if (rawAngle < 0) rawAngle += 360;
     const normalizedAngle = rawAngle % 180;
 
-    const targets = [37.79, 52.21];
+    const targets = [37.79, 52.21, 127.79, 142.21];
     this.isAngleSnapped = false;
 
     for (let target of targets) {
