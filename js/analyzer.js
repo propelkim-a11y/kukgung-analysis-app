@@ -497,7 +497,7 @@ class BowAnalyzer {
 
     this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
     this.ctx.scale(this.transform.scale, this.transform.scale);
-    this.ctx.lineWidth = (1.2 * scaleX) / this.transform.scale;
+    this.ctx.lineWidth = (1.0 * scaleX) / this.transform.scale;
 
     this.lines.forEach((line, idx) => {
       const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
