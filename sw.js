@@ -3,7 +3,7 @@
  */
 
 // 💡 [굳음 박멸 핵심] 캐시 네임스페이스 버전을 격상하여 모바일 디스크의 고착 데이터를 강제 청소합니다.
-const CACHE_NAME = 'bow-archery-v18-0'; 
+const CACHE_NAME = 'bow-archery-v18-1'; 
 
 const ASSETS_TO_CACHE = [
     'index.html',
