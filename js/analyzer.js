@@ -14,7 +14,7 @@ class BowAnalyzer {
     this.currentLine = null;
     this.transform = { scale: 1, offsetX: 0, offsetY: 0 };
     this.toolMode = 'move';
-    this.snapThreshold = 18; // 손가락 터치 타겟팅 기본 반경
+    this.snapThreshold = 35; // 손가락 터치 타겟팅 기본 반경
     this.isSnapped = false;
 
     // 국궁 전통 표준 절대 고각 자석 제어용 플래그 상태 변수
@@ -258,10 +258,10 @@ class BowAnalyzer {
       const currentVertex = this.editingVertexType === 'start' ? line.start : line.end;
       const basePt = this.editingVertexType === 'start' ? line.end : line.start;
 
-      if (isPen) {
+      /*if (isPen) {
         targetX = currentVertex.x + 0.55 * (coords.x - currentVertex.x);
         targetY = currentVertex.y + 0.55 * (coords.y - currentVertex.y);
-      }
+      }*/
 
       const angleSnappedPt = this.snapToAbsoluteAngles(basePt, targetX, targetY);
       targetX = angleSnappedPt.x;
@@ -289,10 +289,10 @@ class BowAnalyzer {
       let deltaX = coords.x - this.lastCoords.x;
       let deltaY = coords.y - this.lastCoords.y;
 
-      if (isPen) {
+      /*if (isPen) {
         deltaX *= 0.55;
         deltaY *= 0.55;
-      }
+      }*/
 
       line.start.x += deltaX;
       line.start.y += deltaY;
@@ -475,7 +475,7 @@ class BowAnalyzer {
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-    this.ctx.lineWidth = (1.5 * scaleX) / this.transform.scale;
+    this.ctx.lineWidth = (0.8 * scaleX) / this.transform.scale;
     const radius = (40 * scaleX) / this.transform.scale;
     this.ctx.arc(l1.end.x, l1.end.y, radius, -a1, -a2, a1 > a2);
     this.ctx.stroke();
@@ -497,7 +497,7 @@ class BowAnalyzer {
 
     this.ctx.translate(this.transform.offsetX * scaleX, this.transform.offsetY * canvasScaleY);
     this.ctx.scale(this.transform.scale, this.transform.scale);
-    this.ctx.lineWidth = (2 * scaleX) / this.transform.scale;
+    this.ctx.lineWidth = (1.2 * scaleX) / this.transform.scale;
 
     this.lines.forEach((line, idx) => {
       const isEditing = (idx === this.editingLineIndex || idx === this.movingLineIndex);
