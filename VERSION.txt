@@ -2,7 +2,7 @@ Kukgung Analysis App
 Version: 6.56
 Release: 2026-10-14
 Summary: P0 모바일 카메라 복구·회전 대응·저전력 촬영 모드
-
+ 
 Changes:
 - 모바일/iPadOS 자이로 기기 판별 조건 수정
 - 카메라 1920x1080 → 1280x720 → 자동 해상도 순차 fallback
