@@ -1,0 +1,592 @@
+/**
+ * style.css - [Part 1]
+ * 국궁 자세 분석 시스템 - iOS Premium Black Edition (v20.6 - 동적 계훈 카루셀 가속화 패치 버전)
+ */
+/* 1. iOS 네이티브 리셋 및 바운스 스크롤 원천 차단 */
+* {
+ margin: 0;
+ padding: 0;
+ box-sizing: border-box;
+ -webkit-user-select: none;
+ user-select: none;
+ -webkit-touch-callout: none;
+ -webkit-tap-highlight-color: transparent;
+}
+body, html {
+ width: 100%;
+ height: 100%;
+ overflow: hidden;
+ background-color: #050507;
+ font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+ letter-spacing: -0.5px;
+}
+/* 2. 각 화면 간의 레이아웃 상호 간섭 원천 차단 */
+.app-scene {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: none; /* !important를 제거하여 active 클래스가 정상 작동하도록 수정 */
+}
+.app-scene.active {
+    display: block !important;
+}
+
+/* 3. 프리미엄 인트로 화면 전용 아키텍처 디자인 명세 */
+#scene-intro {
+    z-index: 9999 !important;
+    background: #0A0A0C; /* 담백한 무광 블랙 단색 배경 */
+    display: none; /* !important 제거 */
+}
+#scene-intro.active {
+    display: flex !important; /* 활성화 시 flex 레이아웃 정상 가동 */
+    justify-content: center;
+    align-items: center;
+}
+
+.intro-glass-panel {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(100px + env(safe-area-inset-top)) 32px calc(48px + env(safe-area-inset-bottom)) 32px;
+    text-align: center;
+}
+.intro-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.intro-subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.4); /* 자극적인 형광색을 버리고 차분한 그레이 화이트 적용 */
+    letter-spacing: 2px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.intro-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.5px;
+}
+
+/* 중앙 로고 - 애니메이션 및 네온 제거 */
+/* 중앙 공지사항 보드 컨테이너 */
+.intro-notice-board {
+    width: 90%;
+    max-width: 320px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 20px 16px;
+    text-align: left; /* 담백한 리스트 정렬을 위해 좌측 정렬 */
+}
+
+/* 공지사항 헤더 타이틀 */
+.notice-board-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: -0.2px;
+    margin-bottom: 14px;
+    padding-left: 4px;
+    border-left: 2px solid rgba(255, 255, 255, 0.4); /* 미니멀한 포인트 바 */
+}
+
+/* 공지사항 아이템 리스트 */
+.notice-board-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notice-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04); /* 은은한 구분선 */
+}
+
+.notice-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none; /* 마지막 아이템은 구분선 제거 */
+}
+
+/* 공지사항 태그 (업데이트, 안내 등) */
+.notice-tag {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* 공지사항 본문 텍스트 */
+.notice-text {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.45);
+    line-height: 1.4;
+    word-break: keep-all;
+}
+
+
+
+/* 하단 버튼 및 안내 문구 */
+.intro-footer-action {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+.intro-notice-text {
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.35);
+}
+.neon-pulse-target {
+    width: 85% !important;
+    max-width: 260px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06) !important; /* 반투명 레이어 처리 */
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #FFFFFF !important;
+    border-radius: 12px !important; /* 둥근 캡슐 모양 대신 모던한 라운드 사각형 */
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.3px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: none !important;
+    animation: none !important; /* 깜빡이는 펄스 애니메이션 소거 */
+    transition: background 0.2s ease, transform 0.1s ease;
+}
+/* 버튼을 누를 때만 자연스러운 반응 */
+.neon-pulse-target:active {
+    background: rgba(255, 255, 255, 0.12) !important;
+    transform: scale(0.98);
+}
+
+.intro-title {
+ font-size: 28px;
+ font-weight: 800;
+ color: #FFFFFF;
+ letter-spacing: -0.5px;
+ text-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+}
+/* style.css - [Part 2] */
+.intro-center-logo {
+    display: none !important;
+}
+.intro-footer-action {
+ width: 100%;
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 20px;
+}
+.intro-notice-text {
+ font-size: 13px;
+ font-weight: 500;
+ color: rgba(255, 255, 255, 0.5);
+ text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+.version-update-notice {
+ font-size: 12px;
+ font-weight: 700;
+ color: #00FF66;
+ background: rgba(0, 255, 102, 0.08);
+ border: 1px solid rgba(0, 255, 102, 0.24);
+ border-radius: 999px;
+ padding: 7px 12px;
+ letter-spacing: -0.2px;
+}
+.neon-pulse-target {
+ width: 85% !important;
+ max-width: 280px;
+ height: 48px;
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ background: rgba(0, 255, 102, 0.1) !important;
+ border: 1.5px solid #00FF66 !important;
+ color: #00FF66 !important;
+ border-radius: 24px !important;
+ font-size: 15px !important;
+ font-weight: 700 !important;
+ box-shadow: 0 0 15px rgba(0, 255, 102, 0.3) !important;
+ animation: neonPulse 2s infinite ease-in-out !important;
+}
+.intro-metadata-group {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 4px;
+ margin-top: 8px;
+ font-family: "SF Pro Text", -apple-system, sans-serif;
+ font-variant-numeric: tabular-nums;
+ letter-spacing: -0.3px;
+}
+.meta-copyright {
+ font-size: 11px;
+ font-weight: 500;
+ color: rgba(255, 255, 255, 0.3);
+}
+.meta-version {
+ font-size: 10px;
+ font-weight: 600;
+ color: #34C759;
+ opacity: 0.55;
+ background: rgba(52, 199, 89, 0.06);
+ padding: 1px 6px;
+ border-radius: 4px;
+ border: 0.5px solid rgba(52, 199, 89, 0.15);
+}
+/* 기존 하단부에 있던 회전 애니메이션 제거 */
+@keyframes logoRotate {
+    /* 이 구역의 코드를 완전히 삭제하거나 비워두세요 */
+}
+
+/* style.css - [Part 3] */
+/* 4. 상단 비디오/카메라 영역 화면 전체 100% 독점 */
+.viewport-container {
+ position: absolute;
+ top: 0;
+ left: 0;
+ width: 100vw;
+ height: 100vh;
+ height: 100dvh;
+ overflow: hidden;
+ background-color: #050507;
+ z-index: 1;
+}
+#camera-preview, #main-video, #draw-canvas {
+ position: absolute;
+ top: 0;
+ left: 0;
+ width: 100%;
+ height: 100%;
+ object-fit: cover !important;
+ transform-origin: top left !important;
+}
+#camera-preview, #main-video {
+ z-index: 2;
+ pointer-events: none !important;
+}
+#draw-canvas {
+ z-index: 5 !important;
+ pointer-events: auto !important;
+}
+.background-grid-layer {
+ display: none !important;
+}
+/* 시인성 높은 십자 가이드라인 (촬영 화면 전용) */
+#scene-record .center-crosshair-v {
+ left: 50%;
+ top: 0;
+ width: 1px;
+ height: 100%;
+ border-left: 1px dashed rgba(255, 255, 255, 0.2);
+ position: absolute;
+ pointer-events: none;
+ z-index: 5;
+}
+#scene-record .center-crosshair-h {
+ top: 50%;
+ left: 0;
+ height: 1px;
+ width: 100%;
+ border-top: 1px dashed rgba(255, 255, 255, 0.2);
+ position: absolute;
+ pointer-events: none;
+ z-index: 5;
+}
+/* 5. 초정밀 실물 수평계 자이로 UI 및 실시간 각도 숫자 매핑 */
+#gyro-horizon-line {
+ position: absolute;
+ top: 50%;
+ left: 50%;
+ width: 90%;
+ height: 1px;
+ background-color: rgba(255, 59, 48, 0.8);
+ transform-origin: center;
+ z-index: 6;
+ pointer-events: none;
+ transition: background-color 0.1s, height 0.1s, box-shadow 0.1s;
+}
+#gyro-vertical-line {
+ position: absolute;
+ top: 5%;
+ left: 50%;
+ width: 1px;
+ height: 90%;
+ background-color: rgba(255, 59, 48, 0.8);
+ transform-origin: center;
+ z-index: 6;
+ pointer-events: none;
+ transition: background-color 0.1s, width 0.1s, box-shadow 0.1s;
+}
+#gyro-horizon-line.perfect-level, #gyro-vertical-line.perfect-level {
+ background-color: #34C759;
+ box-shadow: 0 0 14px rgba(52, 199, 89, 0.8);
+}
+#gyro-horizon-line.perfect-level { height: 2px; }
+#gyro-vertical-line.perfect-level { width: 2px; }
+#gyro-horizon-line::after {
+ content: attr(data-angle);
+ position: absolute;
+ top: -24px;
+ left: 50%;
+ transform: translateX(-50%);
+ font-size: 14px;
+ font-weight: 700;
+ color: #FFFFFF;
+ text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+}
+/* style.css - [Part 4] */
+/* 6. 비디오 화면 위에 겹쳐서 보일 각도 리포트 패널 스타일 사양 */
+#angle-report {
+ position: absolute;
+ top: 20px;
+ left: 20px;
+ background: rgba(0, 0, 0, 0.6) !important;
+ color: #00ff00 !important;
+ padding: 15px;
+ border-radius: 8px;
+ z-index: 100;
+ pointer-events: none;
+}
+.floating-report {
+ position: absolute;
+ top: calc(24px + env(safe-area-inset-top));
+ right: 24px;
+ font-size: 20px;
+ font-weight: 700;
+ color: #34C759;
+ text-shadow: 0px 4px 12px rgba(0, 0, 0, 0.9);
+ z-index: 10;
+ font-variant-numeric: tabular-nums;
+ font-family: "SF Pro Display", -apple-system, sans-serif;
+}
+/* 7. 하단 패널 영역 (크리스탈 에어 글래스 35% 마감 패치) */
+.unified-panel-box {
+ position: absolute;
+ bottom: 0;
+ left: 0;
+ width: 100%;
+ height: 33.333vh;
+ height: min(42dvh, 390px);
+ z-index: 20;
+ padding-bottom: env(safe-area-inset-bottom);
+ background: rgba(10, 10, 14, 0.35) !important; 
+ backdrop-filter: blur(25px) !important;
+ -webkit-backdrop-filter: blur(25px) !important;
+ border-top: 0.5px solid rgba(255, 255, 255, 0.2) !important;
+ border-radius: 30px 30px 0 0 !important;
+}
+#scene-analyze .unified-panel-box {
+ transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#scene-analyze .unified-panel-box.collapsed {
+ transform: translateY(calc(100% - 34px));
+}
+.panel-slider-handle, .panel-slider-handle-placeholder {
+ width: 100%;
+ height: 34px;
+}
+.panel-slider-handle {
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ cursor: pointer;
+}
+.handle-bar {
+ width: 38px;
+ height: 5px;
+ background-color: rgba(255, 255, 255, 0.4);
+ border-radius: 3px;
+}
+.panel-content-wrapper {
+ height: calc(100% - 34px);
+ display: flex;
+ flex-direction: column;
+ justify-content: space-between;
+ padding: 8px 24px 16px 24px;
+}
+.apple-layout-sync-spacer {
+ width: 100%;
+ height: 44px;
+ background-color: transparent;
+}
+/* style.css - [Part 5] */
+/* 8. 메뉴 바 및 버튼 공용 규격 */
+.text-menu-bar {
+ display: flex;
+ width: 100%;
+ height: 44px;
+ padding: 3px;
+ background-color: rgba(255, 255, 255, 0.12);
+ border-radius: 13px;
+ gap: 4px;
+ align-items: center;
+}
+.menu-btn, .fps-btn {
+ flex: 1;
+ height: 38px;
+ background: transparent;
+ border: none;
+ color: rgba(255, 255, 255, 0.6);
+ font-size: 14px;
+ font-weight: 600;
+ border-radius: 10px;
+ cursor: pointer;
+ text-align: center;
+ transition: all 0.2s ease;
+ display: inline-flex;
+ justify-content: center;
+ align-items: center;
+}
+.menu-group {
+ display: inline-flex;
+ flex: 2;
+ gap: 4px;
+ height: 38px;
+}
+.menu-btn.active, .fps-btn.active {
+ background: rgba(255, 255, 255, 0.2);
+ color: #34C759;
+ font-weight: 700;
+}
+/* 9. 타임라인 및 제어 링크 스타일 */
+.timeline-container {
+ width: 100%;
+ padding: 0 4px;
+}
+#video-slider {
+ width: 100%;
+ height: 4px;
+ -webkit-appearance: none;
+ appearance: none;
+ background: rgba(255, 255, 255, 0.25);
+ border-radius: 2px;
+ outline: none;
+}
+#video-slider::-webkit-slider-thumb {
+ -webkit-appearance: none;
+ appearance: none;
+ width: 14px;
+ height: 14px;
+ border-radius: 50%;
+ background: #FFFFFF;
+ box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+ cursor: pointer;
+}
+.video-control-bar {
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ gap: 48px;
+}
+.control-btn {
+ background: none;
+ border: none;
+ color: rgba(255, 255, 255, 0.9);
+ font-size: 14px;
+ font-weight: 600;
+ cursor: pointer;
+ padding: 8px 16px;
+}
+.control-btn:active {
+ color: #34C759;
+}
+.status-text {
+ color: #FFFFFF;
+ font-size: 13px;
+ text-align: center;
+ font-weight: 600;
+ text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.camera-reconnect-btn {
+ align-self: center;
+ min-height: 36px;
+ padding: 8px 16px;
+ border: 1px solid rgba(255, 149, 0, 0.65);
+ border-radius: 10px;
+ background: rgba(255, 149, 0, 0.12);
+ color: #FFB340;
+ font-size: 13px;
+ font-weight: 700;
+}
+.camera-reconnect-btn:active { transform: scale(0.98); }
+@media (orientation: landscape) and (max-height: 520px) {
+ .unified-panel-box { height: min(58dvh, 300px); }
+ .panel-content-wrapper { padding: 5px 16px 10px; }
+ .control-row-center { transform: scale(0.9); }
+}
+.control-row-center {
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ width: 100%;
+}
+.action-btn-main {
+ background: rgba(0, 0, 0, 0.5); 
+ border: 3px solid #FFFFFF;
+ color: #FFFFFF;
+ font-size: 15px;
+ font-weight: 700;
+ padding: 10px 28px;
+ border-radius: 22px;
+ cursor: pointer;
+ box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+ transition: all 0.2s ease;
+}
+#btn-record-toggle.recording {
+ background-color: #ff4444 !important;
+ border-color: #ff4444 !important;
+ color: #FFFFFF !important;
+ box-shadow: 0 0 20px rgba(255, 68, 68, 0.5) !important;
+ animation: pulse 1.5s infinite !important;
+}
+.action-btn-main.recording {
+ background: #FF3B30;
+ border-color: #FF3B30;
+ color: #FFFFFF;
+ box-shadow: 0 0 20px rgba(255, 59, 48, 0.5);
+ animation: pulse 1.5s infinite;
+}
+.switch-btn {
+ width: 100%;
+ height: 40px;
+ background: rgba(0, 0, 0, 0.3);
+ border: 0.5px solid rgba(255, 255, 255, 0.2);
+ border-radius: 12px;
+ color: #FFFFFF;
+ font-size: 13px;
+ font-weight: 600;
+ cursor: pointer;
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+@keyframes pulse {
+ 0% { transform: scale(1); opacity: 1; }
+ 50% { transform: scale(1.05); opacity: 0.9; }
+ 100% { transform: scale(1); opacity: 1; }
+}
+.text-menu-bar-sync, #btn-record-move-sync {
+ display: none !important;
+ visibility: hidden !important;
+ pointer-events: none !important;
+}
