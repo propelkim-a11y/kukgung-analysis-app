@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>활터 왔소 · 궁체 분석</title>
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#050507">
+  <link rel="stylesheet" href="style.css?v=6.64">
+</head>
+<body>
+  <div id="offline-status" class="offline-status" role="status" aria-live="polite" hidden>오프라인 모드 · 기기에 저장된 기능을 사용할 수 있습니다</div>
+  <!-- ========================================================== -->
+  <!-- [SCENE 0] 프리미엄 인트로 레이어 화면 궁도구계훈 카루셀 탑재 완결본 -->
+  <!-- ========================================================== -->
+  <div id="scene-intro" class="app-scene active">
+    <div class="intro-glass-panel">
+      <!-- 중앙 로고를 삭제하고 담백한 공지사항 보드로 대체 -->
+    <div class="intro-header">
+    <div class="intro-subtitle">ARCHERY MECHANICS ANALYZER</div>
+    <h1 class="intro-title">활터 왔소</h1>
+</div>
+      
+    <div class="intro-notice-board">
+    <div class="notice-board-header">공지사항</div>
+    <div class="notice-board-body">
+      <div class="notice-item">
+        <span class="notice-tag">업데이트</span>
+        <span class="notice-text">궁체분석 재설치 안정화 (v6.64)</span>
+      </div>
+      <div class="notice-item">
+        <span class="notice-tag">안내</span>
+        <span class="notice-text">촬영 모드 진입 시 카메라 권한 허용이 필요합니다.</span>
+      </div>
+      <div class="notice-item">
+        <span class="notice-tag">팁</span>
+        <span class="notice-text">각도 리포트 템플릿은 .json 파일로 저장 및 로드 가능합니다.</span>
+      </div>
+   </div>
+  </div>
+      
+
+      <div class="intro-footer-action">
+
+            <!-- 💡 조회수 배지를 안내 문구 바로 위에 추가 -->
+        <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+            <a href="https://github.com">
+               <img alt="Hits" src="https://hits.sh/github.com/propelkim-a11y/kukgung-analysis-app.svg?style=flat-square&label=Users&extraCount=97&color=9f9f9f"/>
+            </a>
+        </div>
+        
+        <p class="intro-notice-text">실시간 하드웨어 자이로 역보정 엔진 대기 중</p>
+        <div id="version-update-notice" class="version-update-notice" role="status" aria-live="polite" hidden></div>
+        <button id="btn-start-app" class="action-btn-main neon-pulse-target">시스템 시작하기</button>
+        <button id="btn-open-sessions" class="session-link" type="button">최근 세션</button>
+        <section id="session-list-panel" class="session-list-panel" hidden aria-label="최근 세션">
+          <div class="session-list-header"><strong>최근 세션</strong><button id="btn-close-sessions" type="button">닫기</button></div>
+          <div id="session-list" class="session-list"></div>
+        </section>
+        <div class="intro-metadata-group">
+          <span class="meta-copyright">© 2026 해현-활터왔소. All Rights Reserved.</span>
+          <span id="app-version" class="meta-version">Ver 6.64 (Stable)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- [SCENE 1] 촬영 모드 화면 -->
+  <!-- ========================================================== -->
+  <div id="scene-record" class="app-scene">
+    <div class="viewport-container">
+      <div id="gyro-horizon-line" data-angle="0.0°"></div>
+      <div id="gyro-vertical-line"></div>
+      <div class="center-crosshair-v"></div>
+      <div class="center-crosshair-h"></div>
+      <video id="camera-preview" autoplay playsinline muted></video>
+    </div>
+    <div id="record-panel" class="unified-panel-box">
+      <button id="btn-toggle-record-panel" class="record-panel-toggle" type="button" aria-expanded="true" aria-label="촬영 패널 접기">
+        <span class="handle-bar"></span><span class="record-panel-toggle-label">패널 접기</span>
+      </button>
+      <div class="panel-content-wrapper">
+        <nav class="text-menu-bar">
+          <button class="fps-btn active" data-fps="30">30</button>
+          <button class="fps-btn" data-fps="60">60</button>
+          <button id="btn-low-power" class="fps-btn" type="button" aria-pressed="false">저전력</button>
+          <button id="btn-camera-facing" class="fps-btn" type="button" aria-label="카메라 방향">후면</button>
+        </nav>
+        <div id="record-status" class="status-text">카메라 ... 초기화 세션 가동 중</div>
+        <button id="btn-reconnect-camera" class="camera-reconnect-btn" type="button" hidden>카메라 다시 연결</button>
+        <div class="control-row-center">
+          <button id="btn-record-toggle" class="action-btn-main">녹화시작</button>
+        </div>
+        <nav class="scene-switch-bar">
+          <button id="btn-go-analyze" class="switch-btn">분석 화면으로 이동</button>
+        </nav>
+      </div>
+    </div>
+  </div>
+  <!-- ========================================================== -->
+  <!-- [SCENE 2] 분석 모드 화면 -->
+  <!-- ========================================================== -->
+  <div id="scene-analyze" class="app-scene">
+    <div id="video-viewport" class="viewport-container">
+      <video id="main-video" playsinline muted loop></video>
+      <canvas id="draw-canvas"></canvas>
+
+      <!-- 비디오 화면 위에 겹쳐서 실시간 데이터를 노출할 각도 리포트 영역 -->
+      <div id="angle-report" class="angle-overlay">
+        <div style="color:#aaa;">분석 대기 중</div>
+      </div>
+    </div>
+    <div id="unified-panel" class="unified-panel-box">
+      <div id="panel-handle" class="panel-slider-handle">
+        <div class="handle-bar"></div>
+      </div>
+      <div class="panel-content-wrapper">
+        <nav class="text-menu-bar">
+          <button id="btn-open" class="menu-btn">열기</button>
+          <button id="btn-move" class="menu-btn">확대</button>
+          <button id="btn-draw" class="menu-btn">선긋기</button>
+          <button id="btn-undo" class="menu-btn" disabled>실행 취소</button>
+          <button id="btn-more-tools" class="menu-btn more-tools-toggle" aria-expanded="false">더보기</button>
+
+          <div id="analysis-secondary-tools" class="analysis-secondary-tools" hidden>
+            <button id="btn-save-template" class="menu-btn" style="color: #FF9500; font-weight: 700;">T저장</button>
+            <button id="btn-load-template" class="menu-btn" style="color: #007AFF; font-weight: 700;">T열기</button>
+            <button id="btn-capture" class="menu-btn">캡쳐</button>
+            <button id="btn-reset" class="menu-btn">초기화</button>
+            <button id="btn-download-video" class="menu-btn" style="color:#34C759;">영상 저장</button>
+          </div>
+        </nav>
+        <div id="export-progress-panel" class="export-progress-panel" hidden role="status" aria-live="polite">
+          <div class="export-progress-label"><span>분석 영상 저장 중</span><span id="export-progress-value">0%</span></div>
+          <progress id="export-progress" max="100" value="0"></progress>
+          <button id="btn-cancel-export" type="button">저장 취소</button>
+        </div>
+        <div class="timeline-container">
+          <input type="range" id="video-slider" min="0" max="100" value="0" step="0.0001">
+        </div>
+        <div class="video-control-bar">
+          <button id="btn-frame-prev" class="control-btn">뒤로</button>
+          <button id="btn-play-pause" class="control-btn">재생</button>
+          <button id="btn-frame-next" class="control-btn">앞으로</button>
+        </div>
+        <nav class="scene-switch-bar">
+          <button id="btn-go-record" class="switch-btn">촬영 화면으로 이동</button>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 비가시성 하드웨어 입출력 파일 트리거 레이어 명세 -->
+  <input type="file" id="template-input" accept=".json" style="display: none;">
+  <input type="file" id="video-input" accept="video/*" style="display: none;">
+
+  <!-- ========================================================== -->
+  <!-- 스크립트 인프라 로드 아키텍처 정렬 안전 순차 컴파일 -->
+  <!-- ========================================================== -->
+  <!-- 1. 핵심 로직 및 센서 모듈 -->
+  <script src="js/app_core.js?v=6.64"></script>
+  <script src="js/sensor.js?v=6.64"></script>
+  <script src="js/analyzer.js?v=6.64"></script>
+  <script src="js/app_gesture.js?v=6.64"></script>
+  <!-- 2. 마스터 컨트롤러 교착 프리징 박멸 -->
+  <script src="js/app.js?v=6.64"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const repoPath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
+        navigator.serviceWorker.register('sw.js?v=6.64', { scope: repoPath })
+          .then(reg => console.log('[PWA] 서비스 워커 무결성 가동', reg.scope))
+          .catch(err => console.error('[PWA] 서비스 워커 샌드박스 진입 실패', err));
+      });
+    }
+  </script>
+</body>
+</html>
